@@ -1,0 +1,44 @@
+name: Build IPA
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установить XcodeGen
+        run: brew install xcodegen
+
+      - name: Сгенерировать проект Xcode
+        run: xcodegen generate
+
+      - name: Версия Xcode
+        run: xcodebuild -version
+
+      - name: Собрать без подписи
+        run: |
+          xcodebuild \
+            -project Prosnis.xcodeproj \
+            -scheme Prosnis \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Упаковать в .ipa
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Prosnis.app Payload/
+          zip -qr Prosnis.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Prosnis-ipa
+          path: Prosnis.ipa

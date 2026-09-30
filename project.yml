@@ -1,0 +1,27 @@
+name: Prosnis
+options:
+  bundleIdPrefix: app.prosnis
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+targets:
+  Prosnis:
+    type: application
+    platform: iOS
+    sources:
+      - Prosnis
+    info:
+      path: Prosnis/Info.plist
+      properties:
+        CFBundleDisplayName: Проснись
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSAlarmKitUsageDescription: Приложению нужно разрешение, чтобы будильник звонил вовремя, даже когда телефон заблокирован или в режиме «Не беспокоить».
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.prosnis.alarm
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
