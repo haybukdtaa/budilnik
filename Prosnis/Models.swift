@@ -1,0 +1,52 @@
+import Foundation
+
+/// Фон будильника: готовый градиент или своё фото.
+enum Wallpaper: Codable, Equatable {
+    case gradient(Int)
+    case photo(String) // имя файла в Documents/Wallpapers
+}
+
+struct AlarmItem: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var hour = 7
+    var minute = 0
+    /// 1 = понедельник ... 7 = воскресенье. Пусто = сработает один раз.
+    var weekdays: Set<Int> = []
+    var label = ""
+    var isEnabled = true
+    var soundID = "classic_beep"
+    var wallpaper: Wallpaper = .gradient(0)
+    /// Ставка пока работает как тренировка: деньги не списываются.
+    var stakeEnabled = false
+    var stakeAmount = 500
+}
+
+enum Weekdays {
+    static let short = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+
+    static func locale(_ number: Int) -> Locale.Weekday {
+        switch number {
+        case 1: return .monday
+        case 2: return .tuesday
+        case 3: return .wednesday
+        case 4: return .thursday
+        case 5: return .friday
+        case 6: return .saturday
+        default: return .sunday
+        }
+    }
+}
+
+extension AlarmItem {
+    var timeText: String { String(format: "%02d:%02d", hour, minute) }
+
+    var repeatText: String {
+        if weekdays.isEmpty { return "Один раз" }
+        if weekdays.count == 7 { return "Каждый день" }
+        if weekdays == [1, 2, 3, 4, 5] { return "По будням" }
+        if weekdays == [6, 7] { return "По выходным" }
+        return weekdays.sorted().map { Weekdays.short[$0 - 1] }.joined(separator: " ")
+    }
+
+    var displayTitle: String { label.isEmpty ? "Будильник" : label }
+}

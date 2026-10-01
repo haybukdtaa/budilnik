@@ -8,9 +8,7 @@ struct ProsnisAlarmData: AlarmMetadata {}
 
 /// Обёртка над системным будильником AlarmKit (iOS 26+).
 @MainActor
-final class AlarmService: ObservableObject {
-    @Published var status: String = "Готов к проверке"
-
+final class AlarmService {
     private let manager = AlarmManager.shared
 
     private func ensureAuthorization() async -> Bool {
@@ -30,52 +28,70 @@ final class AlarmService: ObservableObject {
         }
     }
 
-    /// Ставит тестовый будильник через `seconds` секунд.
-    func scheduleTest(after seconds: TimeInterval) async {
-        guard await ensureAuthorization() else {
-            status = "Нет разрешения на будильники. Включите его в Настройках iPhone."
-            return
-        }
-
+    private func attributes(title: String) -> AlarmAttributes<ProsnisAlarmData> {
         let stopButton = AlarmButton(
             text: "Выключить",
             textColor: .white,
             systemImageName: "stop.circle"
         )
-        let alert = AlarmPresentation.Alert(title: "Просыпайтесь", stopButton: stopButton)
-        let attributes = AlarmAttributes<ProsnisAlarmData>(
+        let alert = AlarmPresentation.Alert(title: LocalizedStringResource(stringLiteral: title), stopButton: stopButton)
+        return AlarmAttributes<ProsnisAlarmData>(
             presentation: AlarmPresentation(alert: alert),
             metadata: ProsnisAlarmData(),
             tintColor: .orange
         )
+    }
 
+    /// Ставит (или переставляет) системный будильник. Возвращает текст ошибки или nil.
+    func sync(_ item: AlarmItem) async -> String? {
+        try? manager.cancel(id: item.id)
+        guard item.isEnabled else { return nil }
+        guard await ensureAuthorization() else {
+            return "Нет разрешения на будильники. Включите его в Настройках iPhone."
+        }
+
+        let time = Alarm.Schedule.Relative.Time(hour: item.hour, minute: item.minute)
+        let recurrence: Alarm.Schedule.Relative.Recurrence = item.weekdays.isEmpty
+            ? .never
+            : .weekly(item.weekdays.sorted().map(Weekdays.locale))
+        let schedule = Alarm.Schedule.relative(.init(time: time, repeats: recurrence))
+
+        let configuration = AlarmManager.AlarmConfiguration.alarm(
+            schedule: schedule,
+            attributes: attributes(title: item.displayTitle),
+            sound: .named(SoundLibrary.option(item.soundID).fileName)
+        )
+
+        do {
+            _ = try await manager.schedule(id: item.id, configuration: configuration)
+            return nil
+        } catch {
+            return "Не удалось поставить будильник: \(error.localizedDescription)"
+        }
+    }
+
+    func cancel(id: UUID) {
+        try? manager.cancel(id: id)
+    }
+
+    /// Тестовый будильник через `seconds` секунд, чтобы проверить звонок.
+    func scheduleTest(after seconds: TimeInterval) async -> String {
+        guard await ensureAuthorization() else {
+            return "Нет разрешения на будильники. Включите его в Настройках iPhone."
+        }
         let fireDate = Date().addingTimeInterval(seconds)
         let configuration = AlarmManager.AlarmConfiguration.alarm(
             schedule: .fixed(fireDate),
-            attributes: attributes,
+            attributes: attributes(title: "Проверка"),
             sound: .default
         )
-
         do {
             _ = try await manager.schedule(id: UUID(), configuration: configuration)
             let formatter = DateFormatter()
             formatter.timeStyle = .medium
-            status = "Будильник сработает в \(formatter.string(from: fireDate)). Заблокируйте телефон и ждите."
+            return "Проверочный звонок в \(formatter.string(from: fireDate)). Заблокируйте телефон и ждите."
         } catch {
-            status = "Не удалось поставить будильник: \(error.localizedDescription)"
-        }
-    }
-
-    /// Отменяет все будильники этого приложения.
-    func cancelAll() {
-        do {
-            let alarms = try manager.alarms
-            for alarm in alarms {
-                try manager.cancel(id: alarm.id)
-            }
-            status = "Отменено будильников: \(alarms.count)"
-        } catch {
-            status = "Не удалось отменить: \(error.localizedDescription)"
+            return "Не удалось поставить проверку: \(error.localizedDescription)"
         }
     }
 }

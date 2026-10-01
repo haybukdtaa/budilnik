@@ -2,10 +2,14 @@ import SwiftUI
 
 @main
 struct ProsnisApp: App {
+    @StateObject private var store = AlarmStore()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AlarmListView()
+                .environmentObject(store)
                 .preferredColorScheme(.dark)
+                .tint(Theme.accent)
         }
     }
 }
