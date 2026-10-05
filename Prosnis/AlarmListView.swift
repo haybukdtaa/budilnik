@@ -3,6 +3,7 @@ import SwiftUI
 /// Главный экран: список будильников.
 struct AlarmListView: View {
     @EnvironmentObject private var store: AlarmStore
+    @EnvironmentObject private var journal: JournalStore
     @State private var editing: AlarmItem?
 
     var body: some View {
@@ -54,6 +55,12 @@ struct AlarmListView: View {
 
     private var list: some View {
         List {
+            if !journal.entries.isEmpty {
+                SavedCard()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            }
             ForEach(store.alarms) { alarm in
                 AlarmRow(alarm: alarm) { editing = alarm }
                     .listRowBackground(Color.clear)

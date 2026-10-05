@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+:root{--bg:#0a0a0f;--card:#17171f;--acc:#ff8a3d;--accg:linear-gradient(90deg,#ff9e40,#ff5c4d);--sec:#8e8e99;--sep:#26262f}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1c1c24;font-family:-apple-system,"SF Pro Rounded","Segoe UI",Roboto,sans-serif;color:#fff;padding:24px;width:1700px}
+.row{display:flex;gap:28px}
+.col{display:flex;flex-direction:column;align-items:center;gap:12px}
+.cap{color:#b5b5c0;font-size:15px}
+.phone{width:390px;height:800px;background:var(--bg);border-radius:44px;border:8px solid #000;overflow:hidden;position:relative}
+.status{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 28px;font-weight:600;font-size:15px}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:6px 20px 0;color:var(--acc);font-size:20px}
+.title{font-size:34px;font-weight:700;padding:6px 20px 10px}
+.ntitle{text-align:center;font-weight:600;font-size:17px}
+.list{padding:0 16px;display:flex;flex-direction:column;gap:12px}
+.alarm{background:var(--card);border-radius:20px;padding:14px;display:flex;align-items:center;gap:14px}
+.strip{width:8px;align-self:stretch;border-radius:4px}
+.time{font-size:46px;font-weight:300;letter-spacing:-1px;line-height:1.05}
+.meta{font-size:14px;color:var(--sec);margin-top:4px}
+.grow{flex:1}
+.tg{width:51px;height:31px;border-radius:16px;background:#3a3a44;position:relative;flex:none}
+.tg.on{background:#ff8a3d}
+.tg::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff}
+.tg.on::after{left:22px}
+.off{opacity:.5}
+.sheet{padding:0 16px;display:flex;flex-direction:column;gap:14px}
+.grp{background:var(--card);border-radius:14px;overflow:hidden}
+.cell{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;font-size:17px;border-bottom:1px solid var(--sep)}
+.cell:last-child{border-bottom:none}
+.sec{color:var(--sec)}
+.hdr{font-size:13px;color:var(--sec);text-transform:uppercase;padding:0 16px 6px;letter-spacing:.3px}
+.wheel{height:120px;display:flex;justify-content:center;align-items:center;gap:30px;position:relative;font-size:26px}
+.wheel .c{display:flex;flex-direction:column;align-items:center;gap:6px;color:#666673}
+.wheel .c b{color:#fff;font-weight:500;font-size:30px;padding:5px 18px;background:#262631;border-radius:9px}
+.chips{display:flex;gap:6px;padding:12px}
+.chip{flex:1;height:38px;border-radius:50%;background:#0f0f15;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--sec)}
+.chip.on{background:var(--accg);color:#000}
+.pv{height:140px;border-radius:18px;margin:12px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.pv::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.25);border-radius:18px}
+.pv *{position:relative;text-shadow:0 2px 8px rgba(0,0,0,.4)}
+.pv .t{font-size:54px;font-weight:600}.pv .n{font-size:17px;font-weight:600}
+.foot{font-size:13px;color:var(--sec);padding:6px 16px}
+.check{color:var(--acc);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:8px 16px}
+.tile{height:140px;border-radius:16px;position:relative;display:flex;align-items:flex-end;padding:10px;font-size:13px;font-weight:600}
+.tile.sel{outline:3px solid var(--acc);outline-offset:-3px}
+.tile .ck{position:absolute;top:8px;right:10px;font-size:20px}
+.plus{background:var(--card);color:var(--acc);align-items:center;justify-content:center;flex-direction:column;gap:6px}
+.g0{background:linear-gradient(135deg,#ffb34d,#f25973)}.g1{background:linear-gradient(135deg,#1a73d9,#0d2666)}
+.g2{background:linear-gradient(135deg,#40a666,#0d4033)}.g3{background:linear-gradient(135deg,#261f66,#05051f)}
+.g4{background:linear-gradient(135deg,#f27340,#591a73)}.g5{background:linear-gradient(135deg,#b3e0fa,#4d8ccc)}
+.stripe{position:absolute;bottom:0;left:0;right:0;text-align:center;padding:6px;font-size:13px;color:#000;background:var(--acc);font-weight:700}
+</style></head><body>
+<div class="row">
+
+<!-- 1. Список -->
+<div class="col"><div class="phone">
+ <div class="status"><span>7:12</span><span>●●● 5G ▮</span></div>
+ <div class="nav"><span>⋯</span><span style="font-size:28px">⊕</span></div>
+ <div class="title">Будильники</div>
+ <div class="list">
+  <div class="alarm"><div class="strip g0"></div><div><div class="time">06:30</div><div class="meta">Работа · По будням</div></div><div class="grow"></div><div class="tg on"></div></div>
+  <div class="alarm"><div class="strip g1"></div><div><div class="time">07:45</div><div class="meta">Спортзал · Сб Вс <span style="color:var(--acc)">⚡</span></div></div><div class="grow"></div><div class="tg on"></div></div>
+  <div class="alarm off"><div class="strip g3"></div><div><div class="time">09:00</div><div class="meta">Будильник · Один раз</div></div><div class="grow"></div><div class="tg"></div></div>
+ </div>
+</div><div class="cap">1. Список будильников</div></div>
+
+<!-- 2. Редактор -->
+<div class="col"><div class="phone">
+ <div class="status"><span>7:12</span><span>●●● 5G ▮</span></div>
+ <div class="nav"><span style="font-size:17px">Отмена</span><span class="ntitle" style="color:#fff">Новый будильник</span><span style="font-size:17px;font-weight:700">Сохранить</span></div>
+ <div class="sheet" style="margin-top:10px">
+  <div class="grp"><div class="wheel"><div class="c"><span>05</span><b>06</b><span>07</span></div><div class="c"><span>29</span><b>30</b><span>31</span></div></div></div>
+  <div><div class="hdr">Повтор</div><div class="grp"><div class="chips"><div class="chip on">Пн</div><div class="chip on">Вт</div><div class="chip on">Ср</div><div class="chip on">Чт</div><div class="chip on">Пт</div><div class="chip">Сб</div><div class="chip">Вс</div></div></div></div>
+  <div class="grp"><div class="cell"><span>Работа</span></div><div class="cell"><span>Звук</span><span class="sec">Утро ›</span></div></div>
+  <div><div class="hdr">Фон</div><div class="grp"><div class="pv g0"><div class="t">06:30</div><div class="n">Работа</div></div><div class="cell"><span style="color:var(--acc)">▣ Выбрать фон</span><span class="sec">›</span></div></div></div>
+  <div class="grp"><div class="cell"><span>Со ставкой</span><div class="tg on"></div></div><div class="cell"><span>Сумма</span><span>500 <span class="sec">₽</span></span></div></div>
+  <div class="foot" style="margin-top:-8px">Сейчас это тренировка: деньги не списываются.</div>
+ </div>
+</div><div class="cap">2. Создание будильника</div></div>
+
+<!-- 3. Звук -->
+<div class="col"><div class="phone">
+ <div class="status"><span>7:12</span><span>●●● 5G ▮</span></div>
+ <div class="nav"><span style="font-size:17px">‹ Назад</span><span class="ntitle" style="color:#fff">Звук</span><span style="width:60px"></span></div>
+ <div class="sheet" style="margin-top:12px;gap:8px">
+  <div class="hdr" style="margin-top:6px">Мелодии</div><div class="grp"><div class="cell"><span>Утро</span><span class="check">✓</span></div><div class="cell"><span>Колокольчики</span></div></div>
+  <div class="hdr">Басы</div><div class="grp"><div class="cell"><span>Бас-пульс</span></div><div class="cell"><span>Глубокий бас</span></div></div>
+  <div class="hdr">Шумы</div><div class="grp"><div class="cell"><span>Белый шум</span></div><div class="cell"><span>Розовый шум</span></div><div class="cell"><span>Коричневый шум</span></div></div>
+  <div class="hdr">Сигналы</div><div class="grp"><div class="cell"><span>Классический сигнал</span></div><div class="cell"><span>Звонок</span></div><div class="cell"><span>Сирена</span></div></div>
+ </div>
+</div><div class="cap">3. Выбор звука</div></div>
+
+<!-- 4. Фон -->
+<div class="col"><div class="phone">
+ <div class="status"><span>7:12</span><span>●●● 5G ▮</span></div>
+ <div class="nav"><span style="font-size:17px">‹ Назад</span><span class="ntitle" style="color:#fff">Фон</span><span style="width:60px"></span></div>
+ <div class="grid" style="margin-top:10px">
+  <div class="tile plus"><span style="font-size:30px">＋</span><span style="font-size:13px">Своё фото</span></div>
+  <div class="tile g0 sel">Рассвет<span class="ck">✅</span></div>
+  <div class="tile g1">Океан</div><div class="tile g2">Лес</div>
+  <div class="tile g3">Ночь</div><div class="tile g4">Закат</div>
+ </div>
+</div><div class="cap">4. Выбор фона</div></div>
+
+</div>
+<div style="margin-top:18px;color:#b5b5c0;font-size:15px">МАКЕТ: так выглядят экраны по написанному коду. Это не снимки реального приложения, оно ещё не запускалось.</div>
+</body></html>

@@ -3,6 +3,7 @@ import SwiftUI
 /// Создание и редактирование будильника.
 struct AlarmEditView: View {
     @EnvironmentObject private var store: AlarmStore
+    @EnvironmentObject private var journal: JournalStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var draft: AlarmItem
@@ -74,6 +75,16 @@ struct AlarmEditView: View {
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 100)
                             Text("₽").foregroundStyle(.secondary)
+                        }
+                        if let hint = StakeAdvisor.hint(entries: journal.entries, current: draft.stakeAmount) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label(hint.text, systemImage: "lightbulb")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                if let suggested = hint.suggested {
+                                    Button("Поставить \(suggested) ₽") { draft.stakeAmount = suggested }
+                                }
+                            }
                         }
                     }
                 } footer: {
