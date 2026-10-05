@@ -96,7 +96,8 @@ final class JournalStore: ObservableObject {
 
     private func save() {
         guard let data = try? JSONEncoder().encode(entries) else { return }
-        try? data.write(to: fileURL, options: .atomic)
+        // Журнал читается только при открытом приложении, поэтому закрываем файл полностью, пока телефон заблокирован.
+        try? data.write(to: fileURL, options: [.atomic, .completeFileProtection])
     }
 
     func add(_ entry: JournalEntry) {
