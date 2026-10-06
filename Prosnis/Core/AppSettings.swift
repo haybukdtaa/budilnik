@@ -52,6 +52,11 @@ final class AppSettings: ObservableObject {
         didSet {
             guard data != oldValue else { return }
             file.save(data)
+            // При перезагрузке с диска побочные действия не нужны: они бы сработали на старых данных.
+            guard !suppressSideEffects else { return }
+            if oldValue.privacy.syncPrayerData && !data.privacy.syncPrayerData {
+                SyncEngine.shared.purgeSensitive()
+            }
             if data.prayer != oldValue.prayer {
                 AlarmStore.shared.refreshDatedAlarms(force: true)
             }
@@ -66,13 +71,28 @@ final class AppSettings: ObservableObject {
     }
 
     private let file = FileStore<SettingsData>("settings")
+    private var suppressSideEffects = false
+    private var loadFailed = false
 
     private init() {
-        data = file.load() ?? SettingsData()
+        let result = file.loadWithState()
+        data = result.value ?? SettingsData()
+        loadFailed = result.state == .unreadable
     }
 
+    /// Перечитывает настройки с диска без побочных действий.
     func reload() {
-        data = file.load() ?? SettingsData()
+        let result = file.loadWithState()
+        suppressSideEffects = true
+        data = result.value ?? SettingsData()
+        suppressSideEffects = false
+        loadFailed = result.state == .unreadable
+    }
+
+    /// Если при запуске файл был закрыт (телефон ещё не разблокировали), перечитывает его.
+    func reloadIfNeeded() {
+        guard loadFailed else { return }
+        reload()
     }
 
     var scheduleContext: ScheduleContext { ScheduleContext(prayer: data.prayer) }

@@ -34,6 +34,17 @@ final class PublicStatusTests: XCTestCase {
         XCTAssertEqual(shared.prayerDone, true)
     }
 
+    func testPrayerExcludedFromSharedProgress() {
+        let entries = [
+            T.entry(T.date(2026, 10, 5, 4), .success, isPrayer: true),
+            T.entry(T.date(2026, 10, 6, 7), .success),
+        ]
+        let shareable = PublicStatusBuilder.shareableEntries(entries, privacy: PrivacySettings())
+        XCTAssertEqual(shareable.count, 1)
+        let prayerChallenge = Challenge(title: "Фаджр", goal: .prayer, durationDays: 7, startDate: T.date(2026, 10, 1))
+        XCTAssertTrue(PublicStatusBuilder.shareableChallenges([prayerChallenge], privacy: PrivacySettings()).isEmpty)
+    }
+
     func testStatusNeverContainsMoney() throws {
         let entries = [T.entry(T.date(2026, 10, 6, 7), .failed, stake: 5000)]
         var privacy = PrivacySettings()
@@ -104,6 +115,24 @@ final class MiscLogicTests: XCTestCase {
             many = SyncEngine.merged(many, adding: OutboxItem(kind: .journalEntry, entityID: UUID(), payload: Data(), deleted: false, createdAt: Date()))
         }
         XCTAssertEqual(many.count, SyncEngine.maxItems)
+    }
+
+    func testSensitiveItemsArePurged() {
+        let normal = OutboxItem(kind: .alarm, entityID: UUID(), payload: Data(), deleted: false, createdAt: Date())
+        let prayer = OutboxItem(kind: .journalEntry, entityID: UUID(), payload: Data(), deleted: false, createdAt: Date(), isSensitive: true)
+        XCTAssertEqual(SyncEngine.withoutSensitive([normal, prayer]), [normal])
+    }
+
+    func testServerDatesWithAndWithoutFractions() {
+        XCTAssertNotNil(HTTPBackend.parseDate("2026-10-06T04:00:00Z"))
+        XCTAssertNotNil(HTTPBackend.parseDate("2026-10-06T04:00:00.123Z"))
+        XCTAssertNil(HTTPBackend.parseDate("06.10.2026"))
+    }
+
+    func testSyncPayloadUsesISODates() throws {
+        let data = try SyncEngine.makeEncoder().encode(T.entry(T.date(2026, 10, 6, 7), .success))
+        let json = String(data: data, encoding: .utf8)!
+        XCTAssertTrue(json.contains("2026-10-06T04:00:00Z"), json)
     }
 
     func testStakeAdvisor() {

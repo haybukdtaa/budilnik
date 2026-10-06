@@ -207,10 +207,11 @@ final class SocialStore: ObservableObject {
     func publishStatus() {
         let backend = self.backend
         guard backend.isOnline else { return }
-        let settings = AppSettings.shared.data
-        let entries = JournalStore.shared.realEntries
-        let snapshot = ProgressEngine.compute(entries: entries, challenges: ChallengeStore.shared.challenges)
-        let status = PublicStatusBuilder.build(entries: entries, snapshot: snapshot, privacy: settings.privacy, now: Date())
+        let privacy = AppSettings.shared.data.privacy
+        let entries = PublicStatusBuilder.shareableEntries(JournalStore.shared.realEntries, privacy: privacy)
+        let challenges = PublicStatusBuilder.shareableChallenges(ChallengeStore.shared.challenges, privacy: privacy)
+        let snapshot = ProgressEngine.compute(entries: entries, challenges: challenges)
+        let status = PublicStatusBuilder.build(entries: JournalStore.shared.realEntries, snapshot: snapshot, privacy: privacy, now: Date())
         Task { try? await backend.publishStatus(status) }
     }
 }

@@ -17,7 +17,19 @@ final class HTTPBackend: SocialBackend, SyncBackend {
         encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let text = try decoder.singleValueContainer().decode(String.self)
+            if let date = HTTPBackend.parseDate(text) { return date }
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Дата не в ISO 8601: \(text)"))
+        }
+    }
+
+    /// ISO 8601 с долями секунды и без них.
+    nonisolated static func parseDate(_ text: String) -> Date? {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFraction.date(from: text) { return date }
+        return ISO8601DateFormatter().date(from: text)
     }
 
     private struct Empty: Codable {}

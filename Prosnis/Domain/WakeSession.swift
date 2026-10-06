@@ -39,6 +39,8 @@ struct WakeSession: Codable {
     var isPrayer = false
     /// Ссылка на блокировку суммы ставки.
     var paymentRef: UUID?
+    /// Будильники, которые прозвенели во время этой проверки: их задание начнётся следом.
+    var queuedAlarmIDs: [UUID]?
 
     var deadline: Date { ringDate.addingTimeInterval(WakeRules.windowSeconds) }
 }

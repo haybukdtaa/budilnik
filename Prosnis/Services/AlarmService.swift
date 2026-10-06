@@ -16,13 +16,30 @@ final class AlarmService {
     static let datedHorizonDays = 10
 
     private let manager = AlarmManager.shared
-    /// Какие системные будильники поставлены на конкретные даты для каждого нашего будильника.
-    private var registry: [String: [UUID]]
-    private let registryFile = FileStore<[String: [UUID]]>("scheduled_ids")
+
+    /// Что поставлено в систему для каждого нашего будильника (ключ — id будильника).
+    private struct Registry: Codable {
+        var ids: [String: [UUID]] = [:]
+        /// Даты, на которые будильник с меняющимся временем действительно поставлен.
+        var dates: [String: [Date]] = [:]
+        /// Будильники, которые в последний раз поставить не удалось.
+        var failed: Set<String> = []
+    }
+
+    private var registry: Registry
+    private let registryFile = FileStore<Registry>("scheduled_alarms")
+    /// Идущие перестановки: следующая для того же будильника ждёт окончания предыдущей.
+    private var inFlight: [UUID: Task<String?, Never>] = [:]
 
     private init() {
-        registry = registryFile.load() ?? [:]
+        registry = registryFile.load() ?? Registry()
     }
+
+    func reloadIfNeeded() {
+        if let loaded = registryFile.load() { registry = loaded }
+    }
+
+    private func saveRegistry() { registryFile.save(registry) }
 
     var isAuthorized: Bool { manager.authorizationState == .authorized }
 
@@ -67,22 +84,74 @@ final class AlarmService {
     /// Снимает все системные будильники, относящиеся к нашему будильнику.
     func cancelAll(for id: UUID) {
         try? manager.cancel(id: id)
-        for systemID in registry[id.uuidString] ?? [] {
+        let key = id.uuidString
+        for systemID in registry.ids[key] ?? [] {
             try? manager.cancel(id: systemID)
         }
-        registry[id.uuidString] = nil
-        registryFile.save(registry)
+        registry.ids[key] = nil
+        // Прошедшие даты храним 30 дней: по ним сверка понимает, что будильник действительно стоял.
+        let now = Date()
+        registry.dates[key] = (registry.dates[key] ?? []).filter { $0 <= now && now.timeIntervalSince($0) < 30 * 86400 }
+        saveRegistry()
+    }
+
+    /// Снимает вообще все будильники приложения (при удалении данных).
+    func cancelEverything() {
+        inFlight.values.forEach { $0.cancel() }
+        inFlight = [:]
+        if let all = try? manager.alarms {
+            for alarm in all { try? manager.cancel(id: alarm.id) }
+        }
+        for ids in registry.ids.values {
+            for id in ids { try? manager.cancel(id: id) }
+        }
+        registry = Registry()
+        registryFile.delete()
     }
 
     func cancel(id: UUID) {
         try? manager.cancel(id: id)
     }
 
-    /// Ставит (или переставляет) системные будильники. Возвращает текст ошибки или nil.
+    /// Стоял ли будильник в системе на это время. Если нет, пропуск не считается провалом.
+    func wasScheduled(_ item: AlarmItem, ring: Date) -> Bool {
+        let key = item.id.uuidString
+        if registry.failed.contains(key) { return false }
+        if item.needsDatedSchedule {
+            return (registry.dates[key] ?? []).contains { abs($0.timeIntervalSince(ring)) < 60 }
+        }
+        return true
+    }
+
+    /// Ставит (или переставляет) системные будильники. Перестановки одного будильника идут по очереди.
+    /// Возвращает текст ошибки или nil.
     func sync(_ item: AlarmItem, context: ScheduleContext) async -> String? {
+        let previous = inFlight[item.id]
+        let task = Task { () -> String? in
+            _ = await previous?.value
+            if Task.isCancelled { return nil }
+            return await self.performSync(item, context: context)
+        }
+        inFlight[item.id] = task
+        let result = await task.value
+        if inFlight[item.id] == task { inFlight[item.id] = nil }
+        return result
+    }
+
+    private func markFailed(_ key: String, _ failed: Bool) {
+        if failed { registry.failed.insert(key) } else { registry.failed.remove(key) }
+        saveRegistry()
+    }
+
+    private func performSync(_ item: AlarmItem, context: ScheduleContext) async -> String? {
         cancelAll(for: item.id)
-        guard item.isEnabled else { return nil }
+        let key = item.id.uuidString
+        guard item.isEnabled else {
+            markFailed(key, false)
+            return nil
+        }
         guard await ensureAuthorization() else {
+            markFailed(key, true)
             return "Нет разрешения на будильники. Включите его в Настройках iPhone."
         }
         let sound = SoundLibrary.option(item.soundID).fileName
@@ -95,7 +164,6 @@ final class AlarmService {
                 to: now.addingTimeInterval(Double(AlarmService.datedHorizonDays) * 86400),
                 context: context
             )
-            var ids: [UUID] = []
             var failed = false
             for date in dates {
                 let systemID = UUID()
@@ -107,13 +175,15 @@ final class AlarmService {
                 )
                 do {
                     _ = try await manager.schedule(id: systemID, configuration: configuration)
-                    ids.append(systemID)
+                    // Записываем сразу: если параллельно начнётся отмена, она увидит этот будильник.
+                    registry.ids[key, default: []].append(systemID)
+                    registry.dates[key, default: []].append(date)
+                    saveRegistry()
                 } catch {
                     failed = true
                 }
             }
-            registry[item.id.uuidString] = ids
-            registryFile.save(registry)
+            markFailed(key, false)
             if item.isFajr && dates.isEmpty {
                 return "В ближайшие дни время Фаджра не определяется для выбранного города. Проверьте настройки намаза."
             }
@@ -132,8 +202,10 @@ final class AlarmService {
         )
         do {
             _ = try await manager.schedule(id: item.id, configuration: configuration)
+            markFailed(key, false)
             return nil
         } catch {
+            markFailed(key, true)
             return "Не удалось поставить будильник: \(error.localizedDescription)"
         }
     }

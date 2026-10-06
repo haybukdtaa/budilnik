@@ -89,13 +89,19 @@ enum ChallengeEvaluator {
         let end = challenge.durationDays.flatMap { calendar.date(byAdding: .day, value: $0, to: start) }
         let daysPassed = max(0, (calendar.dateComponents([.day], from: start, to: today).day ?? 0) + 1)
 
+        // Утра до момента создания челленджа (даже в тот же день) не учитываются.
         let relevant = entries
-            .filter { $0.counts && $0.date >= start && (end == nil || $0.date < end!) }
+            .filter { $0.counts && $0.date >= challenge.startDate && (end == nil || $0.date < end!) }
             .filter { challenge.goal != .prayer || $0.isPrayer == true }
             .sorted { $0.date < $1.date }
 
         var successDays = Set<Date>()
         for entry in relevant {
+            // Чек-лист отмечается после подъёма: сегодняшнее утро без отметок ещё не провал.
+            if challenge.goal == .routine, entry.outcome == .success, entry.routineTotal == nil,
+               calendar.isDate(entry.date, inSameDayAs: now) {
+                continue
+            }
             if passes(entry, challenge: challenge, calendar: calendar) {
                 successDays.insert(calendar.startOfDay(for: entry.date))
             } else if challenge.status == .active || challenge.status == .failed {

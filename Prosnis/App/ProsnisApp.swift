@@ -35,6 +35,12 @@ struct ProsnisApp: App {
     /// Всё, что нужно сделать при открытии приложения.
     @MainActor
     private func becameActive() async {
+        // Если приложение запустилось из звонка до разблокировки, файлы могли быть закрыты.
+        settings.reloadIfNeeded()
+        AlarmService.shared.reloadIfNeeded()
+        store.reloadIfNeeded()
+        challenges.reloadIfNeeded()
+        payments.reloadIfNeeded()
         wake.reconcile()
         store.refreshDatedAlarms()
         challenges.evaluateAll()
@@ -76,7 +82,8 @@ struct RootView: View {
                 isPresented: Binding(
                     get: { wake.session?.phase == .task },
                     set: { _ in }
-                )
+                ),
+                onDismiss: { wake.presentPendingMorning() }
             ) {
                 if let session = wake.session {
                     WakeTaskView(session: session)
@@ -86,6 +93,13 @@ struct RootView: View {
             .sheet(item: $wake.morning) { state in
                 MorningView(state: state)
                     .preferredColorScheme(.dark)
+            }
+            .task {
+                // Пока приложение открыто, сверка идёт каждые 30 секунд: звонок мог прийти, пока экран был включён.
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 30_000_000_000)
+                    wake.reconcile()
+                }
             }
         }
     }

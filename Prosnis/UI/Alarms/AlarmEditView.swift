@@ -1,3 +1,5 @@
+import AVFoundation
+import CoreMotion
 import SwiftUI
 
 /// Создание и редактирование будильника.
@@ -10,6 +12,7 @@ struct AlarmEditView: View {
     @State private var draft: AlarmItem
     @State private var showScanner = false
     @State private var scanError: String?
+    @State private var permissionMessage: String?
     private let isNew: Bool
 
     init(alarm: AlarmItem, isNew: Bool) {
@@ -210,9 +213,9 @@ struct AlarmEditView: View {
             case .off:
                 Text(draft.weekdays.isEmpty ? "Без выбранных дней будильник сработает один раз." : "")
             case .skipHolidays:
-                Text("В праздники и перенесённые выходные будильник молчит. Календарь РФ заложен на 2026–2027 годы.")
+                Text("В праздники и перенесённые выходные будильник молчит. Календарь РФ заложен на 2026–2027 годы. Такие будильники ставятся на \(AlarmService.datedHorizonDays) дней вперёд: открывайте приложение хотя бы раз в неделю.")
             case .workCalendar:
-                Text("Звонит во все рабочие дни по производственному календарю РФ, включая рабочие субботы, и молчит в праздники.")
+                Text("Звонит во все рабочие дни по производственному календарю РФ, включая рабочие субботы, и молчит в праздники. Будильники ставятся на \(AlarmService.datedHorizonDays) дней вперёд: открывайте приложение хотя бы раз в неделю.")
             }
         }
     }
@@ -246,9 +249,20 @@ struct AlarmEditView: View {
             if draft.hasTask {
                 Picker("Задание", selection: Binding(
                     get: { draft.effectiveTask },
-                    set: { draft.taskKind = $0 }
+                    set: { kind in
+                        draft.taskKind = kind
+                        permissionMessage = nil
+                        if kind == .qr || kind == .steps {
+                            Task { await checkPermission(for: kind) }
+                        }
+                    }
                 )) {
                     ForEach(TaskKind.allCases) { Label($0.title, systemImage: $0.icon).tag($0) }
+                }
+                if let permissionMessage {
+                    Text(permissionMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
                 }
                 if draft.effectiveTask == .qr {
                     if let code = draft.qrCode, !code.isEmpty {
@@ -316,6 +330,49 @@ struct AlarmEditView: View {
         }
         .onChange(of: draft.stakeEnabled) { _, isOn in
             if isOn { draft.taskEnabled = true }
+        }
+    }
+
+    /// Задания «код» и «шаги» требуют разрешений. Без них задание выполнить нельзя, поэтому выбор отменяется сразу.
+    private func checkPermission(for kind: TaskKind) async {
+        let granted: Bool
+        switch kind {
+        case .qr:
+            switch AVCaptureDevice.authorizationStatus(for: .video) {
+            case .authorized: granted = true
+            case .notDetermined: granted = await AVCaptureDevice.requestAccess(for: .video)
+            default: granted = false
+            }
+        case .steps:
+            granted = await Self.motionAccess()
+        default:
+            granted = true
+        }
+        if !granted && draft.effectiveTask == kind {
+            draft.taskKind = .typing
+            permissionMessage = kind == .qr
+                ? "Нет доступа к камере. Разрешите его в Настройках iPhone, чтобы выбрать это задание."
+                : "Нет доступа к движению или счётчик шагов недоступен. Разрешите его в Настройках iPhone, чтобы выбрать это задание."
+        }
+    }
+
+    /// Запрашивает доступ к движению пробным запросом шагов.
+    private static func motionAccess() async -> Bool {
+        guard CMPedometer.isStepCountingAvailable() else { return false }
+        switch CMPedometer.authorizationStatus() {
+        case .authorized: return true
+        case .denied, .restricted: return false
+        default: break
+        }
+        let pedometer = CMPedometer()
+        return await withCheckedContinuation { continuation in
+            let now = Date()
+            pedometer.queryPedometerData(from: now.addingTimeInterval(-60), to: now) { _, error in
+                // Держим счётчик живым до ответа системы.
+                withExtendedLifetime(pedometer) {
+                    continuation.resume(returning: error == nil)
+                }
+            }
         }
     }
 

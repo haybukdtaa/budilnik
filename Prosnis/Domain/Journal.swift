@@ -107,18 +107,37 @@ final class JournalStore: ObservableObject {
 
     @Published private(set) var entries: [JournalEntry] = []
 
-    // Журнал читается только при открытом приложении, поэтому файл закрыт полностью, пока телефон заблокирован.
-    private let file = FileStore<[JournalEntry]>("journal", protection: .completeFileProtection)
+    // Файл зашифрован и доступен после первой разблокировки телефона: будильник может записать итог утра,
+    // даже если приложение запустилось из звонка.
+    private let file = FileStore<[JournalEntry]>("journal")
+    /// Файл не прочитался при запуске: перед сохранением нужно слить его с тем, что в памяти.
+    private var needsMerge = false
 
     private init() {
-        entries = (file.load() ?? []).sorted { $0.date > $1.date }
+        reload()
     }
 
     func reload() {
-        entries = (file.load() ?? []).sorted { $0.date > $1.date }
+        let result = file.loadWithState()
+        entries = (result.value ?? []).sorted { $0.date > $1.date }
+        needsMerge = result.state == .unreadable
     }
 
     private func save() {
+        if needsMerge {
+            let result = file.loadWithState()
+            switch result.state {
+            case .loaded:
+                let known = Set(entries.map(\.id))
+                entries += (result.value ?? []).filter { !known.contains($0.id) }
+                entries.sort { $0.date > $1.date }
+                needsMerge = false
+            case .missing, .corrupt:
+                needsMerge = false
+            case .unreadable:
+                return // файл всё ещё закрыт: сохраним позже, ничего не теряя
+            }
+        }
         file.save(entries)
     }
 

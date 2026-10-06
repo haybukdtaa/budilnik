@@ -13,8 +13,14 @@ final class AlarmStore: ObservableObject {
     private let file = FileStore<[AlarmItem]>("alarms")
     private static let lastDatedRefreshKey = "lastDatedRefresh"
 
+    private var loadFailed = false
+
     private init() {
         load()
+    }
+
+    func reloadIfNeeded() {
+        if loadFailed { load() }
     }
 
     var isAuthorized: Bool { service.isAuthorized }
@@ -22,7 +28,9 @@ final class AlarmStore: ObservableObject {
     private var context: ScheduleContext { AppSettings.shared.scheduleContext }
 
     private func load() {
-        alarms = file.load() ?? []
+        let result = file.loadWithState()
+        alarms = result.value ?? []
+        loadFailed = result.state == .unreadable
         sort()
     }
 
@@ -36,7 +44,7 @@ final class AlarmStore: ObservableObject {
 
     private func enqueueSync(_ item: AlarmItem) {
         if item.isPrayerRelated && !AppSettings.shared.data.privacy.syncPrayerData { return }
-        SyncEngine.shared.enqueue(.alarm, id: item.id, value: item)
+        SyncEngine.shared.enqueue(.alarm, id: item.id, value: item, sensitive: item.isPrayerRelated)
     }
 
     func nextOccurrence(of item: AlarmItem, after now: Date = TrustedClock.now) -> Date? {
@@ -54,6 +62,14 @@ final class AlarmStore: ObservableObject {
     func isLocked(_ item: AlarmItem, now: Date = TrustedClock.now) -> Bool {
         guard item.stakeEnabled, item.isEnabled else { return false }
         if WakeCoordinator.shared.session?.alarmID == item.id { return true }
+        if WakeCoordinator.shared.session?.queuedAlarmIDs?.contains(item.id) == true { return true }
+        // Звонок только что был, а утро ещё не записано: менять нельзя, иначе можно уйти от ставки.
+        if let last = lastOccurrence(of: item, onOrBefore: now),
+           now.timeIntervalSince(last) < WakeRules.windowSeconds + 60,
+           last > (item.createdAt ?? .distantPast),
+           !JournalStore.shared.hasEntry(alarmID: item.id, near: last) {
+            return true
+        }
         guard let next = nextOccurrence(of: item, after: now) else { return false }
         return next.timeIntervalSince(now) <= WakeRules.lockSeconds
     }
@@ -64,6 +80,8 @@ final class AlarmStore: ObservableObject {
 
     @discardableResult
     func upsert(_ draft: AlarmItem) -> Bool {
+        // Сначала записываем пропущенные звонки по старым настройкам.
+        WakeCoordinator.shared.reconcile()
         if let existing = alarms.first(where: { $0.id == draft.id }), isLocked(existing) {
             showLockedMessage()
             return false
@@ -93,6 +111,7 @@ final class AlarmStore: ObservableObject {
     }
 
     func delete(_ item: AlarmItem) {
+        WakeCoordinator.shared.reconcile()
         if let existing = alarms.first(where: { $0.id == item.id }), isLocked(existing) {
             showLockedMessage()
             return
@@ -104,7 +123,7 @@ final class AlarmStore: ObservableObject {
         alarms.removeAll { $0.id == item.id }
         save()
         if !(item.isPrayerRelated && !AppSettings.shared.data.privacy.syncPrayerData) {
-            SyncEngine.shared.enqueueDeletion(.alarm, id: item.id)
+            SyncEngine.shared.enqueueDeletion(.alarm, id: item.id, sensitive: item.isPrayerRelated)
         }
     }
 

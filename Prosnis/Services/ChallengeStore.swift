@@ -10,17 +10,27 @@ final class ChallengeStore: ObservableObject {
 
     private let file = FileStore<[Challenge]>("challenges")
 
+    private var loadFailed = false
+
     private init() {
-        challenges = file.load() ?? []
+        reload()
     }
 
-    func reload() { challenges = file.load() ?? [] }
+    func reload() {
+        let result = file.loadWithState()
+        challenges = result.value ?? []
+        loadFailed = result.state == .unreadable
+    }
+
+    func reloadIfNeeded() {
+        if loadFailed { reload() }
+    }
 
     private func save() { file.save(challenges) }
 
     private func sync(_ challenge: Challenge) {
         if challenge.isPrivate && !AppSettings.shared.data.privacy.syncPrayerData { return }
-        SyncEngine.shared.enqueue(.challenge, id: challenge.id, value: challenge)
+        SyncEngine.shared.enqueue(.challenge, id: challenge.id, value: challenge, sensitive: challenge.isPrivate)
     }
 
     var active: [Challenge] { challenges.filter { $0.status == .active } }
@@ -73,8 +83,11 @@ enum AppEvents {
         let mayLeave = entry.isPrayer != true || AppSettings.shared.data.privacy.syncPrayerData
         if entry.isDemo != true && mayLeave {
             // Уходит на свой сервер (нужен для платежей и проверки рекордов), друзьям не показывается.
-            SyncEngine.shared.enqueue(.journalEntry, id: entry.id, value: entry)
+            SyncEngine.shared.enqueue(.journalEntry, id: entry.id, value: entry, sensitive: entry.isPrayer == true)
         }
-        SocialStore.shared.publishStatus()
+        // Утро с намазом без согласия не должно даже менять статус: время отправки выдало бы ранний подъём.
+        if entry.isPrayer != true || AppSettings.shared.data.privacy.sharePrayer {
+            SocialStore.shared.publishStatus()
+        }
     }
 }

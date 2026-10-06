@@ -24,6 +24,21 @@ final class ProgressEngineTests: XCTestCase {
         XCTAssertEqual(snapshot.tree.wilt, 1)
     }
 
+    func testStreakCountsMorningsNotAlarms() {
+        let entries = [
+            T.entry(T.date(2026, 9, 1, 5), .success, isPrayer: true),
+            T.entry(T.date(2026, 9, 1, 7, 30), .success),
+            T.entry(T.date(2026, 9, 2, 5), .success),
+            T.entry(T.date(2026, 9, 2, 7, 30), .failed),
+        ]
+        let snapshot = ProgressEngine.compute(entries: entries, challenges: [], now: T.date(2026, 9, 3), calendar: T.calendar)
+        XCTAssertEqual(snapshot.longestStreak, 1, "Два будильника в одно утро — это одно утро")
+        XCTAssertEqual(snapshot.currentStreak, 0, "Провал в тот же день обнуляет серию")
+        XCTAssertEqual(snapshot.totalWakes, 1)
+        // 11 + 11 за первый день, 10 за удачный будильник в неудачный день.
+        XCTAssertEqual(snapshot.xp, 32)
+    }
+
     func testDemoAndTechnicalEntriesAreIgnored() {
         var entries = days([.success, .success])
         entries.append(T.entry(T.date(2026, 9, 3, 7), .failed, isDemo: true))
@@ -76,7 +91,7 @@ final class ProgressEngineTests: XCTestCase {
 
 final class ChallengeEvaluatorTests: XCTestCase {
     func testNoMissesCompletes() {
-        let challenge = Challenge(title: "Неделя", goal: .noMisses, durationDays: 7, startDate: T.date(2026, 9, 1, 9))
+        let challenge = Challenge(title: "Неделя", goal: .noMisses, durationDays: 7, startDate: T.date(2026, 9, 1, 6))
         let entries = (1...7).map { T.entry(T.date(2026, 9, $0, 7), .success) }
         let result = ChallengeEvaluator.evaluate(challenge, entries: entries, now: T.date(2026, 9, 8, 12), calendar: T.calendar)
         XCTAssertEqual(result.status, .completed)
@@ -108,6 +123,25 @@ final class ChallengeEvaluatorTests: XCTestCase {
             T.entry(T.date(2026, 9, 1, 8), .failed),
         ]
         let result = ChallengeEvaluator.evaluate(challenge, entries: entries, now: T.date(2026, 9, 2), calendar: T.calendar)
+        XCTAssertEqual(result.status, .active)
+    }
+
+    func testRoutineIsPendingUntilChecklistSaved() {
+        let challenge = Challenge(title: "Чек-лист", goal: .routine, durationDays: 7, startDate: T.date(2026, 9, 1))
+        let today = T.entry(T.date(2026, 9, 2, 7), .success)
+        let pending = ChallengeEvaluator.evaluate(challenge, entries: [today], now: T.date(2026, 9, 2, 8), calendar: T.calendar)
+        XCTAssertEqual(pending.status, .active, "Сразу после подъёма чек-лист ещё не отмечен — это не провал")
+        let nextDay = ChallengeEvaluator.evaluate(challenge, entries: [today], now: T.date(2026, 9, 3, 8), calendar: T.calendar)
+        XCTAssertEqual(nextDay.status, .failed, "Если до конца дня не отметили, утро не засчитано")
+        let done = T.entry(T.date(2026, 9, 2, 7), .success, routineDone: ["a", "b"], routineTotal: 2)
+        let ok = ChallengeEvaluator.evaluate(challenge, entries: [done], now: T.date(2026, 9, 3, 8), calendar: T.calendar)
+        XCTAssertEqual(ok.status, .active)
+    }
+
+    func testMorningsBeforeChallengeStartAreIgnored() {
+        let challenge = Challenge(title: "x", goal: .noMisses, durationDays: 7, startDate: T.date(2026, 9, 1, 12))
+        let result = ChallengeEvaluator.evaluate(challenge, entries: [T.entry(T.date(2026, 9, 1, 7), .failed)],
+                                                 now: T.date(2026, 9, 1, 13), calendar: T.calendar)
         XCTAssertEqual(result.status, .active)
     }
 

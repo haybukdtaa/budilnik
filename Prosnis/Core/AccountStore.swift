@@ -28,27 +28,33 @@ final class AccountStore: ObservableObject {
     }
 
     /// Удаляет аккаунт на сервере (если он есть) и все данные на телефоне.
-    func deleteAccountAndData() async {
-        try? await BackendRegistry.current.deleteAccount()
-        for alarm in AlarmStore.shared.alarms {
-            AlarmService.shared.cancelAll(for: alarm.id)
+    /// Возвращает текст ошибки, если сервер не подтвердил удаление: тогда на телефоне ничего не трогается.
+    func deleteAccountAndData() async -> String? {
+        let backend = BackendRegistry.current
+        if backend.isOnline && !backend.isDemo {
+            do {
+                try await backend.deleteAccount()
+            } catch {
+                return "Сервер не подтвердил удаление аккаунта: \(error.localizedDescription) Данные на телефоне не тронуты, попробуйте позже."
+            }
         }
-        if let session = WakeCoordinator.shared.session, let recheck = session.recheckAlarmID {
-            AlarmService.shared.cancel(id: recheck)
-        }
+
+        AlarmService.shared.cancelEverything()
         Keychain.removeAll()
         token = nil
         AppFiles.wipeAll()
-        AppSettings.shared.reload()
+        // Порядок важен: будильники пустеют раньше, чем перечитываются настройки.
         AlarmStore.shared.reload()
+        WakeCoordinator.shared.reload()
         JournalStore.shared.reload()
         ChallengeStore.shared.reload()
-        WakeCoordinator.shared.reload()
         PaymentsStore.shared.reload()
+        AppSettings.shared.reload()
         SocialStore.shared.resetAfterWipe()
         DemoBackend.shared.reload()
-        // Последним: перезагрузка настроек выше могла поставить изменения в очередь.
+        // Последним: перезагрузки выше могли поставить изменения в очередь.
         SyncEngine.shared.clear()
+        return nil
     }
 }
 

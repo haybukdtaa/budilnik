@@ -4,6 +4,15 @@ import Foundation
 /// Денег в статусе нет по устройству типа; утра, связанные с намазом, без согласия не учитываются вовсе,
 /// чтобы ранний подъём не выдавал религиозную практику.
 enum PublicStatusBuilder {
+    /// Утра, из которых можно считать серию, уровень и дерево для друзей.
+    static func shareableEntries(_ entries: [JournalEntry], privacy: PrivacySettings) -> [JournalEntry] {
+        privacy.sharePrayer ? entries : entries.filter { $0.isPrayer != true }
+    }
+
+    static func shareableChallenges(_ challenges: [Challenge], privacy: PrivacySettings) -> [Challenge] {
+        privacy.sharePrayer ? challenges : challenges.filter { !$0.isPrivate }
+    }
+
     static func build(
         entries: [JournalEntry],
         snapshot: ProgressSnapshot,

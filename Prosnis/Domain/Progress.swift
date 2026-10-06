@@ -127,15 +127,25 @@ enum ProgressEngine {
             if unlocked[id] == nil { unlocked[id] = date }
         }
 
-        for entry in ordered {
-            if entry.outcome == .success {
+        // Серия и число подъёмов считаются по утрам (дням), а не по будильникам:
+        // день удачный, если все будильники с заданием в этот день закончились подъёмом.
+        let byDay = Dictionary(grouping: ordered) { calendar.startOfDay(for: $0.date) }
+        var dayResults: [Bool] = []
+        for day in byDay.keys.sorted() {
+            let dayEntries = (byDay[day] ?? []).sorted { $0.date < $1.date }
+            let daySuccess = dayEntries.allSatisfy { $0.outcome == .success }
+            dayResults.append(daySuccess)
+            if daySuccess {
                 streak += 1
                 wakes += 1
                 longest = max(longest, streak)
-                var gained = ProgressEngine.xp(forSuccessWithStreak: streak)
-                if entry.routineComplete {
-                    fullRoutines += 1
-                }
+            } else {
+                streak = 0
+            }
+
+            for entry in dayEntries where entry.outcome == .success {
+                var gained = ProgressEngine.xp(forSuccessWithStreak: daySuccess ? streak : 0)
+                if entry.routineComplete { fullRoutines += 1 }
                 gained += 2 * (entry.routineDone?.count ?? 0)
                 totalXP += gained
                 xpByEntry[entry.id] = gained
@@ -144,15 +154,16 @@ enum ProgressEngine {
                 if entry.isPrayer == true { fajrWakes += 1 }
                 if let kind = entry.taskKind { taskKinds.insert(kind) }
 
-                unlock("first_wake", entry.date)
-                for n in [3, 7, 14, 30, 60, 100, 365] where streak >= n { unlock("streak_\(n)", entry.date) }
-                for n in [10, 50, 100, 500] where wakes >= n { unlock("wakes_\(n)", entry.date) }
                 if earlyWakes >= 10 { unlock("early_bird", entry.date) }
                 if fajrWakes >= 7 { unlock("fajr_7", entry.date) }
                 if fullRoutines >= 10 { unlock("routine_10", entry.date) }
                 if taskKinds.count == TaskKind.allCases.count { unlock("all_tasks", entry.date) }
-            } else {
-                streak = 0
+            }
+
+            if daySuccess, let last = dayEntries.last {
+                unlock("first_wake", last.date)
+                for n in [3, 7, 14, 30, 60, 100, 365] where streak >= n { unlock("streak_\(n)", last.date) }
+                for n in [10, 50, 100, 500] where wakes >= n { unlock("wakes_\(n)", last.date) }
             }
         }
 
@@ -177,7 +188,7 @@ enum ProgressEngine {
 
         // Дерево: растёт с подъёмами, вянет от недавних провалов.
         let stage = max(0, TreeState.thresholds.lastIndex { wakes >= $0 } ?? 0)
-        let recentFailures = ordered.suffix(7).filter { $0.outcome == .failed }.count
+        let recentFailures = dayResults.suffix(7).filter { !$0 }.count
         let tree = TreeState(stage: stage, wilt: min(recentFailures, 3))
 
         func summary(weekContaining date: Date) -> WeekSummary {

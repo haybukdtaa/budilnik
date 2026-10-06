@@ -8,6 +8,7 @@ struct ProfileView: View {
     @EnvironmentObject private var sync: SyncEngine
     @State private var confirmDelete = false
     @State private var deleting = false
+    @State private var deleteError: String?
 
     var body: some View {
         let snapshot = ProgressEngine.compute(entries: journal.realEntries, challenges: challenges.challenges)
@@ -88,12 +89,20 @@ struct ProfileView: View {
                 Button("Удалить всё", role: .destructive) {
                     deleting = true
                     Task {
-                        await AccountStore.shared.deleteAccountAndData()
+                        deleteError = await AccountStore.shared.deleteAccountAndData()
                         deleting = false
                     }
                 }
             } message: {
                 Text("Отменить это действие нельзя.")
+            }
+            .alert(
+                "Не удалось удалить",
+                isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })
+            ) {
+                Button("Понятно", role: .cancel) {}
+            } message: {
+                Text(deleteError ?? "")
             }
         }
     }
