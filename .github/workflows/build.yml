@@ -21,6 +21,7 @@ jobs:
 
       - name: Автотесты на симуляторе
         run: |
+          set -o pipefail
           DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c "
           import json, sys
           data = json.load(sys.stdin)['devices']
@@ -33,10 +34,12 @@ jobs:
             -scheme Prosnis \
             -destination "id=$DEVICE_ID" \
             -derivedDataPath build-tests \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log | grep -E ': error:|Executed [0-9]+ tests|TEST (SUCCEEDED|FAILED)' || true
+          test "${PIPESTATUS[0]}" -eq 0
 
       - name: Собрать без подписи
         run: |
+          set -o pipefail
           xcodebuild \
             -project Prosnis.xcodeproj \
             -scheme Prosnis \
@@ -46,7 +49,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            build 2>&1 | tee build.log | grep -E ': error:|BUILD (SUCCEEDED|FAILED)' || true
+          test "${PIPESTATUS[0]}" -eq 0
 
       - name: Упаковать в .ipa
         run: |
@@ -58,3 +62,12 @@ jobs:
         with:
           name: Prosnis-ipa
           path: Prosnis.ipa
+
+      - name: Ошибки в аннотацию
+        if: failure()
+        run: |
+          for f in test.log build.log; do
+            [ -f "$f" ] || continue
+            msg=$(grep -E ': error:' "$f" | sed -E 's#^.*/(Prosnis|ProsnisTests)/#\1/#' | sort -u | head -60 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            if [ -n "$msg" ]; then echo "::error title=Ошибки ${f}::${msg}"; fi
+          done
