@@ -65,6 +65,20 @@ jobs:
           name: Prosnis-ipa
           path: Prosnis.ipa
 
+      - name: Итоги тестов и предупреждений
+        if: always()
+        run: |
+          if [ -f test.log ]; then
+            summary=$(grep -E "Executed [0-9]+ tests" test.log | tail -1 | sed 's/%/%25/g')
+            echo "::notice title=Тесты::${summary:-нет данных}"
+          fi
+          for f in test.log build.log; do
+            [ -f "$f" ] || continue
+            count=$(grep -E ": warning:" "$f" | grep -E "/(Prosnis|ProsnisTests)/" | sed -E 's#^.*/(Prosnis|ProsnisTests)/#\1/#' | sort -u | wc -l | tr -d ' ')
+            list=$(grep -E ": warning:" "$f" | grep -E "/(Prosnis|ProsnisTests)/" | sed -E 's#^.*/(Prosnis|ProsnisTests)/#\1/#' | sort -u | head -40 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::notice title=Предупреждения ${f} (${count})::${list:-нет}"
+          done
+
       - name: Ошибки в аннотацию
         if: failure()
         run: |
