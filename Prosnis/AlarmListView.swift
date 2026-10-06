@@ -5,6 +5,7 @@ struct AlarmListView: View {
     @EnvironmentObject private var store: AlarmStore
     @EnvironmentObject private var journal: JournalStore
     @State private var editing: AlarmItem?
+    @State private var showBedtime = false
 
     var body: some View {
         NavigationStack {
@@ -14,7 +15,9 @@ struct AlarmListView: View {
                 if store.alarms.isEmpty {
                     emptyState
                 } else {
-                    list
+                    TimelineView(.everyMinute) { context in
+                        list(now: context.date)
+                    }
                 }
             }
             .navigationTitle("Будильники")
@@ -23,6 +26,9 @@ struct AlarmListView: View {
                     Menu {
                         Button("Проверить звонок через минуту", systemImage: "bell.badge") {
                             store.runTest()
+                        }
+                        Button("Проверить задание и повторную проверку", systemImage: "keyboard") {
+                            WakeCoordinator.shared.startDemo()
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -36,8 +42,25 @@ struct AlarmListView: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    showBedtime = true
+                } label: {
+                    Label("Ложусь спать", systemImage: "moon.stars.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 16))
+                        .foregroundStyle(.black)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            }
             .sheet(item: $editing) { alarm in
                 AlarmEditView(alarm: alarm, isNew: !store.alarms.contains { $0.id == alarm.id })
+            }
+            .sheet(isPresented: $showBedtime) {
+                BedtimeView()
             }
             .alert(
                 "Внимание",
@@ -53,7 +76,7 @@ struct AlarmListView: View {
         }
     }
 
-    private var list: some View {
+    private func list(now: Date) -> some View {
         List {
             if !journal.entries.isEmpty {
                 SavedCard()
@@ -62,12 +85,15 @@ struct AlarmListView: View {
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
             }
             ForEach(store.alarms) { alarm in
-                AlarmRow(alarm: alarm) { editing = alarm }
+                let locked = store.isLocked(alarm, now: now)
+                AlarmRow(alarm: alarm, isLocked: locked) { editing = alarm }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .swipeActions {
-                        Button("Удалить", role: .destructive) { store.delete(alarm) }
+                        if !locked {
+                            Button("Удалить", role: .destructive) { store.delete(alarm) }
+                        }
                     }
             }
         }
@@ -91,6 +117,7 @@ struct AlarmListView: View {
 private struct AlarmRow: View {
     @EnvironmentObject private var store: AlarmStore
     let alarm: AlarmItem
+    let isLocked: Bool
     let onTap: () -> Void
 
     var body: some View {
@@ -110,6 +137,9 @@ private struct AlarmRow: View {
                     if alarm.stakeEnabled {
                         Image(systemName: "bolt.fill").foregroundStyle(Theme.accent)
                     }
+                    if isLocked {
+                        Image(systemName: "lock.fill")
+                    }
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -125,6 +155,7 @@ private struct AlarmRow: View {
                 )
             )
             .labelsHidden()
+            .disabled(isLocked)
         }
         .padding(14)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))

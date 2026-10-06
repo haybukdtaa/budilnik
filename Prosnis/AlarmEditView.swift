@@ -27,9 +27,22 @@ struct AlarmEditView: View {
         )
     }
 
+    /// Будильник со ставкой закрыт за 2 часа до звонка и пока идёт проверка.
+    private var isLocked: Bool {
+        guard !isNew, let stored = store.alarms.first(where: { $0.id == draft.id }) else { return false }
+        return store.isLocked(stored)
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                if isLocked {
+                    Section {
+                        Label("Изменения закрыты за 2 часа до звонка и пока идёт проверка", systemImage: "lock.fill")
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+
                 Section {
                     DatePicker("", selection: timeBinding, displayedComponents: .hourAndMinute)
                         .datePickerStyle(.wheel)
@@ -102,19 +115,21 @@ struct AlarmEditView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)
+            .disabled(isLocked)
             .navigationTitle(isNew ? "Новый будильник" : "Будильник")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отмена") { dismiss() }
+                    Button(isLocked ? "Закрыть" : "Отмена") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Сохранить") {
-                        draft.isEnabled = true
-                        store.upsert(draft)
-                        dismiss()
+                if !isLocked {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Сохранить") {
+                            draft.isEnabled = true
+                            if store.upsert(draft) { dismiss() }
+                        }
+                        .bold()
                     }
-                    .bold()
                 }
             }
         }

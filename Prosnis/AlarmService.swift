@@ -1,5 +1,6 @@
 import ActivityKit
 import AlarmKit
+import AppIntents
 import Foundation
 import SwiftUI
 
@@ -10,6 +11,8 @@ struct ProsnisAlarmData: AlarmMetadata {}
 @MainActor
 final class AlarmService {
     private let manager = AlarmManager.shared
+
+    var isAuthorized: Bool { manager.authorizationState == .authorized }
 
     private func ensureAuthorization() async -> Bool {
         switch manager.authorizationState {
@@ -56,9 +59,15 @@ final class AlarmService {
             : .weekly(item.weekdays.sorted().map(Weekdays.locale))
         let schedule = Alarm.Schedule.relative(.init(time: time, repeats: recurrence))
 
+        // У будильника со ставкой кнопка «Выключить» открывает приложение с заданием.
+        let stopIntent: (any LiveActivityIntent)? = item.stakeEnabled
+            ? WakeStopIntent(alarmID: item.id.uuidString, isRecheck: false)
+            : nil
+
         let configuration = AlarmManager.AlarmConfiguration.alarm(
             schedule: schedule,
             attributes: attributes(title: item.displayTitle),
+            stopIntent: stopIntent,
             sound: .named(SoundLibrary.option(item.soundID).fileName)
         )
 
@@ -72,6 +81,24 @@ final class AlarmService {
 
     func cancel(id: UUID) {
         try? manager.cancel(id: id)
+    }
+
+    /// Повторный звонок проверки. Возвращает идентификатор системного будильника или nil при сбое.
+    func scheduleRecheck(alarmID: UUID, soundID: String, at date: Date) async -> UUID? {
+        guard await ensureAuthorization() else { return nil }
+        let configuration = AlarmManager.AlarmConfiguration.alarm(
+            schedule: .fixed(date),
+            attributes: attributes(title: "Проверка: вы не спите?"),
+            stopIntent: WakeStopIntent(alarmID: alarmID.uuidString, isRecheck: true),
+            sound: .named(SoundLibrary.option(soundID).fileName)
+        )
+        let id = UUID()
+        do {
+            _ = try await manager.schedule(id: id, configuration: configuration)
+            return id
+        } catch {
+            return nil
+        }
     }
 
     /// Тестовый будильник через `seconds` секунд, чтобы проверить звонок.

@@ -22,6 +22,10 @@ struct JournalEvent: Codable, Hashable {
 struct JournalEntry: Identifiable, Codable {
     var id = UUID()
     var date: Date
+    /// Какой будильник. nil у тестовых записей.
+    var alarmID: UUID?
+    /// Сбой, который был прощён по правилу «первый раз прощается».
+    var forgiven: Bool?
     var alarmTitle: String
     var timeText: String
     var stake: Int
@@ -81,11 +85,13 @@ enum StakeAdvisor {
 /// Журнал утр: хранение на диске, статистика, споры.
 @MainActor
 final class JournalStore: ObservableObject {
+    static let shared = JournalStore()
+
     @Published private(set) var entries: [JournalEntry] = []
 
     private let fileURL: URL
 
-    init() {
+    private init() {
         let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         fileURL = base.appendingPathComponent("journal.json")
         if let data = try? Data(contentsOf: fileURL),
@@ -104,6 +110,17 @@ final class JournalStore: ObservableObject {
         entries.append(entry)
         entries.sort { $0.date > $1.date }
         save()
+    }
+
+    /// Есть ли запись об этом будильнике около указанного звонка.
+    func hasEntry(alarmID: UUID, near ring: Date) -> Bool {
+        entries.contains { $0.alarmID == alarmID && abs($0.date.timeIntervalSince(ring)) < 3600 }
+    }
+
+    /// Прощали ли сбой за последние 30 дней до `date`.
+    func hasForgiven(before date: Date) -> Bool {
+        let from = date.addingTimeInterval(-30 * 24 * 3600)
+        return entries.contains { $0.forgiven == true && $0.date >= from }
     }
 
     func monthStats(now: Date = Date()) -> MonthStats {
