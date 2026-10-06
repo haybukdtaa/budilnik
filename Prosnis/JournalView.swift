@@ -120,7 +120,7 @@ private struct JournalRow: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(color)
-                if entry.outcome == .failed {
+                if entry.outcome == .failed && entry.stake > 0 {
                     Text(entry.dispute == .refunded ? "0 ₽" : "−\(entry.stake) ₽")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)

@@ -37,7 +37,7 @@ final class AlarmStore: ObservableObject {
     }
 
     /// Закрыт ли будильник со ставкой для изменений: за 2 часа до звонка и пока идёт проверка.
-    func isLocked(_ item: AlarmItem, now: Date = Date()) -> Bool {
+    func isLocked(_ item: AlarmItem, now: Date = TrustedClock.now) -> Bool {
         guard item.stakeEnabled, item.isEnabled else { return false }
         if WakeCoordinator.shared.session?.alarmID == item.id { return true }
         guard let next = item.nextOccurrence(after: now) else { return false }

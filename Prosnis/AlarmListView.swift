@@ -85,7 +85,7 @@ struct AlarmListView: View {
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
             }
             ForEach(store.alarms) { alarm in
-                let locked = store.isLocked(alarm, now: now)
+                let locked = store.isLocked(alarm)
                 AlarmRow(alarm: alarm, isLocked: locked) { editing = alarm }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)

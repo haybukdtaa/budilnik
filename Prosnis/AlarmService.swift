@@ -60,7 +60,7 @@ final class AlarmService {
         let schedule = Alarm.Schedule.relative(.init(time: time, repeats: recurrence))
 
         // У будильника со ставкой кнопка «Выключить» открывает приложение с заданием.
-        let stopIntent: (any LiveActivityIntent)? = item.stakeEnabled
+        let stopIntent: (any LiveActivityIntent)? = item.hasTask
             ? WakeStopIntent(alarmID: item.id.uuidString, isRecheck: false)
             : nil
 

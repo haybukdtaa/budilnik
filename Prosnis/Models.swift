@@ -19,8 +19,13 @@ struct AlarmItem: Identifiable, Codable, Equatable {
     /// Ставка пока работает как тренировка: деньги не списываются.
     var stakeEnabled = false
     var stakeAmount = 500
+    /// Задание для выключения без ставки (у будильника со ставкой задание есть всегда).
+    var taskEnabled: Bool? = false
     /// Когда создан. Нужно, чтобы не засчитывать провалы до создания.
     var createdAt: Date? = Date()
+
+    /// Нужно ли печатать предложение, чтобы выключить будильник.
+    var hasTask: Bool { stakeEnabled || taskEnabled == true }
 }
 
 enum Weekdays {

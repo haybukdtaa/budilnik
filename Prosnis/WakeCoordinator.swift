@@ -56,14 +56,18 @@ final class WakeCoordinator: ObservableObject {
         if let current = session, current.alarmID == alarmID { return }
         guard session == nil,
               let alarm = AlarmStore.shared.alarms.first(where: { $0.id == alarmID }),
-              alarm.stakeEnabled else { return }
+              alarm.hasTask else { return }
 
         let ring = alarm.lastOccurrence(onOrBefore: now) ?? now
+        begin(alarm: alarm, ring: ring, now: now, note: "Нажато «Выключить»")
+    }
+
+    private func begin(alarm: AlarmItem, ring: Date, now: Date, note: String) {
         setSession(WakeSession(
             alarmID: alarm.id,
             alarmTitle: alarm.displayTitle,
             timeText: alarm.timeText,
-            stake: alarm.stakeAmount,
+            stake: alarm.stakeEnabled ? alarm.stakeAmount : 0,
             wallpaper: alarm.wallpaper,
             soundID: alarm.soundID,
             startDate: ring,
@@ -73,10 +77,33 @@ final class WakeCoordinator: ObservableObject {
             sentence: SentenceBank.random(),
             events: [
                 JournalEvent(date: ring, text: "Прозвенел будильник"),
-                JournalEvent(date: now, text: "Нажато «Выключить»"),
+                JournalEvent(date: now, text: note),
             ]
         ))
         evaluate(now)
+    }
+
+    /// Запасной вход: если «Выключить» не открыло приложение, задание начинается, когда его открыли вручную в течение 10 минут после звонка.
+    private func lateStart(_ now: Date) {
+        guard session == nil else { return }
+        let calendar = Calendar.current
+        for alarm in AlarmStore.shared.alarms where alarm.hasTask && alarm.isEnabled {
+            guard let ring = alarm.lastOccurrence(onOrBefore: now),
+                  now.timeIntervalSince(ring) < WakeRules.windowSeconds,
+                  ring > (alarm.createdAt ?? .distantPast),
+                  !JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring) else { continue }
+
+            if alarm.weekdays.isEmpty {
+                guard let first = calendar.nextDate(
+                    after: alarm.createdAt ?? .distantPast,
+                    matching: DateComponents(hour: alarm.hour, minute: alarm.minute),
+                    matchingPolicy: .nextTime
+                ), abs(first.timeIntervalSince(ring)) < 60 else { continue }
+            }
+
+            begin(alarm: alarm, ring: ring, now: now, note: "Приложение открыто вручную после звонка")
+            return
+        }
     }
 
     /// Быстрая проверка всего сценария: повторная проверка через минуту, а не через 10.
@@ -189,6 +216,7 @@ final class WakeCoordinator: ObservableObject {
     /// Находит утра, когда приложение так и не открыли, и записывает их в журнал.
     func reconcile(now: Date = Date()) {
         evaluate(now)
+        lateStart(now)
 
         let defaults = UserDefaults.standard
         let lastCheck = (defaults.object(forKey: "lastReconcile") as? Date) ?? now

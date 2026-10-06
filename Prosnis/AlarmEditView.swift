@@ -78,6 +78,14 @@ struct AlarmEditView: View {
                 }
 
                 Section {
+                    Toggle(
+                        "Задание для выключения",
+                        isOn: Binding(
+                            get: { draft.hasTask },
+                            set: { draft.taskEnabled = $0 }
+                        )
+                    )
+                    .disabled(draft.stakeEnabled)
                     Toggle("Со ставкой", isOn: $draft.stakeEnabled)
                     if draft.stakeEnabled {
                         HStack {
@@ -101,7 +109,7 @@ struct AlarmEditView: View {
                         }
                     }
                 } footer: {
-                    Text("Сейчас это тренировка: деньги не списываются.")
+                    Text("Чтобы выключить такой будильник, нужно напечатать предложение, а через 10 минут пройти повторную проверку. Со ставкой задание обязательно. Сейчас ставка тренировочная: деньги не списываются.")
                 }
 
                 if !isNew {

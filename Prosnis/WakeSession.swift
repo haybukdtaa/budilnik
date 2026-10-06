@@ -36,6 +36,48 @@ struct WakeSession: Codable {
     var deadline: Date { ringDate.addingTimeInterval(WakeRules.windowSeconds) }
 }
 
+/// Время, которому можно верить, даже если на телефоне перевели часы.
+/// Считается от последней проверенной точки по часам, которые идут с загрузки телефона и не зависят от настроек времени.
+/// После перезагрузки проверить нечем, поэтому полную защиту даст только сервер.
+enum TrustedClock {
+    private static let wallKey = "trustedClock.wall"
+    private static let monoKey = "trustedClock.mono"
+
+    private static var monotonicSeconds: Double {
+        Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)) / 1_000_000_000
+    }
+
+    static var now: Date {
+        let wall = Date()
+        let mono = monotonicSeconds
+        let defaults = UserDefaults.standard
+
+        guard let anchorWall = defaults.object(forKey: wallKey) as? Date,
+              defaults.object(forKey: monoKey) != nil else {
+            anchor(wall, mono)
+            return wall
+        }
+        let anchorMono = defaults.double(forKey: monoKey)
+        if mono < anchorMono {
+            // Телефон перезагружали.
+            anchor(wall, mono)
+            return wall
+        }
+        let trusted = anchorWall.addingTimeInterval(mono - anchorMono)
+        if abs(trusted.timeIntervalSince(wall)) < 120 {
+            // Обычный дрейф часов или синхронизация по сети.
+            anchor(wall, mono)
+            return wall
+        }
+        return trusted
+    }
+
+    private static func anchor(_ wall: Date, _ mono: Double) {
+        UserDefaults.standard.set(wall, forKey: wallKey)
+        UserDefaults.standard.set(mono, forKey: monoKey)
+    }
+}
+
 enum Bedtime {
     private static let key = "lastBedtimeCheck"
 
