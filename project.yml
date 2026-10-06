@@ -18,10 +18,27 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSAlarmKitUsageDescription: Приложению нужно разрешение, чтобы будильник звонил вовремя, даже когда телефон заблокирован или в режиме «Не беспокоить».
+        NSCameraUsageDescription: Камера нужна для задания «Сканировать код»: утром вы сканируете код, который заранее зарегистрировали в другой комнате.
+        NSMotionUsageDescription: Счётчик шагов нужен для задания «Пройти шаги» и утренней программы «Спорт».
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.prosnis.alarm
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1"
-        MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.2"
+        CURRENT_PROJECT_VERSION: "2"
+    scheme:
+      testTargets:
+        - ProsnisTests
+  ProsnisTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - ProsnisTests
+    dependencies:
+      - target: Prosnis
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        SWIFT_VERSION: "5.0"
+        PRODUCT_BUNDLE_IDENTIFIER: app.prosnis.alarm.tests

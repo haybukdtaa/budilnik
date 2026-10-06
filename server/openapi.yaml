@@ -1,0 +1,220 @@
+openapi: 3.0.3
+info:
+  title: Проснись — API сервера
+  version: "1.0"
+  description: |
+    Договор между приложением и будущим сервером. Приложение уже отправляет и принимает
+    данные в этом формате (Prosnis/Social/HTTPBackend.swift). Чтобы подключить сервер,
+    достаточно реализовать эти методы и указать адрес в AppConfig.serverURL.
+
+    Правила, которые сервер обязан соблюдать:
+    - Даты в формате ISO 8601 (UTC).
+    - Ставки, суммы, журнал и платежи никогда не отдаются другим пользователям.
+    - Статус друга фильтруется по его настройкам видимости (Visibility) для конкретного зрителя.
+    - Данные о намазе (isPrayer, модуль prayer) приходят только с согласия пользователя
+      и не показываются никому без поля sharePrayer.
+    - Рекорды и таблицы считаются на сервере по журналу (ProgressEngine — та же формула),
+      значения от клиента не принимаются на веру.
+    - Данные граждан РФ хранятся на серверах в РФ.
+servers:
+  - url: https://api.example.ru
+security:
+  - bearer: []
+paths:
+  /v1/time:
+    get:
+      summary: Время сервера (для блокировки изменений за 2 часа)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { now: { type: string, format: date-time } } } } } }
+  /v1/sync:
+    post:
+      summary: Отправка очереди изменений (будильники, журнал, челленджи, приватность, профиль)
+      requestBody:
+        content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/OutboxItem" } } } }
+      responses:
+        "200": { description: Принятые id, content: { application/json: { schema: { type: object, properties: { accepted: { type: array, items: { type: string, format: uuid } } } } } } }
+  /v1/me:
+    delete:
+      summary: Удалить аккаунт и все данные
+      responses: { "204": { description: Удалено } }
+  /v1/me/status:
+    put:
+      summary: Статус дня для друзей
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/PublicStatus" } } } }
+      responses: { "204": { description: OK } }
+  /v1/me/rewards:
+    get:
+      summary: Награды за приглашения
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/InviteReward" } } } } } }
+  /v1/friends:
+    get:
+      summary: Список друзей со статусами, отфильтрованными по их видимости
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Friend" } } } } } }
+  /v1/friends/{id}:
+    delete:
+      summary: Удалить из друзей
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "204": { description: OK } }
+  /v1/friends/{id}/visibility:
+    put:
+      summary: Что видит этот друг
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/Visibility" } } } }
+      responses: { "204": { description: OK } }
+  /v1/friends/{id}/nudge:
+    post:
+      summary: «Разбудить» друга (не больше 3 раз в сутки, иначе 429)
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "204": { description: OK }, "429": { description: Лимит } }
+  /v1/invites:
+    post:
+      summary: Создать код приглашения (6 символов, 7 дней)
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Invite" } } } } }
+  /v1/invites/accept:
+    post:
+      summary: Принять приглашение по коду
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/CodeBody" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Friend" } } } }, "422": { description: Неверный код } }
+  /v1/rooms:
+    get:
+      summary: Комнаты и клубы пользователя
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Room" } } } } } }
+    post:
+      summary: Создать комнату или клуб
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/RoomDraft" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Room" } } } } }
+  /v1/rooms/join:
+    post:
+      summary: Войти по коду (409 — комната заполнена, 30 участников)
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/CodeBody" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Room" } } } }, "409": { description: Заполнена }, "422": { description: Неверный код } }
+  /v1/rooms/{id}/leave:
+    post:
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "204": { description: OK } }
+  /v1/conversations/{kind}/{id}/messages:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [friend, room] } }
+      - { $ref: "#/components/parameters/id" }
+    get:
+      summary: Сообщения (без заблокированных авторов)
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ChatMessage" } } } } } }
+    post:
+      summary: Отправить сообщение (до 1000 символов, модерация на сервере, только 18+)
+      requestBody: { content: { application/json: { schema: { type: object, properties: { text: { type: string, maxLength: 1000 } } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ChatMessage" } } } } }
+  /v1/messages/{id}/report:
+    post:
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { reason: { type: string } } } } } }
+      responses: { "204": { description: OK } }
+  /v1/users/{id}/block:
+    post:
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "204": { description: OK } }
+  /v1/leaderboards/{kind}:
+    get:
+      summary: Таблица (только участники с joinLeaderboards); рекорд держится, пока не побит
+      parameters: [ { name: kind, in: path, required: true, schema: { type: string, enum: [weekRegularity, allTimeStreak, allTimeWakes] } } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Leaderboard" } } } } }
+  /v1/stats/global:
+    get:
+      summary: Анонимная статистика
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/GlobalStats" } } } } }
+  /v1/pair-challenges:
+    get:
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PairChallenge" } } } } } }
+    post:
+      requestBody: { content: { application/json: { schema: { type: object, properties: { friendID: { type: string, format: uuid }, title: { type: string }, days: { type: integer } } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PairChallenge" } } } } }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer }
+  parameters:
+    id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+  schemas:
+    CodeBody: { type: object, properties: { code: { type: string, minLength: 6, maxLength: 6 } } }
+    UserProfile:
+      type: object
+      properties: { id: { type: string, format: uuid }, displayName: { type: string }, avatar: { type: string } }
+    Visibility:
+      type: object
+      properties: { wakeStatus: { type: boolean }, wakeTime: { type: boolean }, streak: { type: boolean }, level: { type: boolean }, tree: { type: boolean }, prayer: { type: boolean } }
+    PublicStatus:
+      type: object
+      description: Без каких-либо денежных полей.
+      properties:
+        day: { type: string, format: date-time }
+        woke: { type: boolean, nullable: true }
+        wakeTime: { type: string, format: date-time, nullable: true }
+        streak: { type: integer, nullable: true }
+        level: { type: integer, nullable: true }
+        treeStage: { type: integer, nullable: true }
+        prayerDone: { type: boolean, nullable: true }
+    Friend:
+      type: object
+      properties:
+        profile: { $ref: "#/components/schemas/UserProfile" }
+        since: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/PublicStatus" }
+        myVisibility: { $ref: "#/components/schemas/Visibility" }
+    Invite: { type: object, properties: { code: { type: string }, expiresAt: { type: string, format: date-time } } }
+    RoomMember:
+      type: object
+      properties: { profile: { $ref: "#/components/schemas/UserProfile" }, status: { $ref: "#/components/schemas/PublicStatus" }, isOwner: { type: boolean } }
+    Room:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        isClub: { type: boolean }
+        topic: { type: string, nullable: true }
+        rules: { type: string, nullable: true }
+        targetWakeMinutes: { type: integer, nullable: true }
+        inviteCode: { type: string }
+        members: { type: array, items: { $ref: "#/components/schemas/RoomMember" } }
+        createdAt: { type: string, format: date-time }
+    RoomDraft:
+      type: object
+      properties: { name: { type: string }, isClub: { type: boolean }, topic: { type: string, nullable: true }, rules: { type: string, nullable: true }, targetWakeMinutes: { type: integer, nullable: true } }
+    ChatMessage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        conversation: { type: object, properties: { kind: { type: string, enum: [friend, room] }, id: { type: string, format: uuid } } }
+        author: { $ref: "#/components/schemas/UserProfile" }
+        text: { type: string }
+        sentAt: { type: string, format: date-time }
+    LeaderboardRow:
+      type: object
+      properties: { rank: { type: integer }, profile: { $ref: "#/components/schemas/UserProfile" }, value: { type: integer }, valueText: { type: string } }
+    Leaderboard:
+      type: object
+      properties:
+        kind: { type: string }
+        rows: { type: array, items: { $ref: "#/components/schemas/LeaderboardRow" } }
+        me: { $ref: "#/components/schemas/LeaderboardRow" }
+        record: { type: object, properties: { profile: { $ref: "#/components/schemas/UserProfile" }, value: { type: integer }, since: { type: string, format: date-time } } }
+    GlobalStats: { type: object, properties: { wokeToday: { type: integer }, activeChallenges: { type: integer } } }
+    InviteReward: { type: object, properties: { id: { type: string }, title: { type: string }, detail: { type: string }, unlocked: { type: boolean } } }
+    PairChallenge:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        partner: { $ref: "#/components/schemas/UserProfile" }
+        durationDays: { type: integer }
+        startDate: { type: string, format: date-time }
+        myDays: { type: integer }
+        partnerDays: { type: integer }
+        status: { type: string, enum: [active, completed, failed, abandoned] }
+    OutboxItem:
+      type: object
+      description: payload — JSON сущности в base64 (будильник, запись журнала, челлендж, приватность, профиль).
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [alarm, journalEntry, challenge, privacy, profile] }
+        entityID: { type: string, format: uuid }
+        payload: { type: string, format: byte }
+        deleted: { type: boolean }
+        createdAt: { type: string, format: date-time }
