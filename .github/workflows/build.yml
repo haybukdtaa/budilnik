@@ -14,7 +14,9 @@ jobs:
         run: brew install xcodegen
 
       - name: Сгенерировать проект Xcode
-        run: xcodegen generate
+        run: |
+          set -o pipefail
+          xcodegen generate 2>&1 | tee xcodegen.log
 
       - name: Версия Xcode
         run: xcodebuild -version
@@ -66,6 +68,10 @@ jobs:
       - name: Ошибки в аннотацию
         if: failure()
         run: |
+          if [ -f xcodegen.log ] && ! grep -q "Created project" xcodegen.log; then
+            msg=$(tail -20 xcodegen.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=XcodeGen::${msg}"
+          fi
           for f in test.log build.log; do
             [ -f "$f" ] || continue
             msg=$(grep -E ': error:' "$f" | sed -E 's#^.*/(Prosnis|ProsnisTests)/#\1/#' | sort -u | head -60 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')

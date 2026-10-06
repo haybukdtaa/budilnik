@@ -45,9 +45,10 @@ final class AccountStore: ObservableObject {
         ChallengeStore.shared.reload()
         WakeCoordinator.shared.reload()
         PaymentsStore.shared.reload()
-        SyncEngine.shared.reload()
         SocialStore.shared.resetAfterWipe()
         DemoBackend.shared.reload()
+        // Последним: перезагрузка настроек выше могла поставить изменения в очередь.
+        SyncEngine.shared.clear()
     }
 }
 
