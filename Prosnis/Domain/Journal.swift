@@ -25,7 +25,7 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var date: Date
     /// Какой будильник. nil у тестовых записей и у быстрой проверки.
     var alarmID: UUID?
-    /// Сбой, который был прощён по правилу «первый раз прощается».
+    /// Только у записей старых версий: тогда первый пропуск прощался. Сейчас прощений нет.
     var forgiven: Bool?
     var alarmTitle: String
     var timeText: String
