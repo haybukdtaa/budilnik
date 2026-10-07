@@ -14,6 +14,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var pairs: [PairChallenge] = []
     @Published private(set) var messages: [ConversationID: [ChatMessage]] = [:]
     @Published private(set) var invite: Invite?
+    @Published private(set) var witnessNotices: [WitnessNotice] = []
     @Published private(set) var isLoading = false
     @Published var errorText: String?
 
@@ -44,6 +45,7 @@ final class SocialStore: ObservableObject {
             stats = try await backend.globalStats()
             pairs = try await backend.pairChallenges()
             rewards = try await backend.inviteRewards()
+            witnessNotices = try await backend.witnessNotices()
         }
         let unlocked = rewards.filter(\.unlocked).map(\.id)
         if Set(unlocked) != Set(AppSettings.shared.data.unlockedRewards) {
@@ -60,6 +62,7 @@ final class SocialStore: ObservableObject {
         pairs = []
         messages = [:]
         invite = nil
+        witnessNotices = []
     }
 
     // MARK: - Друзья
@@ -82,6 +85,7 @@ final class SocialStore: ObservableObject {
         await run {
             try await backend.removeFriend(friend.id)
             friends.removeAll { $0.id == friend.id }
+            AppSettings.shared.setWitness(friend.id, false)
         }
     }
 
@@ -211,7 +215,20 @@ final class SocialStore: ObservableObject {
         let entries = PublicStatusBuilder.shareableEntries(JournalStore.shared.realEntries, privacy: privacy)
         let challenges = PublicStatusBuilder.shareableChallenges(ChallengeStore.shared.challenges, privacy: privacy)
         let snapshot = ProgressEngine.compute(entries: entries, challenges: challenges)
-        let status = PublicStatusBuilder.build(entries: JournalStore.shared.realEntries, snapshot: snapshot, privacy: privacy, now: Date())
+        let species = AppSettings.shared.species(forTree: snapshot.tree.index)
+        let status = PublicStatusBuilder.build(
+            entries: JournalStore.shared.realEntries, snapshot: snapshot, privacy: privacy, now: Date(), species: species
+        )
         Task { try? await backend.publishStatus(status) }
+    }
+
+    /// Сообщает друзьям-свидетелям о проспанном утре. Без сервера ничего не отправляется.
+    func notifyWitnesses(about entry: JournalEntry) {
+        let settings = AppSettings.shared.data
+        guard WitnessPolicy.shouldNotify(entry: entry, privacy: settings.privacy, witnesses: settings.witnesses) else { return }
+        let backend = self.backend
+        guard backend.isOnline else { return }
+        let notice = MissedMorningNotice(day: Calendar.current.startOfDay(for: entry.date), witnesses: settings.witnesses)
+        Task { try? await backend.notifyWitnesses(notice) }
     }
 }

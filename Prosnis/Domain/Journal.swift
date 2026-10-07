@@ -161,7 +161,7 @@ final class JournalStore: ObservableObject {
         entries.append(entry)
         entries.sort { $0.date > $1.date }
         save()
-        AppEvents.journalChanged(entry)
+        AppEvents.journalChanged(entry, isNew: true)
     }
 
     func setRoutine(entryID: UUID, done: [String], total: Int) {

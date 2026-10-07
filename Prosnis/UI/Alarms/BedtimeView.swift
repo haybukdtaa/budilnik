@@ -10,6 +10,7 @@ struct BedtimeView: View {
     @State private var batteryState: UIDevice.BatteryState = .unknown
 
     @EnvironmentObject private var payments: PaymentsStore
+    @EnvironmentObject private var settings: AppSettings
 
     private var nextStaked: (AlarmItem, Date)? {
         let now = Date()
@@ -22,6 +23,11 @@ struct BedtimeView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let reason = settings.wakeReason {
+                    Section("Зачем я встаю") {
+                        Text("«\(reason)»").italic()
+                    }
+                }
                 Section("Проверка перед сном") {
                     row(
                         ok: store.isAuthorized,

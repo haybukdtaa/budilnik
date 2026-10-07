@@ -25,6 +25,12 @@ struct MorningView: View {
                             .font(.largeTitle.bold())
                         Text(Format.dateTime(state.startedAt))
                             .foregroundStyle(.secondary)
+                        if let reason = settings.wakeReason {
+                            Text("«\(reason)»")
+                                .italic()
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 4)
+                        }
                     }
                     .padding(.top, 8)
 
@@ -79,30 +85,43 @@ struct MorningView: View {
     private func rewards(_ snapshot: ProgressSnapshot) -> some View {
         let gained = max(0, snapshot.xp - state.xpBefore)
         let newBadges = snapshot.unlocked.filter { !state.badgesBefore.contains($0.id) }
+        let tree = snapshot.tree
+        let movedToGarden = tree.index > state.treeIndexBefore
         return card {
             HStack(alignment: .center, spacing: 16) {
-                TreeView(stage: snapshot.tree.stage, wilt: snapshot.tree.wilt)
+                TreeView(stage: tree.stage, wilt: tree.wilt,
+                         species: settings.species(forTree: tree.index) ?? .oak,
+                         flowers: tree.flowers, fruits: tree.fruits)
                     .frame(width: 110, height: 130)
                 VStack(alignment: .leading, spacing: 6) {
                     if gained > 0 {
                         Text("+\(gained) опыта").font(.title2.bold()).foregroundStyle(Theme.accentGradient)
                     }
                     if snapshot.level > state.levelBefore {
-                        Label("Новый уровень: \(snapshot.level)", systemImage: "arrow.up.circle.fill")
+                        Label("Новое звание: \(snapshot.title)", systemImage: "arrow.up.circle.fill")
                             .foregroundStyle(.green)
                     } else {
-                        Text("Уровень \(snapshot.level)")
+                        Text(snapshot.title)
                     }
                     Text("Серия: \(snapshot.currentStreak)")
                         .foregroundStyle(.secondary)
-                    if snapshot.tree.stage > state.treeStageBefore {
-                        Text("Дерево выросло: \(snapshot.tree.title)")
+                    if movedToGarden {
+                        Text("Дерево выросло и переехало в ваш сад! Сажаем новое.")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.green)
+                    } else if tree.stage > state.treeStageBefore {
+                        Text("Дерево выросло: \(tree.title)")
                             .font(.subheadline)
                             .foregroundStyle(.green)
                     } else {
-                        Text(snapshot.tree.title)
+                        Text(tree.title)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+                    }
+                    if tree.fruits && !state.fruitsBefore {
+                        Text("Появились плоды: месяц без провалов").font(.subheadline).foregroundStyle(.green)
+                    } else if tree.flowers && !state.flowersBefore {
+                        Text("Дерево зацвело: неделя без провалов").font(.subheadline).foregroundStyle(.pink)
                     }
                     ForEach(newBadges) { item in
                         Label("Значок: \(item.badge.title)", systemImage: item.badge.icon)

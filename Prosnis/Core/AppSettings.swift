@@ -20,6 +20,12 @@ struct SettingsData: Codable, Equatable {
     /// Когда я «будил» друзей (ключ = id друга), для лимита в сутки.
     var nudges: [String: [Date]] = [:]
     var blockedUsers: [UUID] = []
+    /// Вид каждого дерева (ключ — номер дерева). Нет ключа — вид ещё не выбран.
+    var treeSpecies: [String: TreeSpecies] = [:]
+    /// Друзья-свидетели: получают сообщение, если я проспал (без сумм).
+    var witnesses: [UUID] = []
+    /// «Зачем я встаю» — своя фраза. Видна только мне.
+    var wakeReason = ""
 
     init() {}
 
@@ -41,6 +47,9 @@ struct SettingsData: Codable, Equatable {
         profile = try c.decodeIfPresent(UserProfile.self, forKey: .profile) ?? base.profile
         nudges = try c.decodeIfPresent([String: [Date]].self, forKey: .nudges) ?? base.nudges
         blockedUsers = try c.decodeIfPresent([UUID].self, forKey: .blockedUsers) ?? base.blockedUsers
+        treeSpecies = try c.decodeIfPresent([String: TreeSpecies].self, forKey: .treeSpecies) ?? base.treeSpecies
+        witnesses = try c.decodeIfPresent([UUID].self, forKey: .witnesses) ?? base.witnesses
+        wakeReason = try c.decodeIfPresent(String.self, forKey: .wakeReason) ?? base.wakeReason
     }
 }
 
@@ -131,4 +140,28 @@ final class AppSettings: ObservableObject {
     }
 
     func isBlocked(_ id: UUID) -> Bool { data.blockedUsers.contains(id) }
+
+    /// Вид дерева с этим номером, если выбран.
+    func species(forTree index: Int) -> TreeSpecies? { data.treeSpecies[String(index)] }
+
+    /// Выбирает вид для дерева. Выбор окончательный, пока дерево не вырастет.
+    func chooseSpecies(_ species: TreeSpecies, forTree index: Int) {
+        guard data.treeSpecies[String(index)] == nil else { return }
+        data.treeSpecies[String(index)] = species
+    }
+
+    func isWitness(_ id: UUID) -> Bool { data.witnesses.contains(id) }
+
+    func setWitness(_ id: UUID, _ isOn: Bool) {
+        if isOn {
+            if !data.witnesses.contains(id) { data.witnesses.append(id) }
+        } else {
+            data.witnesses.removeAll { $0 == id }
+        }
+    }
+
+    var wakeReason: String? {
+        let text = data.wakeReason.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
 }

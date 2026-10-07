@@ -22,9 +22,23 @@ struct ProfileView: View {
                             AvatarView(profile: settings.data.profile, size: 56)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(settings.data.profile.displayName).font(.title3.bold())
-                                Text("Уровень \(snapshot.level) · серия \(snapshot.currentStreak)")
+                                Text("\(snapshot.title) · уровень \(snapshot.level) · серия \(snapshot.currentStreak)")
                                     .foregroundStyle(.secondary)
                             }
+                        }
+                    }
+                }
+
+                Section {
+                    NavigationLink {
+                        WakeReasonView()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Зачем я встаю", systemImage: "heart.text.square")
+                            Text(settings.wakeReason.map { "«\($0)»" } ?? "Напишите свою причину: она будет на экране задания и утром")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
                         }
                     }
                 }
@@ -105,6 +119,39 @@ struct ProfileView: View {
                 Text(deleteError ?? "")
             }
         }
+    }
+}
+
+/// «Зачем я встаю»: своя причина. Видна только владельцу.
+struct WakeReasonView: View {
+    @EnvironmentObject private var settings: AppSettings
+    @State private var text = ""
+
+    static let examples = [
+        "Утро — единственное время только для меня",
+        "Хочу успевать на тренировку до работы",
+        "Чтобы дети видели меня бодрым",
+        "Каждый подъём приближает меня к цели",
+    ]
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Например: хочу успевать всё до обеда", text: $text, axis: .vertical)
+                    .lineLimit(2...4)
+            } footer: {
+                Text("Фраза показывается на экране задания, утром и вечером. Её видите только вы.")
+            }
+            Section("Примеры") {
+                ForEach(WakeReasonView.examples, id: \.self) { example in
+                    Button(example) { text = example }
+                }
+            }
+        }
+        .navigationTitle("Зачем я встаю")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { text = settings.data.wakeReason }
+        .onDisappear { settings.data.wakeReason = String(text.prefix(200)) }
     }
 }
 

@@ -156,7 +156,8 @@ struct RoomDetailView: View {
                         HStack(spacing: 14) {
                             ForEach(room.members) { member in
                                 VStack(spacing: 4) {
-                                    TreeView(stage: member.status?.treeStage ?? 0, wilt: 0)
+                                    TreeView(stage: member.status?.treeStage ?? 0, wilt: 0,
+                                             species: member.status?.treeSpecies ?? .oak)
                                         .frame(width: 70, height: 80)
                                     Text(member.profile.displayName).font(.caption2)
                                 }

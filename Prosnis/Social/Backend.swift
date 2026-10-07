@@ -54,6 +54,11 @@ protocol SocialBackend: AnyObject {
     func createPairChallenge(with friend: UUID, title: String, days: Int) async throws -> PairChallenge
 
     func deleteAccount() async throws
+
+    /// Сообщить свидетелям, что я проспал (сервер рассылает им уведомление).
+    func notifyWitnesses(_ notice: MissedMorningNotice) async throws
+    /// Друзья, у которых я свидетель и которые проспали за последние дни.
+    func witnessNotices() async throws -> [WitnessNotice]
 }
 
 /// Синхронизация локальных данных (будильники, журнал, челленджи) с сервером.
@@ -93,6 +98,8 @@ final class OfflineBackend: SocialBackend, SyncBackend {
     func pairChallenges() async throws -> [PairChallenge] { try unavailable() }
     func createPairChallenge(with friend: UUID, title: String, days: Int) async throws -> PairChallenge { try unavailable() }
     func deleteAccount() async throws {}
+    func notifyWitnesses(_ notice: MissedMorningNotice) async throws { throw BackendError.serverUnavailable }
+    func witnessNotices() async throws -> [WitnessNotice] { try unavailable() }
 
     func push(_ items: [OutboxItem]) async throws -> [UUID] { try unavailable() }
     func serverTime() async throws -> Date { try unavailable() }

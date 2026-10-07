@@ -15,26 +15,6 @@ struct UnlockedBadge: Identifiable, Hashable {
     var id: String { badge.id }
 }
 
-struct TreeState: Equatable {
-    /// 0 = семечко ... 7 = вековое дерево.
-    var stage: Int
-    /// 0 = здоровое ... 3 = сильно увяло (недавние провалы).
-    var wilt: Int
-
-    static let stageTitles = [
-        "Семечко", "Росток", "Саженец", "Молодое деревце",
-        "Деревце", "Крепкое дерево", "Большое дерево", "Вековое дерево",
-    ]
-    /// Сколько подъёмов нужно для каждой стадии.
-    static let thresholds = [0, 1, 3, 7, 14, 30, 60, 100]
-
-    var title: String { TreeState.stageTitles[min(max(stage, 0), 7)] }
-
-    var nextStageWakes: Int? {
-        stage + 1 < TreeState.thresholds.count ? TreeState.thresholds[stage + 1] : nil
-    }
-}
-
 struct WeekSummary: Equatable {
     var start: Date
     var mornings = 0
@@ -56,6 +36,9 @@ struct ProgressSnapshot: Equatable {
     var totalWakes = 0
     var unlocked: [UnlockedBadge] = []
     var tree = TreeState(stage: 0, wilt: 0)
+    /// Выросшие деревья в саду.
+    var garden: [CompletedTree] = []
+    var title: String { Titles.title(forLevel: level) }
     var thisWeek: WeekSummary
     var lastWeek: WeekSummary
 }
@@ -131,6 +114,7 @@ enum ProgressEngine {
         // день удачный, если все будильники с заданием в этот день закончились подъёмом.
         let byDay = Dictionary(grouping: ordered) { calendar.startOfDay(for: $0.date) }
         var dayResults: [Bool] = []
+        var garden: [CompletedTree] = []
         for day in byDay.keys.sorted() {
             let dayEntries = (byDay[day] ?? []).sorted { $0.date < $1.date }
             let daySuccess = dayEntries.allSatisfy { $0.outcome == .success }
@@ -162,6 +146,10 @@ enum ProgressEngine {
             }
 
             if daySuccess, let last = dayEntries.last {
+                // Каждые 100 удачных утр дерево вырастает и переезжает в сад.
+                if wakes % TreeState.cycle == 0 {
+                    garden.append(CompletedTree(index: wakes / TreeState.cycle - 1, date: last.date))
+                }
                 unlock("first_wake", last.date)
                 for n in [3, 7, 14, 30, 60, 100, 365] where streak >= n { unlock("streak_\(n)", last.date) }
                 for n in [10, 50, 100, 500] where wakes >= n { unlock("wakes_\(n)", last.date) }
@@ -187,10 +175,18 @@ enum ProgressEngine {
 
         let levelInfo = level(forXP: totalXP)
 
-        // Дерево: растёт с подъёмами, вянет от недавних провалов.
-        let stage = max(0, TreeState.thresholds.lastIndex { wakes >= $0 } ?? 0)
+        // Дерево: растёт с подъёмами, вянет от недавних провалов, цветёт и плодоносит от серии.
+        let progress = wakes % TreeState.cycle
         let recentFailures = dayResults.suffix(7).filter { !$0 }.count
-        let tree = TreeState(stage: stage, wilt: min(recentFailures, 3))
+        let wilt = min(recentFailures, 3)
+        let tree = TreeState(
+            index: wakes / TreeState.cycle,
+            progress: progress,
+            stage: TreeState.stage(forProgress: progress),
+            wilt: wilt,
+            flowers: wilt == 0 && streak >= TreeState.flowersStreak,
+            fruits: wilt == 0 && streak >= TreeState.fruitsStreak
+        )
 
         func summary(weekContaining date: Date) -> WeekSummary {
             let interval = calendar.dateInterval(of: .weekOfYear, for: date)
@@ -222,6 +218,7 @@ enum ProgressEngine {
             totalWakes: wakes,
             unlocked: unlockedList,
             tree: tree,
+            garden: garden,
             thisWeek: summary(weekContaining: now),
             lastWeek: summary(weekContaining: lastWeekDate)
         )

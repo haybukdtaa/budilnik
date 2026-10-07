@@ -18,6 +18,7 @@ enum PublicStatusBuilder {
         snapshot: ProgressSnapshot,
         privacy: PrivacySettings,
         now: Date,
+        species: TreeSpecies? = nil,
         calendar: Calendar = .current
     ) -> PublicStatus {
         let todays = entries.filter { $0.counts && calendar.isDate($0.date, inSameDayAs: now) }
@@ -32,7 +33,10 @@ enum PublicStatusBuilder {
         }
         if privacy.shareStreak { status.streak = snapshot.currentStreak }
         if privacy.shareLevel { status.level = snapshot.level }
-        if privacy.shareTree { status.treeStage = snapshot.tree.stage }
+        if privacy.shareTree {
+            status.treeStage = snapshot.tree.stage
+            status.treeSpecies = species
+        }
         if privacy.sharePrayer {
             let prayer = todays.filter { $0.isPrayer == true }
             if !prayer.isEmpty { status.prayerDone = prayer.contains { $0.outcome == .success } }

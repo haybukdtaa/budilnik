@@ -20,6 +20,24 @@ struct FriendsSection: View {
                 }
             }
 
+            if !social.witnessNotices.isEmpty {
+                Section {
+                    ForEach(social.witnessNotices) { notice in
+                        HStack(spacing: 12) {
+                            AvatarView(profile: notice.friend, size: 34)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(notice.friend.displayName) проспал(а)").font(.subheadline.weight(.semibold))
+                                Text(Format.weekday(notice.day)).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Вы свидетель")
+                } footer: {
+                    Text("Поддержите друга сообщением. Суммы и ставки вам не сообщаются.")
+                }
+            }
+
             Section("Друзья") {
                 if social.friends.isEmpty {
                     Text("Пока никого. Пригласите друга по коду.").foregroundStyle(.secondary)
@@ -36,7 +54,8 @@ struct FriendsSection: View {
                             }
                             Spacer()
                             if let stage = friend.status?.treeStage {
-                                TreeView(stage: stage, wilt: 0).frame(width: 34, height: 40)
+                                TreeView(stage: stage, wilt: 0, species: friend.status?.treeSpecies ?? .oak)
+                                    .frame(width: 34, height: 40)
                             }
                         }
                     }
@@ -150,8 +169,10 @@ struct FriendDetailView: View {
                     StatusLine(status: friend.status)
                     if let stage = friend.status?.treeStage {
                         HStack {
-                            TreeView(stage: stage, wilt: 0).frame(width: 60, height: 70)
-                            Text(TreeState.stageTitles[min(max(stage, 0), 7)])
+                            TreeView(stage: stage, wilt: 0, species: friend.status?.treeSpecies ?? .oak)
+                                .frame(width: 60, height: 70)
+                            Text(((friend.status?.treeSpecies?.title).map { "\($0) · " } ?? "")
+                                 + TreeState.stageTitles[min(max(stage, 0), 7)])
                         }
                     }
                 }
@@ -179,6 +200,15 @@ struct FriendDetailView: View {
                     } label: {
                         Label("Парный челлендж", systemImage: "person.2.fill")
                     }
+                }
+
+                Section {
+                    Toggle("Свидетель моих утр", isOn: Binding(
+                        get: { settings.isWitness(friend.id) },
+                        set: { settings.setWitness(friend.id, $0) }
+                    ))
+                } footer: {
+                    Text("Если вы проспите, \(friend.profile.displayName) получит сообщение. Только сам факт: ни времени, ни суммы ставки. Подъём на Фаджр без вашего согласия не сообщается.")
                 }
 
                 Section {

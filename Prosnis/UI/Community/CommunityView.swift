@@ -136,7 +136,7 @@ struct StatusLine: View {
                     Label("\(streak)", systemImage: "flame.fill").foregroundStyle(Theme.accent)
                 }
                 if let level = status.level {
-                    Text("ур. \(level)").foregroundStyle(.secondary)
+                    Text(Titles.title(forLevel: level)).foregroundStyle(.secondary)
                 }
             }
             .font(.caption)

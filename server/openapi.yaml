@@ -43,6 +43,16 @@ paths:
       summary: Статус дня для друзей
       requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/PublicStatus" } } } }
       responses: { "204": { description: OK } }
+  /v1/me/missed:
+    post:
+      summary: Я проспал — разослать уведомление друзьям-свидетелям
+      description: Только день. Сервер не сообщает свидетелям ни время, ни сумму ставки.
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/MissedMorningNotice" } } } }
+      responses: { "204": { description: OK } }
+  /v1/witness-notices:
+    get:
+      summary: Друзья, у которых я свидетель и которые недавно проспали
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/WitnessNotice" } } } } } }
   /v1/me/rewards:
     get:
       summary: Награды за приглашения
@@ -151,6 +161,7 @@ components:
         streak: { type: integer, nullable: true }
         level: { type: integer, nullable: true }
         treeStage: { type: integer, nullable: true }
+        treeSpecies: { type: string, nullable: true, enum: [oak, sakura, pine, birch, maple, palm] }
         prayerDone: { type: boolean, nullable: true }
     Friend:
       type: object
@@ -197,6 +208,17 @@ components:
         me: { $ref: "#/components/schemas/LeaderboardRow" }
         record: { type: object, properties: { profile: { $ref: "#/components/schemas/UserProfile" }, value: { type: integer }, since: { type: string, format: date-time } } }
     GlobalStats: { type: object, properties: { wokeToday: { type: integer }, activeChallenges: { type: integer } } }
+    MissedMorningNotice:
+      type: object
+      properties:
+        day: { type: string, format: date-time }
+        witnesses: { type: array, items: { type: string, format: uuid } }
+    WitnessNotice:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        friend: { $ref: "#/components/schemas/UserProfile" }
+        day: { type: string, format: date-time }
     InviteReward: { type: object, properties: { id: { type: string }, title: { type: string }, detail: { type: string }, unlocked: { type: boolean } } }
     PairChallenge:
       type: object

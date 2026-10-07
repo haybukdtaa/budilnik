@@ -57,6 +57,7 @@ struct PublicStatus: Codable, Equatable {
     var streak: Int?
     var level: Int?
     var treeStage: Int?
+    var treeSpecies: TreeSpecies?
     var prayerDone: Bool?
 }
 
@@ -179,6 +180,19 @@ struct InviteReward: Codable, Identifiable, Equatable {
     var title: String
     var detail: String
     var unlocked: Bool
+}
+
+/// Сообщение свидетелям о проспанном утре. Только день: ни времени, ни сумм.
+struct MissedMorningNotice: Codable, Equatable {
+    var day: Date
+    var witnesses: [UUID]
+}
+
+/// Друг, у которого я свидетель, проспал.
+struct WitnessNotice: Codable, Identifiable, Equatable {
+    var id: UUID
+    var friend: UserProfile
+    var day: Date
 }
 
 /// Ссылка на сообщество региона (группа в Telegram и т. п.).

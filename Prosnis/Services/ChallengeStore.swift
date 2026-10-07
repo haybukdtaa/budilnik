@@ -78,8 +78,12 @@ final class ChallengeStore: ObservableObject {
 /// Что происходит после изменения журнала.
 @MainActor
 enum AppEvents {
-    static func journalChanged(_ entry: JournalEntry) {
+    /// `isNew` — запись только что появилась (а не обновилась чек-листом или спором).
+    static func journalChanged(_ entry: JournalEntry, isNew: Bool = false) {
         ChallengeStore.shared.evaluateAll()
+        if isNew {
+            SocialStore.shared.notifyWitnesses(about: entry)
+        }
         let mayLeave = entry.isPrayer != true || AppSettings.shared.data.privacy.syncPrayerData
         if entry.isDemo != true && mayLeave {
             // Уходит на свой сервер (нужен для платежей и проверки рекордов), друзьям не показывается.

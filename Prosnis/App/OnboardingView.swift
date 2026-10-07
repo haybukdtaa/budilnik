@@ -6,6 +6,7 @@ struct OnboardingView: View {
     @State private var page = 0
     @State private var modules: Set<WakeModule> = [.basic]
     @State private var name = ""
+    @State private var reason = ""
     @State private var isAdult = false
     @State private var permissionText: String?
 
@@ -108,6 +109,10 @@ struct OnboardingView: View {
             TextField("Ваше имя для друзей", text: $name)
                 .padding(12)
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+            TextField("Зачем вы хотите вставать вовремя? (необязательно)", text: $reason, axis: .vertical)
+                .lineLimit(1...3)
+                .padding(12)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
             Toggle("Мне \(AppConfig.adultAge) лет или больше", isOn: $isAdult)
             Text("Нужно для ставок и чатов. Без этого будильник, задания и прогресс работают полностью.")
                 .font(.footnote)
@@ -136,6 +141,7 @@ struct OnboardingView: View {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         if !trimmed.isEmpty { data.profile.displayName = trimmed }
         data.isAdult = isAdult
+        data.wakeReason = String(reason.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
         data.onboardingDone = true
         settings.data = data
     }

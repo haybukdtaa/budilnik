@@ -49,6 +49,7 @@ final class DemoBackend: SocialBackend, SyncBackend {
             streak: streak,
             level: level,
             treeStage: tree,
+            treeSpecies: [TreeSpecies.oak, .sakura, .pine, .birch, .maple][tree % 5],
             prayerDone: nil
         )
     }
@@ -312,6 +313,16 @@ final class DemoBackend: SocialBackend, SyncBackend {
     func deleteAccount() async throws {
         state = DemoBackend.seed()
         file.delete()
+    }
+
+    func notifyWitnesses(_ notice: MissedMorningNotice) async throws {
+        // Вымышленные друзья: сообщение никуда не уходит.
+    }
+
+    func witnessNotices() async throws -> [WitnessNotice] {
+        // Мария (вымышленная) проспала сегодня, а вы её свидетель.
+        guard let maria = state.friends.first(where: { $0.profile.displayName == "Мария" }) else { return [] }
+        return [WitnessNotice(id: UUID(), friend: maria.profile, day: Calendar.current.startOfDay(for: Date()))]
     }
 
     func push(_ items: [OutboxItem]) async throws -> [UUID] { items.map(\.id) }

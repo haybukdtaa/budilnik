@@ -3,6 +3,7 @@ import SwiftUI
 /// Экран задания: выполнить задание, пока не вышло время.
 struct WakeTaskView: View {
     @EnvironmentObject private var wake: WakeCoordinator
+    @EnvironmentObject private var settings: AppSettings
     let session: WakeSession
 
     var body: some View {
@@ -22,6 +23,14 @@ struct WakeTaskView: View {
                         .font(.system(size: 60, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(remaining < 120 ? Color.red : Color.white)
+                }
+
+                if let reason = settings.wakeReason {
+                    Text("«\(reason)»")
+                        .font(.subheadline)
+                        .italic()
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.9))
                 }
 
                 Label(session.taskKind.title, systemImage: session.taskKind.icon)

@@ -131,6 +131,12 @@ final class HTTPBackend: SocialBackend, SyncBackend {
         try await send("POST", "v1/pair-challenges", body: PairBody(friendID: friend, title: title, days: days), as: PairChallenge.self)
     }
     func deleteAccount() async throws { try await call("DELETE", "v1/me") }
+    func notifyWitnesses(_ notice: MissedMorningNotice) async throws {
+        try await call("POST", "v1/me/missed", body: notice)
+    }
+    func witnessNotices() async throws -> [WitnessNotice] {
+        try await get("v1/witness-notices", as: [WitnessNotice].self)
+    }
 
     func push(_ items: [OutboxItem]) async throws -> [UUID] {
         try await send("POST", "v1/sync", body: items, as: SyncResponse.self).accepted

@@ -10,6 +10,9 @@ struct MorningState: Identifiable, Equatable {
     let levelBefore: Int
     let badgesBefore: Set<String>
     let treeStageBefore: Int
+    let treeIndexBefore: Int
+    let flowersBefore: Bool
+    let fruitsBefore: Bool
     let startedAt: Date
 }
 
@@ -355,6 +358,9 @@ final class WakeCoordinator: ObservableObject {
                 levelBefore: before.level,
                 badgesBefore: Set(before.unlocked.map(\.id)),
                 treeStageBefore: before.tree.stage,
+                treeIndexBefore: before.tree.index,
+                flowersBefore: before.tree.flowers,
+                fruitsBefore: before.tree.fruits,
                 startedAt: Date()
             )
         }
