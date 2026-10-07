@@ -322,7 +322,7 @@ final class DemoBackend: SocialBackend, SyncBackend {
     func witnessNotices() async throws -> [WitnessNotice] {
         // Мария (вымышленная) проспала сегодня, а вы её свидетель.
         guard let maria = state.friends.first(where: { $0.profile.displayName == "Мария" }) else { return [] }
-        return [WitnessNotice(id: UUID(), friend: maria.profile, day: Calendar.current.startOfDay(for: Date()))]
+        return [WitnessNotice(id: UUID(), friend: maria.profile, day: WitnessPolicy.dayKey(Date()))]
     }
 
     func push(_ items: [OutboxItem]) async throws -> [UUID] { items.map(\.id) }

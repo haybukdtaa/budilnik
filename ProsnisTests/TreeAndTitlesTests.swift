@@ -2,11 +2,8 @@ import XCTest
 @testable import Prosnis
 
 final class TreeAndTitlesTests: XCTestCase {
-    private func successDays(_ count: Int, failFirst: Bool = false) -> [JournalEntry] {
+    private func successDays(_ count: Int) -> [JournalEntry] {
         var entries: [JournalEntry] = []
-        if failFirst {
-            entries.append(T.entry(T.date(2025, 12, 31, 7), .failed))
-        }
         for offset in 0..<count {
             let day = T.calendar.date(byAdding: .day, value: offset, to: T.date(2026, 1, 1, 7))!
             entries.append(T.entry(day, .success))
@@ -30,6 +27,24 @@ final class TreeAndTitlesTests: XCTestCase {
         XCTAssertEqual(next.garden.count, 1)
         XCTAssertEqual(next.tree.progress, 7)
         XCTAssertEqual(next.tree.stage, 3)
+    }
+
+    func testSecondGardenTreeAndDates() {
+        let snap = snapshot(successDays(200))
+        XCTAssertEqual(snap.garden.map(\.index), [0, 1])
+        // Первое дерево выросло на сотое утро (1 января + 99 дней), второе — на двухсотое.
+        XCTAssertEqual(snap.garden[0].date, T.calendar.date(byAdding: .day, value: 99, to: T.date(2026, 1, 1, 7)))
+        XCTAssertEqual(snap.garden[1].date, T.calendar.date(byAdding: .day, value: 199, to: T.date(2026, 1, 1, 7)))
+        XCTAssertEqual(snap.tree.index, 2)
+    }
+
+    func testNewSeedDoesNotBloom() {
+        // 101 утро подряд: серия большая, но новое дерево — только росток.
+        let tree = snapshot(successDays(101)).tree
+        XCTAssertEqual(tree.stage, 1)
+        XCTAssertFalse(tree.flowers, "Ростку цвести рано")
+        XCTAssertFalse(tree.fruits)
+        XCTAssertTrue(snapshot(successDays(103)).tree.flowers, "Саженец уже цветёт при длинной серии")
     }
 
     func testLastStageBeforeGarden() {
@@ -70,31 +85,56 @@ final class TreeAndTitlesTests: XCTestCase {
         XCTAssertEqual(Titles.title(forLevel: 0), "Новичок")
         XCTAssertNil(Titles.nextTitleLevel(after: Titles.names.count))
         XCTAssertEqual(snapshot([]).title, "Новичок")
+        XCTAssertTrue(Titles.changed(fromLevel: 3, toLevel: 4))
+        XCTAssertFalse(Titles.changed(fromLevel: 9, toLevel: 10), "После девятого уровня звание не меняется")
+    }
+
+    private func notify(_ entry: JournalEntry, privacy: PrivacySettings = PrivacySettings(),
+                        witnesses: [UUID] = [UUID()], now: Date? = nil, last: String? = nil) -> Bool {
+        WitnessPolicy.shouldNotify(entry: entry, privacy: privacy, witnesses: witnesses,
+                                   now: now ?? entry.date.addingTimeInterval(600), lastNotifiedDay: last, calendar: T.calendar)
     }
 
     func testWitnessPolicy() {
-        let witness = [UUID()]
         let failed = T.entry(T.date(2026, 10, 6, 7), .failed)
-        XCTAssertTrue(WitnessPolicy.shouldNotify(entry: failed, privacy: PrivacySettings(), witnesses: witness))
-        XCTAssertFalse(WitnessPolicy.shouldNotify(entry: failed, privacy: PrivacySettings(), witnesses: []))
-        XCTAssertFalse(WitnessPolicy.shouldNotify(entry: T.entry(T.date(2026, 10, 6, 7), .success),
-                                                  privacy: PrivacySettings(), witnesses: witness))
-        XCTAssertFalse(WitnessPolicy.shouldNotify(entry: T.entry(T.date(2026, 10, 6, 7), .technical),
-                                                  privacy: PrivacySettings(), witnesses: witness), "Сбой — не провал")
-        XCTAssertFalse(WitnessPolicy.shouldNotify(entry: T.entry(T.date(2026, 10, 6, 7), .failed, isDemo: true),
-                                                  privacy: PrivacySettings(), witnesses: witness))
+        XCTAssertTrue(notify(failed))
+        XCTAssertFalse(notify(failed, witnesses: []))
+        XCTAssertFalse(notify(T.entry(T.date(2026, 10, 6, 7), .success)))
+        XCTAssertFalse(notify(T.entry(T.date(2026, 10, 6, 7), .technical)), "Сбой — не провал")
+        XCTAssertFalse(notify(T.entry(T.date(2026, 10, 6, 7), .failed, isDemo: true)))
 
         let prayer = T.entry(T.date(2026, 10, 6, 4), .failed, isPrayer: true)
-        XCTAssertFalse(WitnessPolicy.shouldNotify(entry: prayer, privacy: PrivacySettings(), witnesses: witness),
-                       "Проспанный Фаджр без согласия не сообщается")
+        XCTAssertFalse(notify(prayer), "Проспанный Фаджр без согласия не сообщается")
         var consent = PrivacySettings()
         consent.sharePrayer = true
-        XCTAssertTrue(WitnessPolicy.shouldNotify(entry: prayer, privacy: consent, witnesses: witness))
+        XCTAssertTrue(notify(prayer, privacy: consent))
+    }
+
+    func testWitnessNotifiedOncePerMorningAndOnlyFresh() {
+        let first = T.entry(T.date(2026, 10, 6, 7), .failed)
+        let day = WitnessPolicy.dayKey(first.date, calendar: T.calendar)
+        XCTAssertEqual(day, "2026-10-06")
+        XCTAssertFalse(notify(T.entry(T.date(2026, 10, 6, 8), .failed), last: day),
+                       "Второй проспанный будильник того же утра — без второго сообщения")
+        XCTAssertTrue(notify(T.entry(T.date(2026, 10, 7, 7), .failed), last: day), "Следующее утро — новое сообщение")
+        XCTAssertFalse(notify(first, now: T.date(2026, 10, 13, 12)),
+                       "Через неделю без открытия приложения старые утра свидетелям не отправляются")
     }
 
     func testNoticeHasNoMoneyOrTime() {
-        let labels = Mirror(reflecting: MissedMorningNotice(day: Date(), witnesses: [])).children.compactMap(\.label)
+        let notice = MissedMorningNotice(day: "2026-10-06", witnesses: [])
+        let labels = Mirror(reflecting: notice).children.compactMap(\.label)
         XCTAssertEqual(Set(labels), ["day", "witnesses"])
+        let json = String(data: try! JSONEncoder().encode(notice), encoding: .utf8)!
+        XCTAssertTrue(json.contains("\"2026-10-06\""), "День уходит строкой, без времени и пояса: \(json)")
+    }
+
+    func testUnknownTreeSpeciesDoesNotBreakStatus() throws {
+        let json = #"{"day": 0, "treeStage": 3, "treeSpecies": "baobab", "streak": 5}"#
+        let status = try JSONDecoder().decode(PublicStatus.self, from: Data(json.utf8))
+        XCTAssertNil(status.treeSpecies)
+        XCTAssertEqual(status.treeStage, 3)
+        XCTAssertEqual(status.streak, 5)
     }
 
     func testTreeSpeciesSharedOnlyWithTreeConsent() {

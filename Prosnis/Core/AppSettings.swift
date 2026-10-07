@@ -26,6 +26,10 @@ struct SettingsData: Codable, Equatable {
     var witnesses: [UUID] = []
     /// «Зачем я встаю» — своя фраза. Видна только мне.
     var wakeReason = ""
+    /// Последний день, о котором сообщили свидетелям («гггг-мм-дд»).
+    var lastWitnessNoticeDay: String?
+    /// Сообщение свидетелям, которое ещё не удалось отправить (нет сети).
+    var pendingWitnessNotice: MissedMorningNotice?
 
     init() {}
 
@@ -50,6 +54,8 @@ struct SettingsData: Codable, Equatable {
         treeSpecies = try c.decodeIfPresent([String: TreeSpecies].self, forKey: .treeSpecies) ?? base.treeSpecies
         witnesses = try c.decodeIfPresent([UUID].self, forKey: .witnesses) ?? base.witnesses
         wakeReason = try c.decodeIfPresent(String.self, forKey: .wakeReason) ?? base.wakeReason
+        lastWitnessNoticeDay = try c.decodeIfPresent(String.self, forKey: .lastWitnessNoticeDay)
+        pendingWitnessNotice = try c.decodeIfPresent(MissedMorningNotice.self, forKey: .pendingWitnessNotice)
     }
 }
 
@@ -60,6 +66,10 @@ final class AppSettings: ObservableObject {
     @Published var data: SettingsData {
         didSet {
             guard data != oldValue else { return }
+            // Свидетели из демо-режима — вымышленные люди: при выключении демо они не нужны.
+            if oldValue.useDemoSocial && !data.useDemoSocial && AppConfig.serverURL == nil {
+                data.witnesses = []
+            }
             file.save(data)
             // При перезагрузке с диска побочные действия не нужны: они бы сработали на старых данных.
             guard !suppressSideEffects else { return }

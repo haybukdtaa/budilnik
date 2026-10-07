@@ -46,7 +46,11 @@ paths:
   /v1/me/missed:
     post:
       summary: Я проспал — разослать уведомление друзьям-свидетелям
-      description: Только день. Сервер не сообщает свидетелям ни время, ни сумму ставки.
+      description: |
+        Только день («гггг-мм-дд»). Сервер не сообщает свидетелям ни время, ни сумму ставки.
+        Сервер обязан: отправлять только тем из списка, кто сейчас принятый друг и не заблокирован
+        (в любую сторону); не больше одного уведомления на пару «отправитель — свидетель» в сутки;
+        доставлять в фиксированное время или пачкой, чтобы момент уведомления не выдавал время звонка.
       requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/MissedMorningNotice" } } } }
       responses: { "204": { description: OK } }
   /v1/witness-notices:
@@ -160,7 +164,7 @@ components:
         wakeTime: { type: string, format: date-time, nullable: true }
         streak: { type: integer, nullable: true }
         level: { type: integer, nullable: true }
-        treeStage: { type: integer, nullable: true }
+        treeStage: { type: integer, nullable: true, description: "Стадия текущего дерева 0–7; каждые 100 удачных утр дерево уходит в сад и стадия начинается заново" }
         treeSpecies: { type: string, nullable: true, enum: [oak, sakura, pine, birch, maple, palm] }
         prayerDone: { type: boolean, nullable: true }
     Friend:
@@ -211,14 +215,14 @@ components:
     MissedMorningNotice:
       type: object
       properties:
-        day: { type: string, format: date-time }
+        day: { type: string, format: date, description: "День по часам отправителя, без часового пояса" }
         witnesses: { type: array, items: { type: string, format: uuid } }
     WitnessNotice:
       type: object
       properties:
         id: { type: string, format: uuid }
         friend: { $ref: "#/components/schemas/UserProfile" }
-        day: { type: string, format: date-time }
+        day: { type: string, format: date }
     InviteReward: { type: object, properties: { id: { type: string }, title: { type: string }, detail: { type: string }, unlocked: { type: boolean } } }
     PairChallenge:
       type: object

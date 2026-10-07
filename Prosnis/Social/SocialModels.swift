@@ -182,9 +182,9 @@ struct InviteReward: Codable, Identifiable, Equatable {
     var unlocked: Bool
 }
 
-/// Сообщение свидетелям о проспанном утре. Только день: ни времени, ни сумм.
+/// Сообщение свидетелям о проспанном утре. Только день «гггг-мм-дд»: ни времени, ни сумм.
 struct MissedMorningNotice: Codable, Equatable {
-    var day: Date
+    var day: String
     var witnesses: [UUID]
 }
 
@@ -192,7 +192,22 @@ struct MissedMorningNotice: Codable, Equatable {
 struct WitnessNotice: Codable, Identifiable, Equatable {
     var id: UUID
     var friend: UserProfile
-    var day: Date
+    var day: String
+}
+
+extension PublicStatus {
+    /// Неизвестный вид дерева (из более новой версии приложения) не должен ломать весь список друзей.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        day = try c.decode(Date.self, forKey: .day)
+        woke = try c.decodeIfPresent(Bool.self, forKey: .woke)
+        wakeTime = try c.decodeIfPresent(Date.self, forKey: .wakeTime)
+        streak = try c.decodeIfPresent(Int.self, forKey: .streak)
+        level = try c.decodeIfPresent(Int.self, forKey: .level)
+        treeStage = try c.decodeIfPresent(Int.self, forKey: .treeStage)
+        treeSpecies = (try? c.decodeIfPresent(TreeSpecies.self, forKey: .treeSpecies)) ?? nil
+        prayerDone = try c.decodeIfPresent(Bool.self, forKey: .prayerDone)
+    }
 }
 
 /// Ссылка на сообщество региона (группа в Telegram и т. п.).

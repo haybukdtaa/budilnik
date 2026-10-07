@@ -151,7 +151,8 @@ struct WakeReasonView: View {
         .navigationTitle("Зачем я встаю")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { text = settings.data.wakeReason }
-        .onDisappear { settings.data.wakeReason = String(text.prefix(200)) }
+        // Сохраняем сразу, чтобы текст не пропал, если приложение закроют во время правки.
+        .onChange(of: text) { _, value in settings.data.wakeReason = String(value.prefix(200)) }
     }
 }
 

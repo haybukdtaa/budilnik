@@ -14,6 +14,26 @@ enum Format {
         return formatter.string(from: date)
     }
 
+    /// «6 октября 2026»
+    static func fullDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    /// День «гггг-мм-дд» в виде «6 октября»; без сдвига по часовым поясам.
+    static func dayKey(_ key: String) -> String {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: key) else { return key }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMMM"
+        return formatter.string(from: date)
+    }
+
     /// «пн, 6 октября»
     static func weekday(_ date: Date) -> String {
         let formatter = DateFormatter()

@@ -97,7 +97,7 @@ struct MorningView: View {
                     if gained > 0 {
                         Text("+\(gained) опыта").font(.title2.bold()).foregroundStyle(Theme.accentGradient)
                     }
-                    if snapshot.level > state.levelBefore {
+                    if Titles.changed(fromLevel: state.levelBefore, toLevel: snapshot.level) {
                         Label("Новое звание: \(snapshot.title)", systemImage: "arrow.up.circle.fill")
                             .foregroundStyle(.green)
                     } else {

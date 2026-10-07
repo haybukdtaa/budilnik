@@ -49,6 +49,7 @@ struct ProsnisApp: App {
         challenges.evaluateAll()
         await payments.retryPending()
         await payments.checkIfNeeded()
+        social.sendPendingWitnessNotice()
         let backend = BackendRegistry.current
         if backend.isOnline {
             await sync.sync(using: backend)

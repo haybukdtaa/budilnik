@@ -97,12 +97,37 @@ enum Titles {
     }
 }
 
-/// Когда сообщать друзьям-свидетелям о проспанном утре. Никаких сумм в сообщении нет.
+/// Когда сообщать друзьям-свидетелям о проспанном утре. Никаких сумм и времени в сообщении нет.
 enum WitnessPolicy {
-    static func shouldNotify(entry: JournalEntry, privacy: PrivacySettings, witnesses: [UUID]) -> Bool {
+    /// Сообщение о прошлом утре старше суток уже не нужно (например, после недели без открытия приложения).
+    static let freshness: TimeInterval = 24 * 3600
+
+    static func shouldNotify(
+        entry: JournalEntry,
+        privacy: PrivacySettings,
+        witnesses: [UUID],
+        now: Date,
+        lastNotifiedDay: String?,
+        calendar: Calendar = .current
+    ) -> Bool {
         guard !witnesses.isEmpty, entry.counts, entry.outcome == .failed else { return false }
         // Проспанный Фаджр без согласия не выдаём даже свидетелям.
         if entry.isPrayer == true && !privacy.sharePrayer { return false }
-        return true
+        guard now.timeIntervalSince(entry.date) < freshness else { return false }
+        // Одно сообщение за утро, даже если проспано несколько будильников.
+        return dayKey(entry.date, calendar: calendar) != lastNotifiedDay
+    }
+
+    /// День как «гггг-мм-дд» по часам владельца: у свидетеля в другом поясе дата не сдвинется.
+    static func dayKey(_ date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+}
+
+extension Titles {
+    /// Сменилось ли звание (после 9-го уровня оно уже не меняется).
+    static func changed(fromLevel old: Int, toLevel new: Int) -> Bool {
+        title(forLevel: old) != title(forLevel: new)
     }
 }

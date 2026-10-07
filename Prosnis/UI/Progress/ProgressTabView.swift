@@ -390,7 +390,7 @@ struct GardenView: View {
                         VStack(spacing: 4) {
                             TreeView(stage: 7, wilt: 0, species: species, flowers: true, fruits: true).frame(height: 110)
                             Text("\(species.title) №\(tree.index + 1)").font(.caption.weight(.semibold))
-                            Text("вырос \(Format.weekday(tree.date))").font(.caption2).foregroundStyle(.secondary)
+                            Text("вырос \(Format.fullDate(tree.date))").font(.caption2).foregroundStyle(.secondary)
                         }
                         .padding(8)
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
@@ -425,7 +425,7 @@ struct TreePreviewView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: 16) {
                     ForEach(0..<8, id: \.self) { stage in
                         VStack {
-                            TreeView(stage: stage, wilt: 0, flowers: stage >= 4, fruits: stage == 7).frame(height: 140)
+                            TreeView(stage: stage, wilt: 0).frame(height: 140)
                             Text(TreeState.stageTitles[stage]).font(.subheadline.weight(.semibold))
                             Text("\(TreeState.thresholds[stage]) подъёмов").font(.caption).foregroundStyle(.secondary)
                         }

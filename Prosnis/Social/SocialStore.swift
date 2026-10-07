@@ -45,8 +45,10 @@ final class SocialStore: ObservableObject {
             stats = try await backend.globalStats()
             pairs = try await backend.pairChallenges()
             rewards = try await backend.inviteRewards()
-            witnessNotices = try await backend.witnessNotices()
         }
+        // Отдельно: сервер без этого раздела не должен ломать всё остальное.
+        let blocked = Set(AppSettings.shared.data.blockedUsers)
+        witnessNotices = ((try? await backend.witnessNotices()) ?? []).filter { !blocked.contains($0.friend.id) }
         let unlocked = rewards.filter(\.unlocked).map(\.id)
         if Set(unlocked) != Set(AppSettings.shared.data.unlockedRewards) {
             AppSettings.shared.data.unlockedRewards = unlocked
@@ -82,10 +84,11 @@ final class SocialStore: ObservableObject {
     }
 
     func removeFriend(_ friend: Friend) async {
+        // Свидетелем человек перестаёт сразу, даже если сервер сейчас недоступен.
+        AppSettings.shared.setWitness(friend.id, false)
         await run {
             try await backend.removeFriend(friend.id)
             friends.removeAll { $0.id == friend.id }
-            AppSettings.shared.setWitness(friend.id, false)
         }
     }
 
@@ -185,6 +188,8 @@ final class SocialStore: ObservableObject {
         if !AppSettings.shared.data.blockedUsers.contains(user.id) {
             AppSettings.shared.data.blockedUsers.append(user.id)
         }
+        AppSettings.shared.setWitness(user.id, false)
+        witnessNotices.removeAll { $0.friend.id == user.id }
         await run { try await backend.block(user: user.id) }
     }
 
@@ -215,7 +220,9 @@ final class SocialStore: ObservableObject {
         let entries = PublicStatusBuilder.shareableEntries(JournalStore.shared.realEntries, privacy: privacy)
         let challenges = PublicStatusBuilder.shareableChallenges(ChallengeStore.shared.challenges, privacy: privacy)
         let snapshot = ProgressEngine.compute(entries: entries, challenges: challenges)
-        let species = AppSettings.shared.species(forTree: snapshot.tree.index)
+        // Вид — того дерева, которое человек видит у себя (вид не выдаёт ничего личного).
+        let ownTree = ProgressEngine.compute(entries: JournalStore.shared.realEntries, challenges: []).tree
+        let species = AppSettings.shared.species(forTree: ownTree.index)
         let status = PublicStatusBuilder.build(
             entries: JournalStore.shared.realEntries, snapshot: snapshot, privacy: privacy, now: Date(), species: species
         )
@@ -225,10 +232,40 @@ final class SocialStore: ObservableObject {
     /// Сообщает друзьям-свидетелям о проспанном утре. Без сервера ничего не отправляется.
     func notifyWitnesses(about entry: JournalEntry) {
         let settings = AppSettings.shared.data
-        guard WitnessPolicy.shouldNotify(entry: entry, privacy: settings.privacy, witnesses: settings.witnesses) else { return }
+        let blocked = Set(settings.blockedUsers)
+        var recipients = settings.witnesses.filter { !blocked.contains($0) }
+        if !friends.isEmpty {
+            let current = Set(friends.map(\.id))
+            recipients = recipients.filter { current.contains($0) }
+        }
+        guard WitnessPolicy.shouldNotify(
+            entry: entry, privacy: settings.privacy, witnesses: recipients,
+            now: Date(), lastNotifiedDay: settings.lastWitnessNoticeDay
+        ) else { return }
+        let notice = MissedMorningNotice(day: WitnessPolicy.dayKey(entry.date), witnesses: recipients)
+        AppSettings.shared.data.lastWitnessNoticeDay = notice.day
+        AppSettings.shared.data.pendingWitnessNotice = notice
+        sendPendingWitnessNotice()
+    }
+
+    /// Отправляет отложенное сообщение свидетелям (если не ушло из-за сети). Старше суток — отбрасывается.
+    func sendPendingWitnessNotice() {
+        guard let notice = AppSettings.shared.data.pendingWitnessNotice else { return }
+        if notice.day < WitnessPolicy.dayKey(Date().addingTimeInterval(-WitnessPolicy.freshness)) {
+            AppSettings.shared.data.pendingWitnessNotice = nil
+            return
+        }
         let backend = self.backend
         guard backend.isOnline else { return }
-        let notice = MissedMorningNotice(day: Calendar.current.startOfDay(for: entry.date), witnesses: settings.witnesses)
-        Task { try? await backend.notifyWitnesses(notice) }
+        Task {
+            do {
+                try await backend.notifyWitnesses(notice)
+                if AppSettings.shared.data.pendingWitnessNotice == notice {
+                    AppSettings.shared.data.pendingWitnessNotice = nil
+                }
+            } catch {
+                // Останется в очереди: повторим при следующем открытии.
+            }
+        }
     }
 }

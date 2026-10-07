@@ -26,11 +26,14 @@ struct WakeTaskView: View {
                 }
 
                 if let reason = settings.wakeReason {
+                    // Две строки максимум и низший приоритет: задание важнее, его нельзя сжимать.
                     Text("«\(reason)»")
                         .font(.subheadline)
                         .italic()
+                        .lineLimit(2)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.white.opacity(0.9))
+                        .layoutPriority(-1)
                 }
 
                 Label(session.taskKind.title, systemImage: session.taskKind.icon)

@@ -184,8 +184,9 @@ enum ProgressEngine {
             progress: progress,
             stage: TreeState.stage(forProgress: progress),
             wilt: wilt,
-            flowers: wilt == 0 && streak >= TreeState.flowersStreak,
-            fruits: wilt == 0 && streak >= TreeState.fruitsStreak
+            // Семечку и ростку цвести рано: цветы и плоды появляются у саженца и старше.
+            flowers: wilt == 0 && streak >= TreeState.flowersStreak && TreeState.stage(forProgress: progress) >= 2,
+            fruits: wilt == 0 && streak >= TreeState.fruitsStreak && TreeState.stage(forProgress: progress) >= 2
         )
 
         func summary(weekContaining date: Date) -> WeekSummary {

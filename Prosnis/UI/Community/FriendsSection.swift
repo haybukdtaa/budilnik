@@ -27,7 +27,7 @@ struct FriendsSection: View {
                             AvatarView(profile: notice.friend, size: 34)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(notice.friend.displayName) проспал(а)").font(.subheadline.weight(.semibold))
-                                Text(Format.weekday(notice.day)).font(.caption).foregroundStyle(.secondary)
+                                Text(Format.dayKey(notice.day)).font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     }
