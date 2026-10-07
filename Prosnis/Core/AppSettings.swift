@@ -119,6 +119,19 @@ final class AppSettings: ObservableObject {
 
     var scheduleContext: ScheduleContext { ScheduleContext(prayer: data.prayer) }
 
+    /// Человек согласился с условиями ставки на эту сумму. Согласие — доказательство при споре: уходит на сервер.
+    func acceptStakeTerms(amount: Int) {
+        let previous = data.stakeConsent
+        let consent = StakeConsent(
+            version: StakeTerms.version,
+            acceptedAt: TrustedClock.now,
+            maxAmount: max(amount, previous?.version == StakeTerms.version ? previous?.maxAmount ?? 0 : 0)
+        )
+        data.stakeConsent = consent
+        // Каждое согласие хранится отдельно: история согласий нужна при споре.
+        SyncEngine.shared.enqueue(.consent, id: UUID(), value: consent)
+    }
+
     func isEnabled(_ module: WakeModule) -> Bool { data.modules.contains(module) }
 
     func setModule(_ module: WakeModule, enabled: Bool) {

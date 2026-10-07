@@ -149,15 +149,7 @@ struct AlarmEditView: View {
             .sheet(isPresented: $showScanner) { scannerSheet }
             .sheet(isPresented: $showTerms) {
                 StakeTermsView(amount: draft.stakeAmount) {
-                    let previous = settings.data.stakeConsent
-                    let consent = StakeConsent(
-                        version: StakeTerms.version,
-                        acceptedAt: TrustedClock.now,
-                        maxAmount: max(draft.stakeAmount, previous?.version == StakeTerms.version ? previous?.maxAmount ?? 0 : 0)
-                    )
-                    settings.data.stakeConsent = consent
-                    // Согласие — доказательство при споре: уходит на сервер.
-                    SyncEngine.shared.enqueue(.consent, id: settings.data.profile.id, value: consent)
+                    settings.acceptStakeTerms(amount: draft.stakeAmount)
                     showTerms = false
                     Task {
                         _ = await DeadlineNotifications.requestPermission()

@@ -40,8 +40,35 @@ enum DeadlineNotifications {
         return UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
     }
 
-    /// Переставляет уведомления для будильников со ставкой на 10 дней вперёд.
-    static func refresh(alarms: [AlarmItem], context: ScheduleContext, now: Date = Date()) async {
+    /// Идущая перестановка: следующая ждёт её окончания, чтобы две не перемешали уведомления.
+    private static var chain: Task<Void, Never>?
+
+    /// Переставляет уведомления для будильников со ставкой на 10 дней вперёд. Берёт будильники в момент выполнения.
+    static func refresh() async {
+        let previous = chain
+        let task = Task { @MainActor in
+            await previous?.value
+            await perform(now: Date())
+        }
+        chain = task
+        await task.value
+    }
+
+    /// Утро этого звонка уже идёт, ждёт в очереди или записано: предупреждать не о чем.
+    private static func isSettled(_ alarm: AlarmItem, ring: Date) -> Bool {
+        if let session = WakeCoordinator.shared.session {
+            if session.alarmID == alarm.id, abs((session.originalRing ?? session.startDate).timeIntervalSince(ring)) < 60 { return true }
+            if WakeRules.isQueued(alarmID: alarm.id, ring: ring, queue: session.queuedAlarmIDs, rings: session.queuedRings) { return true }
+        }
+        return JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring)
+    }
+
+    /// Будильник всё ещё со ставкой и включён (между ожиданиями его могли изменить).
+    private static func stillStaked(_ alarmID: UUID) -> AlarmItem? {
+        AlarmStore.shared.alarms.first { $0.id == alarmID && $0.isEnabled && AlarmStore.shared.isStakeActive($0) }
+    }
+
+    private static func perform(now: Date) async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
         let ours = pending.map(\.identifier).filter { $0.hasPrefix(prefix) && !$0.hasPrefix(recheckPrefix) }
@@ -52,35 +79,43 @@ enum DeadlineNotifications {
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
 
-        // Будильники по Фаджру и календарю ставятся на 10 дней вперёд: на 7-й день без открытия напоминаем.
-        if alarms.contains(where: { $0.isEnabled && $0.hasTask && $0.needsDatedSchedule }) {
-            let reminder = UNMutableNotificationContent()
-            reminder.title = "Откройте «Проснись»"
-            reminder.body = "Через 3 дня будильники по Фаджру и по праздникам перестанут ставиться. Утро без звонка из-за этого — провал."
-            reminder.sound = .default
-            let fire = now.addingTimeInterval(Double(refreshReminderDays) * 86400)
-            try? await center.add(UNNotificationRequest(identifier: refreshReminderID, content: reminder, trigger: trigger(at: fire)))
-        }
+        let alarms = AlarmStore.shared.alarms
+        let context = AppSettings.shared.scheduleContext
 
-        var planned: [(Date, UNNotificationRequest)] = []
-        let horizon = now.addingTimeInterval(Double(AlarmService.datedHorizonDays) * 86400)
-        for alarm in alarms where alarm.stakeEnabled && alarm.isEnabled && alarm.stakeAmount > 0 {
-            for ring in ScheduleCalculator.effectiveOccurrences(for: alarm, from: now.addingTimeInterval(-WakeRules.windowSeconds), to: horizon, context: context) {
-                let fire = ring.addingTimeInterval(WakeRules.windowSeconds)
-                guard fire > now else { continue }
-                // Утро уже начато или записано: предупреждать не о чем.
-                if WakeCoordinator.shared.session?.alarmID == alarm.id { continue }
-                if JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring) { continue }
-                let request = UNNotificationRequest(
-                    identifier: id(alarmID: alarm.id, ring: ring),
-                    content: content(amount: alarm.stakeAmount, isRecheck: false),
-                    trigger: trigger(at: fire)
-                )
-                planned.append((fire, request))
+        // Будильники по Фаджру и календарю поставлены до конца промежутка: за 3 дня до него напоминаем открыть приложение.
+        let dated = alarms.filter { $0.isEnabled && $0.hasTask && $0.needsDatedSchedule }.map(\.id)
+        if let end = AlarmService.shared.earliestHorizonEnd(for: dated) {
+            let fire = end.addingTimeInterval(-Double(AlarmService.datedHorizonDays - refreshReminderDays) * 86400)
+            if fire > now {
+                let reminder = UNMutableNotificationContent()
+                reminder.title = "Откройте «Проснись»"
+                reminder.body = "Через 3 дня будильники по Фаджру и по праздникам перестанут ставиться. Утро без звонка из-за этого — провал."
+                reminder.sound = .default
+                try? await center.add(UNNotificationRequest(identifier: refreshReminderID, content: reminder, trigger: trigger(at: fire)))
             }
         }
-        for (_, request) in planned.sorted(by: { $0.0 < $1.0 }).prefix(maxPending) {
-            try? await center.add(request)
+
+        var planned: [(fire: Date, alarmID: UUID, ring: Date, amount: Int)] = []
+        let horizon = now.addingTimeInterval(Double(AlarmService.datedHorizonDays + 1) * 86400)
+        for alarm in alarms where alarm.isEnabled && AlarmStore.shared.isStakeActive(alarm) {
+            for ring in ScheduleCalculator.effectiveOccurrences(for: alarm, from: now.addingTimeInterval(-WakeRules.windowSeconds), to: horizon, context: context) {
+                let fire = ring.addingTimeInterval(WakeRules.windowSeconds)
+                guard fire > now, !isSettled(alarm, ring: ring) else { continue }
+                planned.append((fire, alarm.id, ring, alarm.stakeAmount))
+            }
+        }
+        for item in planned.sorted(by: { $0.fire < $1.fire }).prefix(maxPending) {
+            // Пока ставились предыдущие, утро могло начаться или будильник измениться: проверяем заново.
+            guard let alarm = stillStaked(item.alarmID), !isSettled(alarm, ring: item.ring) else { continue }
+            let identifier = id(alarmID: item.alarmID, ring: item.ring)
+            try? await center.add(UNNotificationRequest(
+                identifier: identifier,
+                content: content(amount: item.amount, isRecheck: false),
+                trigger: trigger(at: item.fire)
+            ))
+            if stillStaked(item.alarmID).map({ isSettled($0, ring: item.ring) }) ?? true {
+                center.removePendingNotificationRequests(withIdentifiers: [identifier])
+            }
         }
     }
 

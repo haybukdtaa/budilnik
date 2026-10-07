@@ -2,6 +2,9 @@ import Foundation
 
 enum OutboxKind: String, Codable {
     case alarm, journalEntry, challenge, privacy, profile, wakeEvent, consent
+
+    /// Доказательства для списаний и споров: при переполнении очереди не выбрасываются.
+    var isEvidence: Bool { self == .wakeEvent || self == .consent }
 }
 
 /// Изменение, которое ждёт отправки на сервер.
@@ -37,6 +40,8 @@ final class SyncEngine: ObservableObject {
     private let file = FileStore<[OutboxItem]>("outbox")
     private var needsMerge = false
     private var isSyncing = false
+    /// Во время отправки появилось новое: после неё отправить ещё раз.
+    private var needsAnotherPass = false
 
     private init() {
         reload()
@@ -96,21 +101,58 @@ final class SyncEngine: ObservableObject {
         var result = current.filter { !($0.kind == item.kind && $0.entityID == item.entityID) }
         result.append(item)
         if result.count > maxItems {
-            result.removeFirst(result.count - maxItems)
+            // Сначала выбрасываются старые обычные изменения; события утра и согласие — доказательства, их не теряем.
+            var excess = result.count - maxItems
+            var kept: [OutboxItem] = []
+            for entry in result {
+                if excess > 0 && !entry.kind.isEvidence {
+                    excess -= 1
+                    continue
+                }
+                kept.append(entry)
+            }
+            result = kept
         }
         return result
     }
 
-    func sync(using backend: SyncBackend) async {
-        guard !isSyncing, !items.isEmpty else { return }
+    /// Что уйдёт в одной отправке: события утра первыми (для сервера решает время их получения).
+    nonisolated static func batch(_ items: [OutboxItem], limit: Int = 200) -> [OutboxItem] {
+        Array((items.filter { $0.kind == .wakeEvent } + items.filter { $0.kind != .wakeEvent }).prefix(limit))
+    }
+
+    /// Отправить очередь сейчас, если сервер подключён.
+    func flushSoon() {
+        let backend = BackendRegistry.current
+        guard backend.isOnline, !backend.isDemo else { return }
+        Task { await sync(using: backend) }
+    }
+
+    func sync(using backend: SyncBackend, attempt: Int = 0) async {
+        guard !isSyncing else {
+            needsAnotherPass = true
+            return
+        }
+        guard !items.isEmpty else { return }
         isSyncing = true
-        defer { isSyncing = false }
-        let batch = Array(items.prefix(200))
-        guard let accepted = try? await backend.push(batch) else { return }
-        let done = Set(accepted)
-        items.removeAll { done.contains($0.id) }
-        save()
-        lastSync = Date()
+        let batch = SyncEngine.batch(items)
+        let accepted = try? await backend.push(batch)
+        if let accepted {
+            let done = Set(accepted)
+            items.removeAll { done.contains($0.id) }
+            save()
+            lastSync = Date()
+        }
+        isSyncing = false
+        if accepted == nil {
+            // Утром могла пропасть сеть на минуту: события утра пробуем отправить ещё несколько раз.
+            guard attempt < 3, batch.contains(where: { $0.kind == .wakeEvent }) else { return }
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            await sync(using: backend, attempt: attempt + 1)
+        } else if needsAnotherPass {
+            needsAnotherPass = false
+            await sync(using: backend)
+        }
     }
 
     func clear() {

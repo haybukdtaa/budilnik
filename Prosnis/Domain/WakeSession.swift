@@ -21,6 +21,14 @@ enum WakeRules {
     static func isQueuedRingStale(_ ring: Date, now: Date) -> Bool {
         now.timeIntervalSince(ring) > queueStaleSeconds
     }
+
+    /// Ждёт ли в очереди именно этот звонок будильника (а не любой его звонок).
+    static func isQueued(alarmID: UUID, ring: Date, queue: [UUID]?, rings: [String: Date]?) -> Bool {
+        guard queue?.contains(alarmID) == true else { return false }
+        // Данные старых версий без времени звонка: считаем, что в очереди именно он.
+        guard let queued = rings?[alarmID.uuidString] else { return true }
+        return abs(queued.timeIntervalSince(ring)) < 60
+    }
 }
 
 enum WakePhase: String, Codable {

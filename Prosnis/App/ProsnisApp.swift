@@ -32,6 +32,8 @@ struct ProsnisApp: App {
                 // Сменился часовой пояс (поездка): будильники на конкретные даты переставляются сразу.
                 .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
                     store.refreshDatedAlarms(force: true)
+                    // Ожидания по старому поясу остаются: утро не теряется, а одно утро не списывается дважды.
+                    store.refreshExpected()
                 }
         }
     }
@@ -47,10 +49,11 @@ struct ProsnisApp: App {
         challenges.reloadIfNeeded()
         payments.reloadIfNeeded()
         wake.reconcile()
+        store.refreshExpected()
         store.refreshDatedAlarms()
         store.resyncFailed()
         store.cleanupOrphans()
-        await DeadlineNotifications.refresh(alarms: store.alarms, context: settings.scheduleContext)
+        await DeadlineNotifications.refresh()
         challenges.evaluateAll()
         await payments.retryPending()
         await payments.checkIfNeeded()
@@ -72,6 +75,15 @@ struct ProsnisApp: App {
 struct RootView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var wake: WakeCoordinator
+    @ObservedObject private var alarmStore = AlarmStore.shared
+    /// Человек закрыл условия, не согласившись: до следующего запуска не спрашиваем.
+    @State private var consentPostponed = false
+
+    /// Условия ставки изменились: ставки не действуют, пока человек не согласится заново.
+    private var reconsentAmount: Int? {
+        guard !consentPostponed, wake.session == nil, wake.morning == nil else { return nil }
+        return alarmStore.alarmsNeedingConsent.map(\.stakeAmount).max()
+    }
 
     var body: some View {
         if !settings.data.onboardingDone {
@@ -80,6 +92,15 @@ struct RootView: View {
             TabView {
                 AlarmListView()
                     .tabItem { Label("Будильники", systemImage: "alarm") }
+                    .sheet(isPresented: Binding(
+                        get: { reconsentAmount != nil },
+                        set: { if !$0 { consentPostponed = true } }
+                    )) {
+                        StakeTermsView(amount: reconsentAmount ?? 0) {
+                            settings.acceptStakeTerms(amount: reconsentAmount ?? 0)
+                            consentPostponed = true
+                        }
+                    }
                 ProgressTabView()
                     .tabItem { Label("Прогресс", systemImage: "chart.line.uptrend.xyaxis") }
                 CommunityView()

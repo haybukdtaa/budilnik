@@ -162,6 +162,7 @@ private struct JournalRow: View {
 
 struct JournalDetailView: View {
     @EnvironmentObject private var journal: JournalStore
+    @EnvironmentObject private var settings: AppSettings
     let entryID: UUID
 
     var body: some View {
@@ -204,11 +205,20 @@ struct JournalDetailView: View {
                     }
                 }
 
-                if entry.outcome == .failed {
+                if entry.outcome == .failed && entry.stake > 0 {
                     Section {
                         switch entry.dispute {
                         case .none:
-                            Button("Оспорить списание") { journal.dispute(entry) }
+                            if entry.isPrayer == true && !settings.data.privacy.syncPrayerData {
+                                // Утро с намазом не покидает телефон без согласия: серверу нечего рассматривать.
+                                Text("Чтобы оспорить это списание, разрешите отправку данных о намазе в разделе «Приватность». Без них спор не рассмотреть.")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Button("Оспорить списание") { journal.dispute(entry) }
+                            }
+                        case .rejected:
+                            Label("Спор рассмотрен, списание осталось", systemImage: "xmark.circle")
+                                .foregroundStyle(.secondary)
                         case .refunded:
                             Label("Спор принят, деньги возвращены", systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)

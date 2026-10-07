@@ -9,8 +9,9 @@ enum Outcome: String, Codable {
 
 enum DisputeState: String, Codable {
     case none
-    case refunded   // первый спор в аккаунте возвращается сразу
-    case pending    // последующие споры рассматриваются вручную
+    case pending    // спор отправлен и рассматривается по журналу и событиям утра
+    case refunded   // спор решён в пользу человека, деньги возвращены
+    case rejected   // спор рассмотрен, списание остаётся
 }
 
 struct JournalEvent: Codable, Hashable {
@@ -177,12 +178,6 @@ final class JournalStore: ObservableObject {
         entries.contains { $0.alarmID == alarmID && abs($0.date.timeIntervalSince(ring)) < 3600 }
     }
 
-    /// Прощали ли сбой за последние 30 дней до `date`.
-    func hasForgiven(before date: Date) -> Bool {
-        let from = date.addingTimeInterval(-30 * 24 * 3600)
-        return entries.contains { $0.forgiven == true && $0.date >= from && $0.date <= date }
-    }
-
     func monthStats(now: Date = Date()) -> MonthStats {
         let calendar = Calendar.current
         let counted = entries.filter(\.counts)
@@ -199,7 +194,7 @@ final class JournalStore: ObservableObject {
 
     /// Оспаривание. Автоматического возврата нет: каждый спор рассматривается по записям журнала и событиям утра.
     func dispute(_ entry: JournalEntry) {
-        guard entry.outcome == .failed, entry.dispute == .none,
+        guard entry.outcome == .failed, entry.dispute == .none, entry.stake > 0,
               let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
         entries[index].dispute = .pending
         save()
@@ -209,7 +204,7 @@ final class JournalStore: ObservableObject {
     /// Итог рассмотрения спора (придёт с сервера). При решении в пользу человека деньги возвращаются.
     func resolveDispute(entryID: UUID, refund: Bool) {
         guard let index = entries.firstIndex(where: { $0.id == entryID }), entries[index].dispute == .pending else { return }
-        entries[index].dispute = refund ? .refunded : .none
+        entries[index].dispute = refund ? .refunded : .rejected
         save()
         let entry = entries[index]
         if refund, let ref = entry.paymentRef, entry.stake > 0 {

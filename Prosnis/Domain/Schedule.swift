@@ -73,3 +73,58 @@ enum ScheduleCalculator {
         return occurrences(for: alarm, from: from, to: to, context: context)
     }
 }
+
+/// Возможное время звонка одного утра. После смены часового пояса у утра бывает два времени:
+/// ожидавшееся при постановке будильника и посчитанное по новому поясу.
+struct RingCandidate: Codable, Equatable {
+    var at: Date
+    /// День утра «гггг-мм-дд» в том поясе, в котором время посчитано.
+    var day: String
+}
+
+/// Сверка пропущенных утр: одно утро будильника — не больше одного списания, как бы ни переводили часы.
+enum MissedMornings {
+    static func dayLabel(_ date: Date, calendar: Calendar) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    static func candidates(_ dates: [Date], calendar: Calendar) -> [RingCandidate] {
+        dates.map { RingCandidate(at: $0, day: dayLabel($0, calendar: calendar)) }
+    }
+
+    /// Объединяет кандидатов; время в пределах минуты считается одним звонком.
+    static func merged(_ first: [RingCandidate], _ second: [RingCandidate]) -> [RingCandidate] {
+        var result = first
+        for item in second where !result.contains(where: { abs($0.at.timeIntervalSince(item.at)) < 60 }) {
+            result.append(item)
+        }
+        return result.sorted { $0.at < $1.at }
+    }
+
+    /// Утра, которые пора записать как пропущенные: для каждого — его прошедшие в (from, until] времена по возрастанию.
+    /// Утро ждёт, пока у него есть время позже `until` (человек мог встать по нему), и не записывается,
+    /// если хоть одно его время «закрыто»: есть запись в журнале, идёт задание или звонок ждёт в очереди.
+    static func due(candidates: [RingCandidate], after from: Date, until: Date, isCovered: (Date) -> Bool) -> [[Date]] {
+        let groups = Dictionary(grouping: candidates, by: \.day)
+        var result: [[Date]] = []
+        for day in groups.keys.sorted() {
+            let group = groups[day] ?? []
+            let passed = group.map(\.at).filter { $0 > from && $0 <= until }.sorted()
+            guard !passed.isEmpty else { continue }
+            if group.contains(where: { $0.at > until }) { continue }
+            if group.contains(where: { isCovered($0.at) }) { continue }
+            result.append(passed)
+        }
+        return result
+    }
+
+    /// Есть ли утро, которое ещё не решено: время прошло (за последние полтора дня), а записи нет ни по одному его времени.
+    static func hasUnresolved(candidates: [RingCandidate], now: Date, isCovered: (Date) -> Bool) -> Bool {
+        let groups = Dictionary(grouping: candidates, by: \.day)
+        return groups.values.contains { group in
+            group.contains { $0.at <= now && now.timeIntervalSince($0.at) < 36 * 3600 }
+                && !group.contains { isCovered($0.at) }
+        }
+    }
+}

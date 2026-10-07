@@ -73,9 +73,22 @@ final class AlarmStore: ObservableObject {
         ScheduleCalculator.lastOccurrence(for: item, onOrBefore: now, context: context)
     }
 
+    /// Ставка действует: включена, сумма больше нуля и человек согласился с текущими условиями на эту сумму.
+    func isStakeActive(_ item: AlarmItem) -> Bool {
+        item.stakeEnabled && item.stakeAmount > 0
+            && !StakeTerms.needsConsent(AppSettings.shared.data.stakeConsent, amount: item.stakeAmount)
+    }
+
+    /// Включённые будильники со ставкой, для которых нужно заново согласиться с условиями (условия изменились).
+    var alarmsNeedingConsent: [AlarmItem] {
+        alarms.filter { $0.isEnabled && $0.stakeEnabled && $0.stakeAmount > 0 && !isStakeActive($0) }
+    }
+
     /// Закрыт ли будильник со ставкой для изменений: за 2 часа до звонка и пока идёт проверка.
     func isLocked(_ item: AlarmItem, now: Date = TrustedClock.now) -> Bool {
-        guard item.stakeEnabled, item.isEnabled else { return false }
+        guard isStakeActive(item), item.isEnabled else { return false }
+        // После смены пояса утро ждёт своего второго времени звонка: пока оно не решено, менять нельзя.
+        if WakeCoordinator.shared.hasUnresolvedMorning(item, now: now) { return true }
         if WakeCoordinator.shared.session?.alarmID == item.id { return true }
         if WakeCoordinator.shared.session?.queuedAlarmIDs?.contains(item.id) == true { return true }
         // Звонок только что был, а утро ещё не записано: менять нельзя, иначе можно уйти от ставки.
@@ -110,6 +123,17 @@ final class AlarmStore: ObservableObject {
         }
         if !AppSettings.shared.data.isAdult { item.stakeEnabled = false }
         if item.stakeAmount <= 0 { item.stakeEnabled = false }
+        if item.stakeEnabled && item.isEnabled {
+            // Ставка без согласия с текущими условиями или без разрешения на будильники не включается.
+            if StakeTerms.needsConsent(AppSettings.shared.data.stakeConsent, amount: item.stakeAmount) {
+                message = "Сначала согласитесь с условиями ставки: откройте будильник и нажмите «Сохранить»."
+                return false
+            }
+            if !service.isAuthorized {
+                message = "Чтобы включить будильник со ставкой, разрешите будильники в Настройках iPhone."
+                return false
+            }
+        }
         if item.effectiveTask == .qr && (item.qrCode ?? "").isEmpty { item.taskKind = .typing }
 
         if let index = alarms.firstIndex(where: { $0.id == item.id }) {
@@ -171,6 +195,12 @@ final class AlarmStore: ObservableObject {
         }
     }
 
+    /// Запоминает ожидаемые звонки будильников с заданием на ближайшие дни (защита от перевода часов).
+    func refreshExpected() {
+        let context = self.context
+        for item in alarms { service.recordExpected(item, context: context) }
+    }
+
     /// Переставляет будильники, которые не удалось поставить (например, разрешение дали позже).
     func resyncFailed() {
         guard service.isAuthorized else { return }
@@ -201,7 +231,10 @@ final class AlarmStore: ObservableObject {
             if let error = await service.sync(item, context: context) {
                 message = error
             }
-            await DeadlineNotifications.refresh(alarms: alarms, context: context)
+            if let current = alarms.first(where: { $0.id == item.id }) {
+                service.recordExpected(current, context: context)
+            }
+            await DeadlineNotifications.refresh()
         }
     }
 }

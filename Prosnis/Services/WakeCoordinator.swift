@@ -29,6 +29,8 @@ final class WakeCoordinator: ObservableObject {
     private let service = AlarmService.shared
     private let file = FileStore<WakeSession>("wake_session")
     private var loadFailed = false
+    /// Повторный звонок сейчас ставится: второй раз не ставим.
+    private var isArmingRecheck = false
     private static let lastReconcileKey = "lastReconcile"
 
     private init() {
@@ -71,6 +73,48 @@ final class WakeCoordinator: ObservableObject {
         session?.queuedAlarmIDs?.contains(alarmID) == true
     }
 
+    /// Ждёт ли в очереди именно этот звонок.
+    private func isQueued(_ alarmID: UUID, ring: Date) -> Bool {
+        WakeRules.isQueued(alarmID: alarmID, ring: ring, queue: session?.queuedAlarmIDs, rings: session?.queuedRings)
+    }
+
+    /// Идёт ли задание именно этого звонка.
+    private func isActiveRing(_ alarmID: UUID, _ ring: Date) -> Bool {
+        guard let active = session, active.alarmID == alarmID else { return false }
+        return abs((active.originalRing ?? active.startDate).timeIntervalSince(ring)) < 60
+    }
+
+    /// Звонок, который только что был: по расписанию в текущем поясе или ожидавшийся при постановке
+    /// (системный будильник на конкретную дату не сдвигается при смене пояса).
+    private func recentRing(of alarm: AlarmItem, now: Date) -> Date? {
+        let scheduled = AlarmStore.shared.lastOccurrence(of: alarm, onOrBefore: now)
+        let expected = service.expectedRings(for: alarm).map(\.at).filter { $0 <= now }.max()
+        return [scheduled, expected].compactMap { $0 }.max()
+    }
+
+    /// Все возможные времена звонков будильника около промежутка: по текущему поясу и ожидавшиеся при постановке.
+    private func ringCandidates(_ alarm: AlarmItem, from: Date, to: Date) -> [RingCandidate] {
+        let changed = AlarmStore.changedAt(alarm)
+        let recomputed = ScheduleCalculator.effectiveOccurrences(
+            for: alarm, from: from.addingTimeInterval(-2 * 86400), to: to.addingTimeInterval(2 * 86400), context: context
+        ).filter { $0 > changed }
+        let stored = service.expectedRings(for: alarm).filter { $0.at > changed }
+        return MissedMornings.merged(stored, MissedMornings.candidates(recomputed, calendar: context.calendar))
+    }
+
+    /// Закрыто ли это время звонка: записано, идёт или ждёт в очереди.
+    private func isCovered(_ alarm: AlarmItem, _ ring: Date) -> Bool {
+        isActiveRing(alarm.id, ring) || isQueued(alarm.id, ring: ring)
+            || JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring)
+    }
+
+    /// Есть ли у будильника утро, которое ещё не решено (например, после смены пояса ждёт второго времени звонка).
+    func hasUnresolvedMorning(_ alarm: AlarmItem, now: Date) -> Bool {
+        guard alarm.hasTask, alarm.isEnabled else { return false }
+        let candidates = ringCandidates(alarm, from: now.addingTimeInterval(-36 * 3600), to: now)
+        return MissedMornings.hasUnresolved(candidates: candidates, now: now) { isCovered(alarm, $0) }
+    }
+
     // MARK: - Вход: нажали «Выключить»
 
     /// Вызывается из интента, когда на звонке нажали «Выключить».
@@ -86,7 +130,7 @@ final class WakeCoordinator: ObservableObject {
 
         guard let alarm = AlarmStore.shared.alarms.first(where: { $0.id == alarmID }),
               alarm.hasTask, alarm.isEnabled else { return }
-        let ring = AlarmStore.shared.lastOccurrence(of: alarm, onOrBefore: now) ?? now
+        let ring = recentRing(of: alarm, now: now) ?? now
         // Это утро уже записано (например, звонок от устаревшего системного будильника).
         guard !JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring) else { return }
 
@@ -100,6 +144,8 @@ final class WakeCoordinator: ObservableObject {
                 current.queuedRings = (current.queuedRings ?? [:]).merging([alarm.id.uuidString: ring]) { _, new in new }
                 current.events.append(JournalEvent(date: now, text: "Во время проверки прозвенел будильник «\(alarm.displayTitle)», его задание начнётся следом"))
                 setSession(current)
+                // Человек занят другой проверкой: «время вышло» по этому звонку было бы неправдой.
+                DeadlineNotifications.cancel(alarmID: alarm.id, ring: ring)
             }
             return
         }
@@ -126,7 +172,8 @@ final class WakeCoordinator: ObservableObject {
     ) {
         var kind = alarm.effectiveTask
         if kind == .qr && (alarm.qrCode ?? "").isEmpty { kind = .typing }
-        let stake = alarm.stakeEnabled ? alarm.stakeAmount : 0
+        // Ставка действует только при согласии с текущими условиями.
+        let stake = AlarmStore.shared.isStakeActive(alarm) ? alarm.stakeAmount : 0
         let reference: UUID? = stake > 0 ? UUID() : nil
 
         setSession(WakeSession(
@@ -175,6 +222,8 @@ final class WakeCoordinator: ObservableObject {
             signature: AccountStore.shared.sign(WakeEvent.signedMessage(morningID: morning, kind: kind, at: at))
         )
         SyncEngine.shared.enqueue(.wakeEvent, id: event.id, value: event, sensitive: value.isPrayer)
+        // Для сервера решает время получения: отправляем сразу, не дожидаясь следующего открытия.
+        SyncEngine.shared.flushSoon()
     }
 
     /// Запасной вход: если «Выключить» не открыло приложение, задание начинается,
@@ -183,7 +232,7 @@ final class WakeCoordinator: ObservableObject {
         guard session == nil else { return }
         var ringing: [(AlarmItem, Date)] = []
         for alarm in AlarmStore.shared.alarms where alarm.hasTask && alarm.isEnabled {
-            guard let ring = AlarmStore.shared.lastOccurrence(of: alarm, onOrBefore: now),
+            guard let ring = recentRing(of: alarm, now: now),
                   now.timeIntervalSince(ring) < WakeRules.windowSeconds,
                   // Звонок был после последнего изменения будильника (включение тоже изменение).
                   ring > AlarmStore.changedAt(alarm),
@@ -310,10 +359,19 @@ final class WakeCoordinator: ObservableObject {
             Task { await DeadlineNotifications.scheduleRecheckDeadline(alarmID: alarmID, recheck: recheckAt, amount: amount) }
         }
 
-        let snapshot = current
+        armRecheck(current, at: recheckAt)
+    }
+
+    /// Ставит системный повторный звонок. Если поставить нельзя: выключенное разрешение — выбор человека (провал),
+    /// иначе сбой системы (без списания, но и без успеха).
+    private func armRecheck(_ snapshot: WakeSession, at recheckAt: Date) {
+        guard !isArmingRecheck else { return }
+        isArmingRecheck = true
         Task {
+            defer { isArmingRecheck = false }
             let id = await service.scheduleRecheck(alarmID: snapshot.alarmID, soundID: snapshot.soundID, at: recheckAt)
-            guard var latest = session, latest.alarmID == snapshot.alarmID, latest.startDate == snapshot.startDate else {
+            guard var latest = session, latest.alarmID == snapshot.alarmID, latest.startDate == snapshot.startDate,
+                  latest.stage == 1, latest.phase == .waiting else {
                 if let id { service.cancel(id: id) }
                 return
             }
@@ -321,10 +379,12 @@ final class WakeCoordinator: ObservableObject {
                 latest.recheckAlarmID = id
                 latest.events.append(JournalEvent(date: Date(), text: "Повторная проверка назначена на \(WakeCoordinator.clock(recheckAt))"))
                 setSession(latest)
+            } else if !service.isAuthorized {
+                latest.events.append(JournalEvent(date: Date(), text: "Разрешение на будильники выключено во время проверки, повторный звонок поставить нельзя"))
+                finish(latest, outcome: .failed)
             } else {
-                // Не удалось назначить повторный звонок: это наш сбой, этап засчитываем.
-                latest.events.append(JournalEvent(date: Date(), text: "Повторный звонок назначить не удалось, этап засчитан"))
-                finish(latest, outcome: .success)
+                latest.events.append(JournalEvent(date: Date(), text: "Повторный звонок не удалось поставить из-за сбоя системы, списания нет"))
+                finish(latest, outcome: .technical)
             }
         }
     }
@@ -397,6 +457,7 @@ final class WakeCoordinator: ObservableObject {
 
         // Экран задания закроется сам; утро покажется после этого (см. RootView). Иначе показываем сразу.
         if !wasOnTaskScreen { presentPendingMorning() }
+        Task { await DeadlineNotifications.refresh() }
     }
 
     /// Показывает отложенный утренний экран, если сейчас не идёт задание.
@@ -423,6 +484,11 @@ final class WakeCoordinator: ObservableObject {
         evaluate(now)
         lateStart(now)
         resumeHoldIfNeeded()
+        // Приложение закрыли раньше, чем встал повторный звонок: ставим его снова.
+        if let current = session, current.phase == .waiting, current.stage == 1, current.recheckAlarmID == nil,
+           let recheck = current.recheckDate, recheck.timeIntervalSince(now) > 5 {
+            armRecheck(current, at: recheck)
+        }
 
         let defaults = UserDefaults.standard
         let window = WakeRules.windowSeconds
@@ -432,15 +498,17 @@ final class WakeCoordinator: ObservableObject {
         if let lastCheck = defaults.object(forKey: WakeCoordinator.lastReconcileKey) as? Date {
             if checkUntil > lastCheck {
                 // Проспанное утро записывается у любого будильника с заданием, со ставкой и без.
+                // Времена звонков считаются и по текущему поясу, и по ожидавшимся при постановке:
+                // перевод часов не прячет утро, а одно утро не списывается дважды.
                 for alarm in AlarmStore.shared.alarms where alarm.hasTask && alarm.isEnabled {
                     // Изменения будильника после звонка не делают тот звонок пропущенным.
                     let from = max(lastCheck, AlarmStore.changedAt(alarm))
-                    for ring in ScheduleCalculator.effectiveOccurrences(for: alarm, from: from, to: checkUntil, context: context) {
-                        if let active = session, active.alarmID == alarm.id,
-                           abs(active.startDate.timeIntervalSince(ring)) < 3600
-                            || abs((active.originalRing ?? active.startDate).timeIntervalSince(ring)) < 60 { continue }
-                        if isQueued(alarm.id) { continue }
-                        if JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring) { continue }
+                    guard checkUntil > from else { continue }
+                    let candidates = ringCandidates(alarm, from: from, to: checkUntil)
+                    let due = MissedMornings.due(candidates: candidates, after: from, until: checkUntil) { isCovered(alarm, $0) }
+                    for passed in due {
+                        // Если одно из времён стояло в системе, считаем по нему: будильник звонил.
+                        let ring = passed.first { service.scheduleState(alarm, ring: $0) == .scheduled } ?? passed[0]
                         recordMissed(alarm: alarm, ring: ring)
                     }
                 }
@@ -468,7 +536,6 @@ final class WakeCoordinator: ObservableObject {
         let outcome: Outcome
         // Правило без исключений: проспал — провал и списание. Прощений нет ни в первый, ни в следующий раз.
         // Не списывается только то, что было не по вине человека: будильник не стоял в системе из-за сбоя.
-        let forgiven: Bool? = nil
 
         let state = service.scheduleState(alarm, ring: ring)
         if state == .systemFailure {
@@ -487,12 +554,11 @@ final class WakeCoordinator: ObservableObject {
             outcome = .failed
         }
 
-        let stake = alarm.stakeEnabled ? alarm.stakeAmount : 0
+        let stake = AlarmStore.shared.isStakeActive(alarm) ? alarm.stakeAmount : 0
         let reference: UUID? = (outcome == .failed && stake > 0) ? UUID() : nil
         JournalStore.shared.add(JournalEntry(
             date: ring,
             alarmID: alarm.id,
-            forgiven: forgiven,
             alarmTitle: alarm.displayTitle,
             timeText: WakeCoordinator.clock(ring),
             stake: stake,

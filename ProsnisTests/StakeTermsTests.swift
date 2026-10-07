@@ -25,7 +25,25 @@ final class StakeTermsTests: XCTestCase {
         let text = StakeTerms.clauses(amount: 500, isTraining: false).joined(separator: " ")
         XCTAssertTrue(text.contains("10 дней"))
         XCTAssertTrue(text.contains("автоматического возврата нет"))
-        XCTAssertGreaterThanOrEqual(StakeTerms.version, 2, "Условия изменились — версия выросла, согласие спросится заново")
+        XCTAssertTrue(text.contains("сервер был недоступен"), "Сбой сервера — тоже не по вине человека")
+        let previous = StakeConsent(version: StakeTerms.version - 1, acceptedAt: Date(), maxAmount: 10_000)
+        XCTAssertTrue(StakeTerms.needsConsent(previous, amount: 100), "Согласие на прошлые условия не действует")
+    }
+
+    func testPartialDatedFailureAndHorizon() {
+        let now = Date(timeIntervalSince1970: 1_791_000_000)
+        let end = now.addingTimeInterval(10 * 86400)
+        let scheduled = [now.addingTimeInterval(86400), now.addingTimeInterval(3 * 86400)]
+        let failedDay = now.addingTimeInterval(2 * 86400)
+        func state(_ ring: Date) -> AlarmService.ScheduleState {
+            AlarmService.classify(authorized: true, denied: false, failed: true, dated: true, scheduledDates: scheduled,
+                                  failedDates: [failedDay], horizonEnd: end, ring: ring)
+        }
+        XCTAssertEqual(state(scheduled[0]), .scheduled)
+        XCTAssertEqual(state(failedDay), .systemFailure, "Дату не удалось поставить — сбой, без списания")
+        XCTAssertEqual(state(now.addingTimeInterval(5 * 86400)), .systemFailure,
+                       "Внутри поставленного промежутка, но после последней даты — всё равно не вина человека")
+        XCTAssertEqual(state(end.addingTimeInterval(3600)), .notRefreshed, "После конца промежутка — не открывали приложение")
     }
 
     func testScheduleStateClassification() {

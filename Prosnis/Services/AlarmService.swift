@@ -28,6 +28,19 @@ final class AlarmService {
         var denied: Set<String>? = []
         /// Проверочные звонки: их не трогает уборка «призраков», пока не прозвенят.
         var tests: [UUID: Date]? = [:]
+        /// До какого момента поставлены будильники с меняющимся временем (при последней постановке).
+        var horizonEnd: [String: Date]? = [:]
+        /// Даты внутри этого промежутка, которые поставить не удалось (сбой системы).
+        var failedDates: [String: [Date]]? = [:]
+        /// Когда будильник с заданием должен звонить, по поясу на момент постановки. Не стирается при смене пояса:
+        /// утро нельзя «потерять», переведя часы.
+        var expected: [String: ExpectedRings]? = [:]
+    }
+
+    /// Ожидаемые звонки для конкретных настроек будильника (version — время последнего изменения).
+    struct ExpectedRings: Codable {
+        var version: Date
+        var rings: [RingCandidate]
     }
 
     private var registry: Registry
@@ -130,6 +143,50 @@ final class AlarmService {
         let previous = inFlight[id]
         _ = await previous?.value
         cancelAll(for: id)
+        registry.expected?[id.uuidString] = nil
+        saveRegistry()
+    }
+
+    /// Запоминает, когда будильник с заданием должен звонить в ближайшие дни, по текущему поясу.
+    /// Ожидания для тех же настроек объединяются со старыми: после смены пояса у утра два времени, а не одно.
+    func recordExpected(_ item: AlarmItem, context: ScheduleContext, now: Date = Date()) {
+        let key = item.id.uuidString
+        var all = registry.expected ?? [:]
+        guard item.isEnabled && item.hasTask else {
+            guard all[key] != nil else { return }
+            all[key] = nil
+            registry.expected = all
+            saveRegistry()
+            return
+        }
+        let version = AlarmStore.changedAt(item)
+        let fresh = MissedMornings.candidates(
+            ScheduleCalculator.effectiveOccurrences(
+                for: item, from: now,
+                to: now.addingTimeInterval(Double(AlarmService.datedHorizonDays + 1) * 86400),
+                context: context
+            ),
+            calendar: context.calendar
+        )
+        var old: [RingCandidate] = []
+        if let stored = all[key], abs(stored.version.timeIntervalSince(version)) < 1 {
+            old = stored.rings.filter { now.timeIntervalSince($0.at) < 30 * 86400 }
+        }
+        all[key] = ExpectedRings(version: version, rings: MissedMornings.merged(old, fresh))
+        registry.expected = all
+        saveRegistry()
+    }
+
+    /// Ожидаемые звонки для текущих настроек будильника (после изменения настроек старые не действуют).
+    func expectedRings(for item: AlarmItem) -> [RingCandidate] {
+        guard let stored = registry.expected?[item.id.uuidString],
+              abs(stored.version.timeIntervalSince(AlarmStore.changedAt(item))) < 1 else { return [] }
+        return stored.rings
+    }
+
+    /// Самый ранний конец поставленного промежутка среди будильников с меняющимся временем.
+    func earliestHorizonEnd(for ids: [UUID]) -> Date? {
+        ids.compactMap { registry.horizonEnd?[$0.uuidString] }.min()
     }
 
     func isFailed(_ id: UUID) -> Bool { registry.failed.contains(id.uuidString) }
@@ -169,13 +226,15 @@ final class AlarmService {
 
     /// Чистая функция: был ли будильник в системе на время звонка и кто отвечает, если нет.
     nonisolated static func classify(
-        authorized: Bool, denied: Bool, failed: Bool, dated: Bool, scheduledDates: [Date], ring: Date
+        authorized: Bool, denied: Bool, failed: Bool, dated: Bool, scheduledDates: [Date],
+        failedDates: [Date] = [], horizonEnd: Date? = nil, ring: Date
     ) -> ScheduleState {
         if !authorized || denied { return .permissionMissing }
         if dated {
             if scheduledDates.contains(where: { abs($0.timeIntervalSince(ring)) < 60 }) { return .scheduled }
-            // Звонок позже последней поставленной даты: новые даты не поставлены, потому что приложение не открывали.
-            if let last = scheduledDates.max(), ring > last.addingTimeInterval(60) { return .notRefreshed }
+            if failedDates.contains(where: { abs($0.timeIntervalSince(ring)) < 60 }) { return .systemFailure }
+            // Звонок позже конца поставленного промежутка: новые даты не поставлены, потому что приложение не открывали.
+            if let end = horizonEnd ?? scheduledDates.max(), ring > end.addingTimeInterval(60) { return .notRefreshed }
             return .systemFailure
         }
         return failed ? .systemFailure : .scheduled
@@ -190,6 +249,8 @@ final class AlarmService {
             failed: registry.failed.contains(key),
             dated: item.needsDatedSchedule,
             scheduledDates: registry.dates[key] ?? [],
+            failedDates: registry.failedDates?[key] ?? [],
+            horizonEnd: registry.horizonEnd?[key],
             ring: ring
         )
     }
@@ -248,11 +309,13 @@ final class AlarmService {
         if item.needsDatedSchedule {
             // Время меняется по дням или есть исключения: ставим будильники на конкретные даты.
             let now = Date()
-            let dates = ScheduleCalculator.effectiveOccurrences(
-                for: item, from: now,
-                to: now.addingTimeInterval(Double(AlarmService.datedHorizonDays) * 86400),
-                context: context
-            )
+            let horizon = now.addingTimeInterval(Double(AlarmService.datedHorizonDays) * 86400)
+            let dates = ScheduleCalculator.effectiveOccurrences(for: item, from: now, to: horizon, context: context)
+            // Конец промежутка записываем до постановки: звонок внутри него, который не встал, — сбой, а не «не открывали».
+            var ends = registry.horizonEnd ?? [:]
+            ends[key] = horizon
+            registry.horizonEnd = ends
+            var failedList = (registry.failedDates?[key] ?? []).filter { $0 <= now && now.timeIntervalSince($0) < 30 * 86400 }
             var failed = false
             for date in dates {
                 guard stillWanted(item, generation: generation) else { break }
@@ -276,9 +339,14 @@ final class AlarmService {
                     saveRegistry()
                 } catch {
                     failed = true
+                    failedList.append(date)
                 }
             }
-            markFailed(key, false)
+            var allFailed = registry.failedDates ?? [:]
+            allFailed[key] = failedList
+            registry.failedDates = allFailed
+            // Частичный сбой отмечается: при следующем открытии будильник переставится.
+            markFailed(key, failed)
             if item.isFajr && dates.isEmpty {
                 return "В ближайшие дни время Фаджра не определяется для выбранного города. Проверьте настройки намаза."
             }
