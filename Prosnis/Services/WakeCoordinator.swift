@@ -439,30 +439,18 @@ final class WakeCoordinator: ObservableObject {
         let window = WakeRules.windowSeconds
         var events = [JournalEvent(date: ring, text: "Время звонка по расписанию")]
         let outcome: Outcome
-        var forgiven: Bool?
+        // Правило без исключений: проспал — провал и списание. Прощений нет ни в первый, ни в следующий раз.
+        // Не списывается только то, что было не по вине человека: будильник не стоял в системе из-за сбоя.
+        let forgiven: Bool? = nil
 
         let state = service.scheduleState(alarm, ring: ring)
         if state == .systemFailure {
-            // Будильник не стоял в системе по нашей вине или из-за сбоя: списывать нельзя.
             events.append(JournalEvent(date: ring, text: "Будильник не был поставлен в системе из-за сбоя, списания нет"))
             outcome = .technical
         } else if state == .permissionMissing {
-            // Разрешение выключил сам человек. Первый раз за 30 дней прощается, дальше это провал.
-            if !JournalStore.shared.hasForgiven(before: ring) {
-                events.append(JournalEvent(date: ring, text: "Разрешение на будильники было выключено. Первый такой случай прощён"))
-                outcome = .technical
-                forgiven = true
-            } else {
-                events.append(JournalEvent(date: ring, text: "Разрешение на будильники было выключено, будильник не прозвенел"))
-                outcome = .failed
-            }
-        } else if Bedtime.wasChecked(before: ring) && !JournalStore.shared.hasForgiven(before: ring) {
-            events.append(JournalEvent(
-                date: ring.addingTimeInterval(window),
-                text: "Приложение не открывали. Вечерняя проверка была пройдена, первый такой случай прощён"
-            ))
-            outcome = .technical
-            forgiven = true
+            // Разрешение выключил сам человек: это его выбор, а не сбой.
+            events.append(JournalEvent(date: ring, text: "Разрешение на будильники было выключено, будильник не прозвенел"))
+            outcome = .failed
         } else {
             events.append(JournalEvent(date: ring.addingTimeInterval(window), text: "Приложение не открывали, задание не выполнено"))
             outcome = .failed
