@@ -201,6 +201,7 @@ final class AlarmStore: ObservableObject {
             if let error = await service.sync(item, context: context) {
                 message = error
             }
+            await DeadlineNotifications.refresh(alarms: alarms, context: context)
         }
     }
 }

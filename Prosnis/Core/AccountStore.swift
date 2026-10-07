@@ -42,6 +42,11 @@ final class AccountStore: ObservableObject {
         return secret
     }
 
+    /// Подпись секретом устройства (для событий утра).
+    func sign(_ message: String) -> String {
+        WakeEvent.sign(message, secret: deviceSecret)
+    }
+
     /// Если сервер подключён, а токена нет, регистрирует устройство. Без сервера ничего не делает.
     func ensureSignedIn() async {
         guard token == nil, let url = AppConfig.serverURL else { return }

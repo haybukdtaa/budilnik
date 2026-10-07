@@ -20,6 +20,22 @@ info:
     - Право на первый автоматический возврат по спору сервер считает по аккаунту и устройству:
       удаление данных на телефоне его не обнуляет.
     - 401 означает «токен недействителен»: приложение забывает токен и заново проходит /v1/auth/register.
+
+    Списание ставки делает сервер, по таймеру, без участия приложения:
+    - За 2 часа до звонка будильника со ставкой сервер блокирует сумму у платёжного сервиса.
+      Если блокировка не прошла (нет денег), человек получает уведомление вечером.
+    - Через 10 минут после звонка: нет события «started» и «taskDone» → списание.
+    - Через 10 минут после повторного звонка: нет «recheckDone» → списание.
+      Это так, даже если «taskDone» был: вставший, но не прошедший вторую проверку — провал.
+    - Есть «recheckDone» вовремя → блокировка снимается.
+    - Одно утро (morningID) — одно решение. Повторные события ничего не меняют, двойного списания нет.
+    - Прощений нет. Не списывается только утро, когда будильник не был поставлен из-за сбоя,
+      и утро, на время которого сам сервер был недоступен.
+    - Поздние доказательства: если утром не было сети, события приходят позже. Сервер проверяет подпись
+      (HMAC-SHA256 секретом устройства из /v1/auth/register) по строке «morningID|kind|секунды at»,
+      порядок событий и то, что они уложились в 10-минутные окна. Если доказано, что утро успешно, —
+      автоматический возврат. Срок для поздних доказательств — 48 часов.
+    - Согласие с условиями ставки (OutboxItem kind=consent) хранится как доказательство для споров.
 servers:
   - url: https://api.example.ru
 security:
@@ -236,6 +252,24 @@ components:
         me: { $ref: "#/components/schemas/LeaderboardRow" }
         record: { type: object, properties: { profile: { $ref: "#/components/schemas/UserProfile" }, value: { type: integer }, since: { type: string, format: date-time } } }
     GlobalStats: { type: object, properties: { wokeToday: { type: integer }, activeChallenges: { type: integer } } }
+    WakeEvent:
+      type: object
+      description: Событие утра (payload у OutboxItem kind=wakeEvent).
+      properties:
+        id: { type: string, format: uuid }
+        morningID: { type: string, description: "«alarmID|секунды времени звонка»" }
+        alarmID: { type: string, format: uuid }
+        ring: { type: string, format: date-time }
+        kind: { type: string, enum: [started, taskDone, recheckDone, failed] }
+        at: { type: string, format: date-time, description: "По защищённым часам, с точностью до секунды" }
+        signature: { type: string, description: "base64 HMAC-SHA256 строки «morningID|kind|секунды at»" }
+    StakeConsent:
+      type: object
+      description: Согласие с условиями ставки (payload у OutboxItem kind=consent).
+      properties:
+        version: { type: integer }
+        acceptedAt: { type: string, format: date-time }
+        maxAmount: { type: integer }
     MissedMorningNotice:
       type: object
       properties:
@@ -264,7 +298,7 @@ components:
       description: payload — JSON сущности в base64 (будильник, запись журнала, челлендж, приватность, профиль).
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [alarm, journalEntry, challenge, privacy, profile] }
+        kind: { type: string, enum: [alarm, journalEntry, challenge, privacy, profile, wakeEvent, consent] }
         entityID: { type: string, format: uuid }
         payload: { type: string, format: byte }
         deleted: { type: boolean }

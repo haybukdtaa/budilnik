@@ -50,6 +50,7 @@ struct ProsnisApp: App {
         store.refreshDatedAlarms()
         store.resyncFailed()
         store.cleanupOrphans()
+        await DeadlineNotifications.refresh(alarms: store.alarms, context: settings.scheduleContext)
         challenges.evaluateAll()
         await payments.retryPending()
         await payments.checkIfNeeded()

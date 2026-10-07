@@ -1,7 +1,7 @@
 import Foundation
 
 enum OutboxKind: String, Codable {
-    case alarm, journalEntry, challenge, privacy, profile
+    case alarm, journalEntry, challenge, privacy, profile, wakeEvent, consent
 }
 
 /// Изменение, которое ждёт отправки на сервер.

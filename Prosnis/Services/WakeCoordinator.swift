@@ -157,7 +157,24 @@ final class WakeCoordinator: ObservableObject {
         if let reference {
             Task { await PaymentsStore.shared.hold(amount: stake, reference: reference) }
         }
+        let morningRing = originalRing ?? ring
+        DeadlineNotifications.cancel(alarmID: alarm.id, ring: morningRing)
+        if let started = session { emit(.started, session: started, at: now) }
         evaluate(now)
+    }
+
+    /// Событие утра для сервера: подписано, уходит через очередь. Тест и утра с намазом без согласия не уходят.
+    private func emit(_ kind: WakeEventKind, session value: WakeSession, at date: Date) {
+        guard !value.isDemo else { return }
+        if value.isPrayer && !AppSettings.shared.data.privacy.syncPrayerData { return }
+        let ring = value.originalRing ?? value.startDate
+        let morning = WakeEvent.morningID(alarmID: value.alarmID, ring: ring)
+        let at = Date(timeIntervalSince1970: floor(date.timeIntervalSince1970))
+        let event = WakeEvent(
+            morningID: morning, alarmID: value.alarmID, ring: ring, kind: kind, at: at,
+            signature: AccountStore.shared.sign(WakeEvent.signedMessage(morningID: morning, kind: kind, at: at))
+        )
+        SyncEngine.shared.enqueue(.wakeEvent, id: event.id, value: event, sensitive: value.isPrayer)
     }
 
     /// Запасной вход: если «Выключить» не открыло приложение, задание начинается,
@@ -286,6 +303,12 @@ final class WakeCoordinator: ObservableObject {
         current.phase = .waiting
         current.recheckDate = recheckAt
         setSession(current)
+        emit(.taskDone, session: current, at: now)
+        if !current.isDemo {
+            let alarmID = current.alarmID
+            let amount = current.stake
+            Task { await DeadlineNotifications.scheduleRecheckDeadline(alarmID: alarmID, recheck: recheckAt, amount: amount) }
+        }
 
         let snapshot = current
         Task {
@@ -324,6 +347,10 @@ final class WakeCoordinator: ObservableObject {
         if let recheckID = finished.recheckAlarmID {
             service.cancel(id: recheckID)
         }
+        if let recheck = finished.recheckDate {
+            DeadlineNotifications.cancelRecheck(alarmID: finished.alarmID, recheck: recheck)
+        }
+        emit(outcome == .success ? .recheckDone : .failed, session: finished, at: TrustedClock.now)
         let before = ProgressEngine.compute(entries: JournalStore.shared.realEntries, challenges: ChallengeStore.shared.challenges)
 
         let entry = JournalEntry(

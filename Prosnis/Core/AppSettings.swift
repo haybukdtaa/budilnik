@@ -30,6 +30,8 @@ struct SettingsData: Codable, Equatable {
     var lastWitnessNoticeDay: String?
     /// Сообщение свидетелям, которое ещё не удалось отправить (нет сети).
     var pendingWitnessNotice: MissedMorningNotice?
+    /// Согласие с условиями ставки.
+    var stakeConsent: StakeConsent?
 
     init() {}
 
@@ -56,6 +58,7 @@ struct SettingsData: Codable, Equatable {
         wakeReason = try c.decodeIfPresent(String.self, forKey: .wakeReason) ?? base.wakeReason
         lastWitnessNoticeDay = try c.decodeIfPresent(String.self, forKey: .lastWitnessNoticeDay)
         pendingWitnessNotice = try c.decodeIfPresent(MissedMorningNotice.self, forKey: .pendingWitnessNotice)
+        stakeConsent = try c.decodeIfPresent(StakeConsent.self, forKey: .stakeConsent)
     }
 }
 

@@ -13,6 +13,7 @@ struct AlarmEditView: View {
     @State private var showScanner = false
     @State private var scanError: String?
     @State private var permissionMessage: String?
+    @State private var showTerms = false
     private let isNew: Bool
 
     init(alarm: AlarmItem, isNew: Bool) {
@@ -146,6 +147,24 @@ struct AlarmEditView: View {
                 }
             }
             .sheet(isPresented: $showScanner) { scannerSheet }
+            .sheet(isPresented: $showTerms) {
+                StakeTermsView(amount: draft.stakeAmount) {
+                    let previous = settings.data.stakeConsent
+                    let consent = StakeConsent(
+                        version: StakeTerms.version,
+                        acceptedAt: TrustedClock.now,
+                        maxAmount: max(draft.stakeAmount, previous?.version == StakeTerms.version ? previous?.maxAmount ?? 0 : 0)
+                    )
+                    settings.data.stakeConsent = consent
+                    // Согласие — доказательство при споре: уходит на сервер.
+                    SyncEngine.shared.enqueue(.consent, id: settings.data.profile.id, value: consent)
+                    showTerms = false
+                    Task {
+                        _ = await DeadlineNotifications.requestPermission()
+                        saveStake()
+                    }
+                }
+            }
             // Сообщения хранилища (например, «будильник закрыт») видны прямо здесь, а не после закрытия редактора.
             .alert(
                 "Внимание",
@@ -164,6 +183,15 @@ struct AlarmEditView: View {
             if store.upsert(draft) { dismiss() }
             return
         }
+        // Сначала согласие с условиями ставки: без него будильник со ставкой не сохраняется.
+        if StakeTerms.needsConsent(settings.data.stakeConsent, amount: draft.stakeAmount) {
+            showTerms = true
+            return
+        }
+        saveStake()
+    }
+
+    private func saveStake() {
         // Ставка имеет смысл, только если будильник точно поставлен: без разрешения сохранить её нельзя.
         Task {
             if await AlarmService.shared.requestAuthorization() {
