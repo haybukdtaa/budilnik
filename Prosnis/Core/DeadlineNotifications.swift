@@ -9,6 +9,9 @@ enum DeadlineNotifications {
     static let maxPending = 50
     private static let prefix = "deadline-"
     private static let recheckPrefix = "deadline-recheck-"
+    private static let refreshReminderID = "refresh-reminder"
+    /// Через сколько дней без открытия напомнить, что будильники по Фаджру и календарю скоро закончатся.
+    static let refreshReminderDays = 7
 
     static func id(alarmID: UUID, ring: Date) -> String {
         "\(prefix)\(alarmID.uuidString)-\(Int(ring.timeIntervalSince1970))"
@@ -44,8 +47,20 @@ enum DeadlineNotifications {
         let ours = pending.map(\.identifier).filter { $0.hasPrefix(prefix) && !$0.hasPrefix(recheckPrefix) }
         center.removePendingNotificationRequests(withIdentifiers: ours)
 
+        center.removePendingNotificationRequests(withIdentifiers: [refreshReminderID])
+
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+
+        // Будильники по Фаджру и календарю ставятся на 10 дней вперёд: на 7-й день без открытия напоминаем.
+        if alarms.contains(where: { $0.isEnabled && $0.hasTask && $0.needsDatedSchedule }) {
+            let reminder = UNMutableNotificationContent()
+            reminder.title = "Откройте «Проснись»"
+            reminder.body = "Через 3 дня будильники по Фаджру и по праздникам перестанут ставиться. Утро без звонка из-за этого — провал."
+            reminder.sound = .default
+            let fire = now.addingTimeInterval(Double(refreshReminderDays) * 86400)
+            try? await center.add(UNNotificationRequest(identifier: refreshReminderID, content: reminder, trigger: trigger(at: fire)))
+        }
 
         var planned: [(Date, UNNotificationRequest)] = []
         let horizon = now.addingTimeInterval(Double(AlarmService.datedHorizonDays) * 86400)

@@ -197,18 +197,25 @@ final class JournalStore: ObservableObject {
         return stats
     }
 
-    /// Оспаривание. Первый спор в аккаунте возвращается сразу, остальные идут на рассмотрение.
+    /// Оспаривание. Автоматического возврата нет: каждый спор рассматривается по записям журнала и событиям утра.
     func dispute(_ entry: JournalEntry) {
         guard entry.outcome == .failed, entry.dispute == .none,
               let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
-        let hadEarlier = entries.contains { $0.dispute != .none && $0.isDemo != true }
-        let refunded = !hadEarlier || entry.isDemo == true
-        entries[index].dispute = refunded ? .refunded : .pending
+        entries[index].dispute = .pending
         save()
-        if refunded, let ref = entry.paymentRef, entry.stake > 0 {
+        AppEvents.journalChanged(entries[index])
+    }
+
+    /// Итог рассмотрения спора (придёт с сервера). При решении в пользу человека деньги возвращаются.
+    func resolveDispute(entryID: UUID, refund: Bool) {
+        guard let index = entries.firstIndex(where: { $0.id == entryID }), entries[index].dispute == .pending else { return }
+        entries[index].dispute = refund ? .refunded : .none
+        save()
+        let entry = entries[index]
+        if refund, let ref = entry.paymentRef, entry.stake > 0 {
             PaymentsStore.shared.refund(reference: ref, amount: entry.stake)
         }
-        AppEvents.journalChanged(entries[index])
+        AppEvents.journalChanged(entry)
     }
 
     /// Тестовые записи, чтобы посмотреть экраны. В статистику не идут.

@@ -21,6 +21,32 @@ final class StakeTermsTests: XCTestCase {
         XCTAssertTrue(StakeTerms.clauses(amount: 500, isTraining: true).joined().contains("тренировочные"))
     }
 
+    func testTermsMentionTenDaysAndNoAutoRefund() {
+        let text = StakeTerms.clauses(amount: 500, isTraining: false).joined(separator: " ")
+        XCTAssertTrue(text.contains("10 дней"))
+        XCTAssertTrue(text.contains("автоматического возврата нет"))
+        XCTAssertGreaterThanOrEqual(StakeTerms.version, 2, "Условия изменились — версия выросла, согласие спросится заново")
+    }
+
+    func testScheduleStateClassification() {
+        let ring = Date(timeIntervalSince1970: 1_791_000_000)
+        let scheduled = (0..<10).map { ring.addingTimeInterval(Double($0) * 86400 - 9 * 86400) } // последняя дата — ring
+        XCTAssertEqual(AlarmService.classify(authorized: true, denied: false, failed: false, dated: true,
+                                             scheduledDates: scheduled, ring: ring), .scheduled)
+        XCTAssertEqual(AlarmService.classify(authorized: true, denied: false, failed: false, dated: true,
+                                             scheduledDates: scheduled, ring: ring.addingTimeInterval(86400)), .notRefreshed,
+                       "Звонок после последней поставленной даты: приложение не открывали — провал")
+        XCTAssertEqual(AlarmService.classify(authorized: true, denied: false, failed: false, dated: true,
+                                             scheduledDates: scheduled, ring: ring.addingTimeInterval(-86400 / 2)), .systemFailure,
+                       "Дата внутри поставленного промежутка, но не поставлена — сбой")
+        XCTAssertEqual(AlarmService.classify(authorized: false, denied: false, failed: false, dated: false,
+                                             scheduledDates: [], ring: ring), .permissionMissing)
+        XCTAssertEqual(AlarmService.classify(authorized: true, denied: false, failed: true, dated: false,
+                                             scheduledDates: [], ring: ring), .systemFailure)
+        XCTAssertEqual(AlarmService.classify(authorized: true, denied: false, failed: false, dated: false,
+                                             scheduledDates: [], ring: ring), .scheduled)
+    }
+
     func testWakeEventSignatureMatchesReference() {
         // Эталон посчитан стандартной библиотекой Python (hmac, sha256, base64).
         let message = "6F9619FF-8B86-D011-B42D-00C04FC964FF|1791255600|taskDone|1791256000"

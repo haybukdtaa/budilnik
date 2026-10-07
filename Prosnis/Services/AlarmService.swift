@@ -160,20 +160,38 @@ final class AlarmService {
         case scheduled
         /// Разрешение на будильники выключил сам человек.
         case permissionMissing
-        /// Сбой системы или приложения (в том числе будильник за пределами 10 дней): человек не виноват.
+        /// Будильник с меняющимся временем не поставлен, потому что приложение не открывали дольше 10 дней.
+        /// Об этом предупреждают условия ставки и напоминание: это ответственность человека.
+        case notRefreshed
+        /// Сбой системы или приложения: человек не виноват.
         case systemFailure
+    }
+
+    /// Чистая функция: был ли будильник в системе на время звонка и кто отвечает, если нет.
+    nonisolated static func classify(
+        authorized: Bool, denied: Bool, failed: Bool, dated: Bool, scheduledDates: [Date], ring: Date
+    ) -> ScheduleState {
+        if !authorized || denied { return .permissionMissing }
+        if dated {
+            if scheduledDates.contains(where: { abs($0.timeIntervalSince(ring)) < 60 }) { return .scheduled }
+            // Звонок позже последней поставленной даты: новые даты не поставлены, потому что приложение не открывали.
+            if let last = scheduledDates.max(), ring > last.addingTimeInterval(60) { return .notRefreshed }
+            return .systemFailure
+        }
+        return failed ? .systemFailure : .scheduled
     }
 
     /// Стоял ли будильник в системе на это время.
     func scheduleState(_ item: AlarmItem, ring: Date) -> ScheduleState {
         let key = item.id.uuidString
-        if !isAuthorized || (registry.denied ?? []).contains(key) { return .permissionMissing }
-        if registry.failed.contains(key) { return .systemFailure }
-        if item.needsDatedSchedule {
-            let scheduled = (registry.dates[key] ?? []).contains { abs($0.timeIntervalSince(ring)) < 60 }
-            return scheduled ? .scheduled : .systemFailure
-        }
-        return .scheduled
+        return AlarmService.classify(
+            authorized: isAuthorized,
+            denied: (registry.denied ?? []).contains(key),
+            failed: registry.failed.contains(key),
+            dated: item.needsDatedSchedule,
+            scheduledDates: registry.dates[key] ?? [],
+            ring: ring
+        )
     }
 
     private func markDenied(_ key: String, _ denied: Bool) {

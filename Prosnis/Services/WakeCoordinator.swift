@@ -478,6 +478,10 @@ final class WakeCoordinator: ObservableObject {
             // Разрешение выключил сам человек: это его выбор, а не сбой.
             events.append(JournalEvent(date: ring, text: "Разрешение на будильники было выключено, будильник не прозвенел"))
             outcome = .failed
+        } else if state == .notRefreshed {
+            // Приложение не открывали дольше 10 дней: новые будильники по Фаджру или календарю не были поставлены.
+            events.append(JournalEvent(date: ring, text: "Приложение не открывали дольше 10 дней, будильник не был поставлен"))
+            outcome = .failed
         } else {
             events.append(JournalEvent(date: ring.addingTimeInterval(window), text: "Приложение не открывали, задание не выполнено"))
             outcome = .failed
