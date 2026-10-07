@@ -244,7 +244,12 @@ struct FriendDetailView: View {
             .onAppear { visibility = friend.myVisibility }
             .onChange(of: visibility) { _, value in
                 guard value != friend.myVisibility else { return }
-                Task { await social.setVisibility(value, for: friend) }
+                Task {
+                    // Сервер не принял изменение: показываем то, что друг видит на самом деле.
+                    if !(await social.setVisibility(value, for: friend)) {
+                        visibility = social.friends.first { $0.id == friendID }?.myVisibility ?? friend.myVisibility
+                    }
+                }
             }
             .sheet(isPresented: $showPair) { PairCreateView(friend: friend) }
             .confirmationDialog("Удалить из друзей?", isPresented: $confirmRemove, titleVisibility: .visible) {

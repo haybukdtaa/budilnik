@@ -29,6 +29,10 @@ struct ProsnisApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { Task { await becameActive() } }
                 }
+                // Сменился часовой пояс (поездка): будильники на конкретные даты переставляются сразу.
+                .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
+                    store.refreshDatedAlarms(force: true)
+                }
         }
     }
 
@@ -52,8 +56,12 @@ struct ProsnisApp: App {
         social.sendPendingWitnessNotice()
         await AccountStore.shared.ensureSignedIn()
         let backend = BackendRegistry.current
-        if backend.isOnline {
+        if backend.isOnline && !backend.isDemo {
+            // Время сервера — самое надёжное для блокировки ставки.
+            if let serverNow = try? await backend.serverTime() { TrustedClock.anchorToServer(serverNow) }
             await sync.sync(using: backend)
+        }
+        if backend.isOnline {
             social.publishStatus()
         }
     }

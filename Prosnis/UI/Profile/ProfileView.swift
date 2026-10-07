@@ -65,9 +65,9 @@ struct ProfileView: View {
                 } header: {
                     Text("Сообщество")
                 } footer: {
-                    Text(AppConfig.serverURL == nil
+                    Text(AccountStore.shared.signInProblem ?? (AppConfig.serverURL == nil
                          ? "Сервер ещё не подключён. Демо-режим показывает вымышленных людей; ваши данные никуда не уходят."
-                         : "Сервер подключён.")
+                         : "Сервер подключён."))
                 }
 
                 Section {

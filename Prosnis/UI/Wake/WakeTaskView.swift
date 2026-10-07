@@ -46,7 +46,7 @@ struct WakeTaskView: View {
             }
             .padding(20)
         }
-        .id("\(session.stage)-\(session.taskKind.rawValue)")
+        .id("\(session.alarmID)-\(session.startDate.timeIntervalSince1970)-\(session.stage)-\(session.taskKind.rawValue)")
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)

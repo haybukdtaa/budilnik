@@ -16,15 +16,21 @@ final class HTTPBackend: SocialBackend, SyncBackend {
         self.session = session
         encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        decoder = JSONDecoder()
+        decoder = HTTPBackend.makeDecoder()
+    }
+
+    /// ISO 8601 с долями секунды и без них.
+    /// Тот же разбор дат, что и в запросах к серверу (для тестов).
+    nonisolated static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let text = try decoder.singleValueContainer().decode(String.self)
             if let date = HTTPBackend.parseDate(text) { return date }
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Дата не в ISO 8601: \(text)"))
         }
+        return decoder
     }
 
-    /// ISO 8601 с долями секунды и без них.
     nonisolated static func parseDate(_ text: String) -> Date? {
         let withFraction = ISO8601DateFormatter()
         withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -49,8 +55,9 @@ final class HTTPBackend: SocialBackend, SyncBackend {
         request.httpMethod = method
         request.timeoutInterval = 20
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let token = AccountStore.shared.token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let usedToken = AccountStore.shared.token
+        if let usedToken {
+            request.setValue("Bearer \(usedToken)", forHTTPHeaderField: "Authorization")
         }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -70,9 +77,10 @@ final class HTTPBackend: SocialBackend, SyncBackend {
             if Response.self == Empty.self || data.isEmpty, let empty = Empty() as? Response { return empty }
             return try decoder.decode(Response.self, from: data)
         case 401:
-            if path != "v1/auth/register" { AccountStore.shared.tokenRejected() }
+            if path != "v1/auth/register" { AccountStore.shared.tokenRejected(usedToken) }
             throw BackendError.forbidden
         case 403: throw BackendError.forbidden
+        
         case 404: throw BackendError.notFound
         case 409: throw BackendError.roomFull
         case 422: throw BackendError.invalidCode

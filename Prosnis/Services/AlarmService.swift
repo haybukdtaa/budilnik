@@ -24,6 +24,8 @@ final class AlarmService {
         var dates: [String: [Date]] = [:]
         /// Будильники, которые в последний раз поставить не удалось.
         var failed: Set<String> = []
+        /// Не поставлены, потому что разрешение на будильники выключено.
+        var denied: Set<String>? = []
         /// Проверочные звонки: их не трогает уборка «призраков», пока не прозвенят.
         var tests: [UUID: Date]? = [:]
     }
@@ -132,6 +134,14 @@ final class AlarmService {
 
     func isFailed(_ id: UUID) -> Bool { registry.failed.contains(id.uuidString) }
 
+    /// Будильник, который ставится прямо сейчас: уборка «призраков» не трогает его час.
+    private func protect(_ id: UUID) {
+        var tests = registry.tests ?? [:]
+        tests[id] = Date()
+        registry.tests = tests
+        saveRegistry()
+    }
+
     /// Снимает системные будильники, которых нет ни у одного нашего будильника («призраки» после сбоев).
     func pruneOrphans(known: Set<UUID>) {
         guard let all = try? manager.alarms else { return }
@@ -146,14 +156,31 @@ final class AlarmService {
         saveRegistry()
     }
 
-    /// Стоял ли будильник в системе на это время. Если нет, пропуск не считается провалом.
-    func wasScheduled(_ item: AlarmItem, ring: Date) -> Bool {
+    enum ScheduleState: Equatable {
+        case scheduled
+        /// Разрешение на будильники выключил сам человек.
+        case permissionMissing
+        /// Сбой системы или приложения (в том числе будильник за пределами 10 дней): человек не виноват.
+        case systemFailure
+    }
+
+    /// Стоял ли будильник в системе на это время.
+    func scheduleState(_ item: AlarmItem, ring: Date) -> ScheduleState {
         let key = item.id.uuidString
-        if registry.failed.contains(key) { return false }
+        if !isAuthorized || (registry.denied ?? []).contains(key) { return .permissionMissing }
+        if registry.failed.contains(key) { return .systemFailure }
         if item.needsDatedSchedule {
-            return (registry.dates[key] ?? []).contains { abs($0.timeIntervalSince(ring)) < 60 }
+            let scheduled = (registry.dates[key] ?? []).contains { abs($0.timeIntervalSince(ring)) < 60 }
+            return scheduled ? .scheduled : .systemFailure
         }
-        return true
+        return .scheduled
+    }
+
+    private func markDenied(_ key: String, _ denied: Bool) {
+        var set = registry.denied ?? []
+        if denied { set.insert(key) } else { set.remove(key) }
+        registry.denied = set
+        saveRegistry()
     }
 
     /// Ставит (или переставляет) системные будильники. Перестановки одного будильника идут по очереди.
@@ -193,8 +220,10 @@ final class AlarmService {
         }
         guard await ensureAuthorization() else {
             markFailed(key, true)
+            markDenied(key, true)
             return "Нет разрешения на будильники. Включите его в Настройках iPhone."
         }
+        markDenied(key, false)
         guard stillWanted(item, generation: generation) else { return nil }
         let sound = SoundLibrary.option(item.soundID).fileName
 
@@ -266,6 +295,7 @@ final class AlarmService {
     func scheduleRecheck(alarmID: UUID, soundID: String, at date: Date) async -> UUID? {
         guard await ensureAuthorization() else { return nil }
         let systemID = UUID()
+        protect(systemID)
         let configuration = AlarmManager.AlarmConfiguration.alarm(
             schedule: .fixed(date),
             attributes: attributes(title: "Проверка: вы не спите?"),
@@ -292,12 +322,9 @@ final class AlarmService {
             sound: .default
         )
         let testID = UUID()
+        protect(testID)
         do {
             _ = try await manager.schedule(id: testID, configuration: configuration)
-            var tests = registry.tests ?? [:]
-            tests[testID] = fireDate
-            registry.tests = tests
-            saveRegistry()
             let formatter = DateFormatter()
             formatter.timeStyle = .medium
             return "Проверочный звонок в \(formatter.string(from: fireDate)). Заблокируйте телефон и ждите."

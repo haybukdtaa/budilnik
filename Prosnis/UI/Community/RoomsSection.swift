@@ -240,7 +240,10 @@ struct ChatView: View {
                     Button {
                         let value = text
                         text = ""
-                        Task { await social.send(value, to: conversation) }
+                        Task {
+                            // Не ушло — возвращаем текст, чтобы он не пропал.
+                            if !(await social.send(value, to: conversation)) && text.isEmpty { text = value }
+                        }
                     } label: {
                         Image(systemName: "arrow.up.circle.fill").font(.title)
                     }

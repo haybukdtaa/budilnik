@@ -23,8 +23,8 @@ final class WakeCoordinator: ObservableObject {
 
     @Published private(set) var session: WakeSession?
     @Published var morning: MorningState?
-    /// Утренний экран, который покажется, когда закроется экран задания.
-    private var pendingMorning: MorningState?
+    /// Утренние экраны, которые покажутся по очереди, когда закроется экран задания.
+    private var pendingMornings: [MorningState] = []
 
     private let service = AlarmService.shared
     private let file = FileStore<WakeSession>("wake_session")
@@ -42,7 +42,7 @@ final class WakeCoordinator: ObservableObject {
         session = result.value
         loadFailed = result.state == .unreadable
         morning = nil
-        pendingMorning = nil
+        pendingMornings = []
     }
 
     func reloadIfNeeded() {
@@ -347,11 +347,12 @@ final class WakeCoordinator: ObservableObject {
 
         if let reference = finished.paymentRef {
             let amount = finished.stake
+            PaymentsStore.shared.markOutcome(reference: reference, success: outcome == .success, amount: amount)
             Task { await PaymentsStore.shared.settle(reference: reference, success: outcome == .success, amount: amount) }
         }
 
         if outcome == .success {
-            pendingMorning = MorningState(
+            pendingMornings.append(MorningState(
                 entryID: entry.id,
                 module: finished.module,
                 xpBefore: before.xp,
@@ -362,7 +363,7 @@ final class WakeCoordinator: ObservableObject {
                 flowersBefore: before.tree.flowers,
                 fruitsBefore: before.tree.fruits,
                 startedAt: Date()
-            )
+            ))
         }
 
         startQueued(finished.queuedAlarmIDs ?? [], rings: finished.queuedRings ?? [:], now: TrustedClock.now)
@@ -373,9 +374,8 @@ final class WakeCoordinator: ObservableObject {
 
     /// Показывает отложенный утренний экран, если сейчас не идёт задание.
     func presentPendingMorning() {
-        guard session == nil, morning == nil, let pending = pendingMorning else { return }
-        pendingMorning = nil
-        morning = pending
+        guard session == nil, morning == nil, !pendingMornings.isEmpty else { return }
+        morning = pendingMornings.removeFirst()
     }
 
     /// Если приложение закрыли сразу после начала утра, блокировка ставки могла не успеть пройти.
@@ -404,7 +404,8 @@ final class WakeCoordinator: ObservableObject {
 
         if let lastCheck = defaults.object(forKey: WakeCoordinator.lastReconcileKey) as? Date {
             if checkUntil > lastCheck {
-                for alarm in AlarmStore.shared.alarms where alarm.stakeEnabled && alarm.isEnabled {
+                // Проспанное утро записывается у любого будильника с заданием, со ставкой и без.
+                for alarm in AlarmStore.shared.alarms where alarm.hasTask && alarm.isEnabled {
                     // Изменения будильника после звонка не делают тот звонок пропущенным.
                     let from = max(lastCheck, AlarmStore.changedAt(alarm))
                     for ring in ScheduleCalculator.effectiveOccurrences(for: alarm, from: from, to: checkUntil, context: context) {
@@ -440,13 +441,21 @@ final class WakeCoordinator: ObservableObject {
         let outcome: Outcome
         var forgiven: Bool?
 
-        if !service.isAuthorized || !service.wasScheduled(alarm, ring: ring) {
-            // Будильник в системе не стоял (нет разрешения или сбой): списывать нельзя.
-            events.append(JournalEvent(
-                date: ring,
-                text: "Будильник не был поставлен в системе (нет разрешения или сбой), списания нет"
-            ))
+        let state = service.scheduleState(alarm, ring: ring)
+        if state == .systemFailure {
+            // Будильник не стоял в системе по нашей вине или из-за сбоя: списывать нельзя.
+            events.append(JournalEvent(date: ring, text: "Будильник не был поставлен в системе из-за сбоя, списания нет"))
             outcome = .technical
+        } else if state == .permissionMissing {
+            // Разрешение выключил сам человек. Первый раз за 30 дней прощается, дальше это провал.
+            if !JournalStore.shared.hasForgiven(before: ring) {
+                events.append(JournalEvent(date: ring, text: "Разрешение на будильники было выключено. Первый такой случай прощён"))
+                outcome = .technical
+                forgiven = true
+            } else {
+                events.append(JournalEvent(date: ring, text: "Разрешение на будильники было выключено, будильник не прозвенел"))
+                outcome = .failed
+            }
         } else if Bedtime.wasChecked(before: ring) && !JournalStore.shared.hasForgiven(before: ring) {
             events.append(JournalEvent(
                 date: ring.addingTimeInterval(window),
@@ -459,14 +468,15 @@ final class WakeCoordinator: ObservableObject {
             outcome = .failed
         }
 
-        let reference: UUID? = (outcome == .failed && alarm.stakeAmount > 0) ? UUID() : nil
+        let stake = alarm.stakeEnabled ? alarm.stakeAmount : 0
+        let reference: UUID? = (outcome == .failed && stake > 0) ? UUID() : nil
         JournalStore.shared.add(JournalEntry(
             date: ring,
             alarmID: alarm.id,
             forgiven: forgiven,
             alarmTitle: alarm.displayTitle,
             timeText: WakeCoordinator.clock(ring),
-            stake: alarm.stakeAmount,
+            stake: stake,
             outcome: outcome,
             events: events,
             isTraining: PaymentsStore.shared.isTraining,
@@ -476,15 +486,20 @@ final class WakeCoordinator: ObservableObject {
             paymentRef: reference
         ))
         if let reference {
-            let amount = alarm.stakeAmount
-            Task {
-                await PaymentsStore.shared.settle(reference: reference, success: false, amount: amount)
-                await PaymentsStore.shared.hold(amount: amount, reference: reference)
-            }
+            let amount = stake
+            PaymentsStore.shared.markOutcome(reference: reference, success: false, amount: amount)
+            Task { await PaymentsStore.shared.hold(amount: amount, reference: reference) }
         }
     }
 
     func finishMorning() {
         morning = nil
+        // Следующее утро из очереди (если два будильника прозвенели подряд) — после закрытия этого экрана.
+        if !pendingMornings.isEmpty {
+            Task {
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                presentPendingMorning()
+            }
+        }
     }
 }

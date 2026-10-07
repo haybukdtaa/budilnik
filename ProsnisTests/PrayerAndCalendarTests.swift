@@ -156,9 +156,25 @@ final class ScheduleTests: XCTestCase {
         alarm.fajrOffset = -20
         alarm.weekdays = [1, 2, 3, 4, 5, 6, 7]
         let ring = ScheduleCalculator.ringDate(for: alarm, onDayOf: T.date(2026, 10, 6, 12), context: context)!
-        let fajr = PrayerTimes.day(for: T.date(2026, 10, 6, 12), settings: PrayerSettings()).fajr!
-        XCTAssertEqual(ring.timeIntervalSince(fajr), -20 * 60, accuracy: 1)
+        // Эталон astral: Фаджр в Москве 6 октября 2026 по 16° — 04:52; за 20 минут — 04:32.
+        XCTAssertLessThanOrEqual(abs(T.minutes(ring) - (4 * 60 + 32)), 2)
         XCTAssertTrue(alarm.needsDatedSchedule)
         XCTAssertTrue(alarm.isPrayerRelated)
+    }
+
+    func testFajrForCityInAnotherTimeZone() {
+        // Телефон по Москве, город — Новосибирск (UTC+7). Эталон astral: Фаджр 6 октября 2026 по 16° — 05:52 по Новосибирску,
+        // то есть 01:52 по Москве.
+        var prayer = PrayerSettings()
+        prayer.cityID = "novosibirsk"
+        var alarm = AlarmItem()
+        alarm.module = .prayer
+        alarm.fajrOffset = 0
+        alarm.weekdays = [1, 2, 3, 4, 5, 6, 7]
+        let ring = ScheduleCalculator.ringDate(for: alarm, onDayOf: T.date(2026, 10, 6, 12),
+                                               context: ScheduleContext(prayer: prayer, calendar: T.calendar))!
+        let novosibirsk = TimeZone(identifier: "Asia/Novosibirsk")!
+        XCTAssertLessThanOrEqual(abs(T.minutes(ring, in: novosibirsk) - (5 * 60 + 52)), 2)
+        XCTAssertLessThanOrEqual(abs(T.minutes(ring) - ((5 * 60 + 52) - 4 * 60)), 2)
     }
 }

@@ -139,16 +139,38 @@ struct AlarmEditView: View {
                 }
                 if !isLocked {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Сохранить") {
-                            draft.isEnabled = true
-                            if store.upsert(draft) { dismiss() }
-                        }
-                        .bold()
-                        .disabled(!canSave)
+                        Button("Сохранить") { save() }
+                            .bold()
+                            .disabled(!canSave)
                     }
                 }
             }
             .sheet(isPresented: $showScanner) { scannerSheet }
+            // Сообщения хранилища (например, «будильник закрыт») видны прямо здесь, а не после закрытия редактора.
+            .alert(
+                "Внимание",
+                isPresented: Binding(get: { store.message != nil }, set: { if !$0 { store.message = nil } })
+            ) {
+                Button("Понятно", role: .cancel) {}
+            } message: {
+                Text(store.message ?? "")
+            }
+        }
+    }
+
+    private func save() {
+        draft.isEnabled = true
+        guard draft.stakeEnabled && settings.data.isAdult else {
+            if store.upsert(draft) { dismiss() }
+            return
+        }
+        // Ставка имеет смысл, только если будильник точно поставлен: без разрешения сохранить её нельзя.
+        Task {
+            if await AlarmService.shared.requestAuthorization() {
+                if store.upsert(draft) { dismiss() }
+            } else {
+                store.message = "Чтобы поставить будильник со ставкой, разрешите будильники в Настройках iPhone."
+            }
         }
     }
 

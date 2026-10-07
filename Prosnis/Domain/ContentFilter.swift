@@ -5,15 +5,23 @@ import Foundation
 enum ContentFilter {
     static let maxLength = 1000
 
-    /// Корни слов, которые заменяются звёздочками.
-    private static let roots = ["хуй", "хуе", "хуё", "пизд", "ебат", "ебан", "ёбан", "ебал", "бля", "сука", "суки", "мудак", "гандон", "шлюх"]
+    /// Длинные корни ищутся внутри слова.
+    private static let roots = ["пизд", "ебат", "ебан", "ёбан", "ебал", "мудак", "гандон", "шлюх"]
+    /// Короткие корни — только в начале слова или после приставки, иначе пострадают «рубля», «корабля», «употребляю».
+    private static let shortRoots = ["хуй", "хуе", "хуё", "бля", "сука", "суки", "сучк"]
+    private static let prefixes = ["", "на", "по", "за", "от", "вы", "до", "ни", "о", "об", "раз", "у"]
+
+    static func isRude(_ word: String) -> Bool {
+        let letters = word.lowercased().filter { $0.isLetter }
+        if roots.contains(where: { letters.contains($0) }) { return true }
+        return shortRoots.contains { root in prefixes.contains { letters.hasPrefix($0 + root) } }
+    }
 
     static func clean(_ text: String) -> String {
         let trimmed = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxLength))
         var words: [String] = []
         for word in trimmed.split(separator: " ", omittingEmptySubsequences: false) {
-            let lower = word.lowercased()
-            if roots.contains(where: { lower.contains($0) }) {
+            if isRude(String(word)) {
                 words.append(String(repeating: "*", count: word.count))
             } else {
                 words.append(String(word))

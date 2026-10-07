@@ -92,13 +92,17 @@ final class SocialStore: ObservableObject {
         }
     }
 
-    func setVisibility(_ visibility: Visibility, for friend: Friend) async {
+    @discardableResult
+    func setVisibility(_ visibility: Visibility, for friend: Friend) async -> Bool {
+        var ok = false
         await run {
             try await backend.setVisibility(visibility, for: friend.id)
             if let index = friends.firstIndex(where: { $0.id == friend.id }) {
                 friends[index].myVisibility = visibility
             }
+            ok = true
         }
+        return ok
     }
 
     /// Сколько раз ещё можно «разбудить» друга сегодня.
@@ -164,17 +168,21 @@ final class SocialStore: ObservableObject {
         (messages[conversation] ?? []).filter { !AppSettings.shared.isBlocked($0.author.id) }
     }
 
-    func send(_ text: String, to conversation: ConversationID) async {
+    @discardableResult
+    func send(_ text: String, to conversation: ConversationID) async -> Bool {
         guard AppSettings.shared.data.isAdult else {
             errorText = "Чаты доступны с \(AppConfig.adultAge) лет."
-            return
+            return false
         }
-        guard ContentFilter.isSendable(text) else { return }
+        guard ContentFilter.isSendable(text) else { return false }
         let cleaned = ContentFilter.clean(text)
+        var ok = false
         await run {
             let message = try await backend.send(cleaned, to: conversation)
             messages[conversation, default: []].append(message)
+            ok = true
         }
+        return ok
     }
 
     func report(_ message: ChatMessage) async {

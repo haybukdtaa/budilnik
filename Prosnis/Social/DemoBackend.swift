@@ -325,6 +325,7 @@ final class DemoBackend: SocialBackend, SyncBackend {
         return [WitnessNotice(id: UUID(), friend: maria.profile, day: WitnessPolicy.dayKey(Date()))]
     }
 
-    func push(_ items: [OutboxItem]) async throws -> [UUID] { items.map(\.id) }
+    /// Демо не принимает очередь: настоящие данные должны дождаться настоящего сервера.
+    func push(_ items: [OutboxItem]) async throws -> [UUID] { throw BackendError.serverUnavailable }
     func serverTime() async throws -> Date { Date() }
 }

@@ -11,6 +11,8 @@ final class AccountStore: ObservableObject {
     private static let secretKey = "auth.secret"
 
     @Published private(set) var token: String?
+    /// Почему не удалось войти на сервер (показывается в Профиле).
+    @Published private(set) var signInProblem: String?
 
     private init() {
         token = Keychain.get(AccountStore.tokenKey)
@@ -35,7 +37,8 @@ final class AccountStore: ObservableObject {
         var bytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         let secret = Data(bytes).base64EncodedString()
-        Keychain.set(secret, for: AccountStore.secretKey)
+        // Секрет переносится на новый телефон вместе с зашифрованной резервной копией: аккаунт не теряется.
+        Keychain.set(secret, for: AccountStore.secretKey, migratable: true)
         return secret
     }
 
@@ -43,13 +46,20 @@ final class AccountStore: ObservableObject {
     func ensureSignedIn() async {
         guard token == nil, let url = AppConfig.serverURL else { return }
         let backend = BackendRegistry.httpBackend(url)
-        if let newToken = try? await backend.register(profile: AppSettings.shared.data.profile, secret: deviceSecret) {
+        do {
+            let newToken = try await backend.register(profile: AppSettings.shared.data.profile, secret: deviceSecret)
             signIn(token: newToken)
+            signInProblem = nil
+        } catch BackendError.forbidden {
+            signInProblem = "Сервер не узнал это устройство. Если вы перенесли данные со старого телефона без резервной копии связки ключей, обратитесь в поддержку."
+        } catch {
+            signInProblem = nil // нет сети: попробуем при следующем открытии
         }
     }
 
-    /// Сервер отверг токен: забываем его, при следующем открытии устройство войдёт заново тем же секретом.
-    func tokenRejected() {
+    /// Сервер отверг токен, с которым был запрос. Если тем временем пришёл новый, его не трогаем.
+    func tokenRejected(_ usedToken: String?) {
+        guard usedToken != nil, usedToken == token else { return }
         signOut()
     }
 
@@ -58,6 +68,9 @@ final class AccountStore: ObservableObject {
     func deleteAccountAndData() async -> String? {
         if WakeCoordinator.shared.session != nil {
             return "Сейчас идёт утренняя проверка. Удалить данные можно после её окончания."
+        }
+        if AlarmStore.shared.alarms.contains(where: { AlarmStore.shared.isLocked($0) }) {
+            return "Будильник со ставкой зазвонит меньше чем через 2 часа. Удалить данные можно после утра."
         }
         await PaymentsStore.shared.retryPending()
         if PaymentsStore.shared.hasOpenOperations {

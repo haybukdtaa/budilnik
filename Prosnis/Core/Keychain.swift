@@ -5,7 +5,8 @@ import Security
 enum Keychain {
     private static let service = "app.prosnis.alarm"
 
-    static func set(_ value: String?, for key: String) {
+    /// `migratable`: переносится на новый телефон с зашифрованной резервной копией.
+    static func set(_ value: String?, for key: String, migratable: Bool = false) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -15,7 +16,9 @@ enum Keychain {
         guard let value, let data = value.data(using: .utf8) else { return }
         var item = query
         item[kSecValueData as String] = data
-        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        item[kSecAttrAccessible as String] = migratable
+            ? kSecAttrAccessibleAfterFirstUnlock
+            : kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(item as CFDictionary, nil)
     }
 

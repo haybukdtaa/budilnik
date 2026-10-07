@@ -67,41 +67,70 @@ struct WakeSession: Codable {
 /// Считается от последней проверенной точки по часам, которые идут с загрузки телефона и не зависят от настроек времени.
 /// После перезагрузки проверить нечем, поэтому полную защиту даст только сервер.
 enum TrustedClock {
-    private static let wallKey = "trustedClock.wall"
-    private static let monoKey = "trustedClock.mono"
+    /// Точка отсчёта: время в момент сверки, показания часов с загрузки и идентификатор загрузки.
+    struct Anchor: Codable, Equatable {
+        var wall: Date
+        var mono: Double
+        var boot: String
+    }
+
+    private static let anchorKey = "trustedClock.anchor"
+    /// Расхождение меньше этого — обычный дрейф часов или синхронизация по сети.
+    static let driftTolerance: TimeInterval = 120
+    /// Дольше этого защищённое время не перекрывает часы телефона: без новой сверки не держимся за старую точку вечно.
+    static let maxOverride: TimeInterval = 3 * 86400
 
     private static var monotonicSeconds: Double {
         Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)) / 1_000_000_000
     }
 
-    static var now: Date {
-        let wall = Date()
-        let mono = monotonicSeconds
-        let defaults = UserDefaults.standard
-
-        guard let anchorWall = defaults.object(forKey: wallKey) as? Date,
-              defaults.object(forKey: monoKey) != nil else {
-            anchor(wall, mono)
-            return wall
+    /// Идентификатор текущей загрузки телефона: новый после каждой перезагрузки.
+    static var bootSession: String {
+        var size = 0
+        if sysctlbyname("kern.bootsessionuuid", nil, &size, nil, 0) == 0, size > 0 {
+            var buffer = [CChar](repeating: 0, count: size)
+            if sysctlbyname("kern.bootsessionuuid", &buffer, &size, nil, 0) == 0 {
+                return String(cString: buffer)
+            }
         }
-        let anchorMono = defaults.double(forKey: monoKey)
-        if mono < anchorMono {
-            // Телефон перезагружали.
-            anchor(wall, mono)
-            return wall
+        // Запасной вариант: время загрузки ядра.
+        var boottime = timeval()
+        size = MemoryLayout<timeval>.stride
+        if sysctlbyname("kern.boottime", &boottime, &size, nil, 0) == 0 {
+            return "boot-\(boottime.tv_sec)"
         }
-        let trusted = anchorWall.addingTimeInterval(mono - anchorMono)
-        if abs(trusted.timeIntervalSince(wall)) < 120 {
-            // Обычный дрейф часов или синхронизация по сети.
-            anchor(wall, mono)
-            return wall
-        }
-        return trusted
+        return ""
     }
 
-    private static func anchor(_ wall: Date, _ mono: Double) {
-        UserDefaults.standard.set(wall, forKey: wallKey)
-        UserDefaults.standard.set(mono, forKey: monoKey)
+    /// Чистая функция: какое время считать настоящим и какую точку отсчёта сохранить (nil — оставить прежнюю).
+    static func resolve(wall: Date, mono: Double, boot: String, anchor: Anchor?) -> (now: Date, anchor: Anchor?) {
+        let fresh = Anchor(wall: wall, mono: mono, boot: boot)
+        // Нет точки, другая загрузка или счётчик пошёл заново: проверить нечем, верим часам телефона.
+        guard let anchor, anchor.boot == boot, mono >= anchor.mono else { return (wall, fresh) }
+        let elapsed = mono - anchor.mono
+        let trusted = anchor.wall.addingTimeInterval(elapsed)
+        if abs(trusted.timeIntervalSince(wall)) < driftTolerance { return (wall, fresh) }
+        if elapsed > maxOverride { return (wall, fresh) }
+        return (trusted, nil)
+    }
+
+    static var now: Date {
+        let defaults = UserDefaults.standard
+        let anchor = defaults.data(forKey: anchorKey).flatMap { try? JSONDecoder().decode(Anchor.self, from: $0) }
+        let result = resolve(wall: Date(), mono: monotonicSeconds, boot: bootSession, anchor: anchor)
+        if let fresh = result.anchor { save(fresh) }
+        return result.now
+    }
+
+    /// Время с сервера — самое надёжное: ставим точку отсчёта по нему.
+    static func anchorToServer(_ serverNow: Date) {
+        save(Anchor(wall: serverNow, mono: monotonicSeconds, boot: bootSession))
+    }
+
+    private static func save(_ anchor: Anchor) {
+        if let data = try? JSONEncoder().encode(anchor) {
+            UserDefaults.standard.set(data, forKey: anchorKey)
+        }
     }
 }
 

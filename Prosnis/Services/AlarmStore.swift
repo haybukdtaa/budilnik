@@ -38,6 +38,14 @@ final class AlarmStore: ObservableObject {
         let result = file.loadWithState()
         alarms = result.value ?? []
         loadFailed = result.state == .unreadable
+        // Данные старых версий без даты создания: считаем созданными сейчас, иначе одноразовый будильник «звонил» бы в 1 году.
+        if alarms.contains(where: { $0.createdAt == nil }) {
+            let now = Date()
+            for index in alarms.indices where alarms[index].createdAt == nil {
+                alarms[index].createdAt = now
+            }
+            if result.state == .loaded { save() }
+        }
         sort()
     }
 

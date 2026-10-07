@@ -17,6 +17,9 @@ info:
     - Рекорды и таблицы считаются на сервере по журналу (ProgressEngine — та же формула),
       значения от клиента не принимаются на веру.
     - Данные граждан РФ хранятся на серверах в РФ.
+    - Право на первый автоматический возврат по спору сервер считает по аккаунту и устройству:
+      удаление данных на телефоне его не обнуляет.
+    - 401 означает «токен недействителен»: приложение забывает токен и заново проходит /v1/auth/register.
 servers:
   - url: https://api.example.ru
 security:
@@ -45,7 +48,7 @@ paths:
         "403": { description: Секрет не совпал }
   /v1/time:
     get:
-      summary: Время сервера (для блокировки изменений за 2 часа)
+      summary: Время сервера. Приложение сверяет по нему защищённое время для блокировки ставки за 2 часа
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { now: { type: string, format: date-time } } } } } }
   /v1/sync:
@@ -266,3 +269,4 @@ components:
         payload: { type: string, format: byte }
         deleted: { type: boolean }
         createdAt: { type: string, format: date-time }
+        isSensitive: { type: boolean, nullable: true, description: "Данные о намазе: хранить отдельно, удалить при отзыве согласия" }

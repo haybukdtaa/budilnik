@@ -130,8 +130,9 @@ final class TreeAndTitlesTests: XCTestCase {
     }
 
     func testUnknownTreeSpeciesDoesNotBreakStatus() throws {
-        let json = #"{"day": 0, "treeStage": 3, "treeSpecies": "baobab", "streak": 5}"#
-        let status = try JSONDecoder().decode(PublicStatus.self, from: Data(json.utf8))
+        // Тот же разбор, что и в ответах сервера: даты строкой ISO 8601.
+        let json = #"{"day": "2026-10-06T00:00:00.000Z", "treeStage": 3, "treeSpecies": "baobab", "streak": 5}"#
+        let status = try HTTPBackend.makeDecoder().decode(PublicStatus.self, from: Data(json.utf8))
         XCTAssertNil(status.treeSpecies)
         XCTAssertEqual(status.treeStage, 3)
         XCTAssertEqual(status.streak, 5)
