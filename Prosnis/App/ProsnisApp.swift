@@ -50,6 +50,7 @@ struct ProsnisApp: App {
         await payments.retryPending()
         await payments.checkIfNeeded()
         social.sendPendingWitnessNotice()
+        await AccountStore.shared.ensureSignedIn()
         let backend = BackendRegistry.current
         if backend.isOnline {
             await sync.sync(using: backend)

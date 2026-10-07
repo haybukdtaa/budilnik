@@ -101,6 +101,7 @@ final class AlarmStore: ObservableObject {
             item.createdAt = now
         }
         if !AppSettings.shared.data.isAdult { item.stakeEnabled = false }
+        if item.stakeAmount <= 0 { item.stakeEnabled = false }
         if item.effectiveTask == .qr && (item.qrCode ?? "").isEmpty { item.taskKind = .typing }
 
         if let index = alarms.firstIndex(where: { $0.id == item.id }) {

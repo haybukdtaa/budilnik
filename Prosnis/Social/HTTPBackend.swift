@@ -38,6 +38,8 @@ final class HTTPBackend: SocialBackend, SyncBackend {
     private struct ReasonBody: Codable { var reason: String }
     private struct PairBody: Codable { var friendID: UUID; var title: String; var days: Int }
     private struct SyncResponse: Codable { var accepted: [UUID] }
+    private struct RegisterBody: Codable { var userID: UUID; var secret: String; var displayName: String; var avatar: String }
+    private struct TokenResponse: Codable { var token: String }
     private struct TimeResponse: Codable { var now: Date }
 
     private func send<Body: Encodable, Response: Decodable>(
@@ -67,7 +69,10 @@ final class HTTPBackend: SocialBackend, SyncBackend {
         case 200..<300:
             if Response.self == Empty.self || data.isEmpty, let empty = Empty() as? Response { return empty }
             return try decoder.decode(Response.self, from: data)
-        case 401, 403: throw BackendError.forbidden
+        case 401:
+            if path != "v1/auth/register" { AccountStore.shared.tokenRejected() }
+            throw BackendError.forbidden
+        case 403: throw BackendError.forbidden
         case 404: throw BackendError.notFound
         case 409: throw BackendError.roomFull
         case 422: throw BackendError.invalidCode
@@ -136,6 +141,13 @@ final class HTTPBackend: SocialBackend, SyncBackend {
     }
     func witnessNotices() async throws -> [WitnessNotice] {
         try await get("v1/witness-notices", as: [WitnessNotice].self)
+    }
+
+    /// Регистрация устройства без пароля: id пользователя + секрет из связки ключей → токен.
+    /// Повторный вызов с тем же секретом возвращает тот же аккаунт.
+    func register(profile: UserProfile, secret: String) async throws -> String {
+        let body = RegisterBody(userID: profile.id, secret: secret, displayName: profile.displayName, avatar: profile.avatar)
+        return try await send("POST", "v1/auth/register", body: body, as: TokenResponse.self).token
     }
 
     func push(_ items: [OutboxItem]) async throws -> [UUID] {

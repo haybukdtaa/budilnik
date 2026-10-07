@@ -61,7 +61,10 @@ struct AlarmEditView: View {
     }
 
     private var canSave: Bool {
-        !(draft.hasTask && draft.effectiveTask == .qr && (draft.qrCode ?? "").isEmpty)
+        if draft.hasTask && draft.effectiveTask == .qr && (draft.qrCode ?? "").isEmpty { return false }
+        // Ставка без суммы бессмысленна: будильник закрывается для изменений, а на кону ничего нет.
+        if draft.stakeEnabled && draft.stakeAmount <= 0 { return false }
+        return true
     }
 
     var body: some View {
@@ -301,7 +304,11 @@ struct AlarmEditView: View {
                             .frame(width: 100)
                         Text("₽").foregroundStyle(.secondary)
                     }
-                    if draft.stakeAmount >= 3000 {
+                    if draft.stakeAmount <= 0 {
+                        Label("Укажите сумму больше нуля", systemImage: "exclamationmark.circle")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    } else if draft.stakeAmount >= 3000 {
                         Label("Крупная сумма. Убедитесь, что это осознанно.", systemImage: "exclamationmark.triangle")
                             .font(.footnote)
                             .foregroundStyle(.orange)

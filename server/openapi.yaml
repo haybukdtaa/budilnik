@@ -22,6 +22,27 @@ servers:
 security:
   - bearer: []
 paths:
+  /v1/auth/register:
+    post:
+      summary: Регистрация устройства без пароля
+      description: |
+        Приложение один раз создаёт случайный секрет и хранит его в связке ключей.
+        Первый вызов создаёт пользователя с этим userID; повторный с тем же секретом возвращает новый
+        токен для того же пользователя; с другим секретом — 403 (чужой userID захватить нельзя).
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userID: { type: string, format: uuid }
+                secret: { type: string }
+                displayName: { type: string }
+                avatar: { type: string }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { token: { type: string } } } } } }
+        "403": { description: Секрет не совпал }
   /v1/time:
     get:
       summary: Время сервера (для блокировки изменений за 2 часа)

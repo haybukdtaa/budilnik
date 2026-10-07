@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import SwiftUI
 
 /// Аккаунт: токен сервера и удаление всех данных.
@@ -7,6 +8,7 @@ final class AccountStore: ObservableObject {
     static let shared = AccountStore()
 
     private static let tokenKey = "auth.token"
+    private static let secretKey = "auth.secret"
 
     @Published private(set) var token: String?
 
@@ -25,6 +27,30 @@ final class AccountStore: ObservableObject {
     func signOut() {
         Keychain.set(nil, for: AccountStore.tokenKey)
         token = nil
+    }
+
+    /// Секрет устройства: создаётся один раз и хранится в связке ключей.
+    private var deviceSecret: String {
+        if let existing = Keychain.get(AccountStore.secretKey) { return existing }
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        let secret = Data(bytes).base64EncodedString()
+        Keychain.set(secret, for: AccountStore.secretKey)
+        return secret
+    }
+
+    /// Если сервер подключён, а токена нет, регистрирует устройство. Без сервера ничего не делает.
+    func ensureSignedIn() async {
+        guard token == nil, let url = AppConfig.serverURL else { return }
+        let backend = BackendRegistry.httpBackend(url)
+        if let newToken = try? await backend.register(profile: AppSettings.shared.data.profile, secret: deviceSecret) {
+            signIn(token: newToken)
+        }
+    }
+
+    /// Сервер отверг токен: забываем его, при следующем открытии устройство войдёт заново тем же секретом.
+    func tokenRejected() {
+        signOut()
     }
 
     /// Удаляет аккаунт на сервере (если он есть) и все данные на телефоне.
@@ -71,10 +97,16 @@ enum BackendRegistry {
     private static var http: HTTPBackend?
     private static let offline = OfflineBackend()
 
+    static func httpBackend(_ url: URL) -> HTTPBackend {
+        if let http { return http }
+        let created = HTTPBackend(baseURL: url)
+        http = created
+        return created
+    }
+
     static var current: SocialBackend & SyncBackend {
         if let url = AppConfig.serverURL {
-            if http == nil { http = HTTPBackend(baseURL: url) }
-            return http!
+            return httpBackend(url)
         }
         if AppSettings.shared.data.useDemoSocial { return DemoBackend.shared }
         return offline
