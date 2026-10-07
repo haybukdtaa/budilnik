@@ -54,6 +54,19 @@ enum WallpaperStorage {
         UIImage(contentsOfFile: directory.appendingPathComponent(name).path)
     }
 
+    /// Удаляет фото фонов, которые ни к чему не относятся. Свежие (меньше часа) не трогает:
+    /// их может держать открытый редактор будильника.
+    static func deleteAll(except used: Set<String>, olderThan age: TimeInterval = 3600) {
+        let manager = FileManager.default
+        let names = (try? manager.contentsOfDirectory(atPath: directory.path)) ?? []
+        let now = Date()
+        for name in names where !used.contains(name) {
+            let path = directory.appendingPathComponent(name).path
+            let modified = (try? manager.attributesOfItem(atPath: path)[.modificationDate] as? Date) ?? now
+            if now.timeIntervalSince(modified) > age { delete(name) }
+        }
+    }
+
     static func delete(_ name: String) {
         try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
     }

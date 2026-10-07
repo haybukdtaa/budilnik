@@ -45,6 +45,14 @@ final class PublicStatusTests: XCTestCase {
         XCTAssertTrue(PublicStatusBuilder.shareableChallenges([prayerChallenge], privacy: PrivacySettings()).isEmpty)
     }
 
+    func testStatusTypeHasNoMoneyFields() {
+        // Защита на уровне типа: если кто-то добавит в статус денежное поле, тест упадёт.
+        let labels = Mirror(reflecting: PublicStatus(day: Date())).children.compactMap(\.label).map { $0.lowercased() }
+        for forbidden in ["stake", "amount", "charged", "money", "payment"] {
+            XCTAssertFalse(labels.contains { $0.contains(forbidden) }, forbidden)
+        }
+    }
+
     func testStatusNeverContainsMoney() throws {
         let entries = [T.entry(T.date(2026, 10, 6, 7), .failed, stake: 5000)]
         var privacy = PrivacySettings()
@@ -115,6 +123,21 @@ final class MiscLogicTests: XCTestCase {
             many = SyncEngine.merged(many, adding: OutboxItem(kind: .journalEntry, entityID: UUID(), payload: Data(), deleted: false, createdAt: Date()))
         }
         XCTAssertEqual(many.count, SyncEngine.maxItems)
+    }
+
+    func testRecheckStartsInAppOnlyWithinWindow() {
+        let recheck = T.date(2026, 10, 6, 7, 10)
+        XCTAssertFalse(WakeRules.shouldStartRecheckInApp(recheckDate: recheck, now: recheck.addingTimeInterval(5)),
+                       "Сначала даём сработать самому звонку")
+        XCTAssertTrue(WakeRules.shouldStartRecheckInApp(recheckDate: recheck, now: recheck.addingTimeInterval(60)))
+        XCTAssertFalse(WakeRules.shouldStartRecheckInApp(recheckDate: recheck, now: recheck.addingTimeInterval(WakeRules.windowSeconds + 1)),
+                       "После окна уже провал, а не начало проверки")
+    }
+
+    func testQueuedRingStaleness() {
+        let ring = T.date(2026, 10, 6, 6, 5)
+        XCTAssertFalse(WakeRules.isQueuedRingStale(ring, now: ring.addingTimeInterval(15 * 60)))
+        XCTAssertTrue(WakeRules.isQueuedRingStale(ring, now: ring.addingTimeInterval(3 * 3600)))
     }
 
     func testSensitiveItemsArePurged() {

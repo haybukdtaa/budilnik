@@ -80,6 +80,16 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
         }
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // Экран мог вернуться после ухода: камеру нужно запустить снова.
+        guard configured else { return }
+        let session = captureSession
+        DispatchQueue.global(qos: .userInitiated).async {
+            if !session.isRunning { session.startRunning() }
+        }
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         previewLayer?.frame = view.bounds

@@ -36,6 +36,7 @@ struct ProsnisApp: App {
     @MainActor
     private func becameActive() async {
         // Если приложение запустилось из звонка до разблокировки, файлы могли быть закрыты.
+        journal.reloadIfNeeded()
         settings.reloadIfNeeded()
         AlarmService.shared.reloadIfNeeded()
         store.reloadIfNeeded()
@@ -43,6 +44,8 @@ struct ProsnisApp: App {
         payments.reloadIfNeeded()
         wake.reconcile()
         store.refreshDatedAlarms()
+        store.resyncFailed()
+        store.cleanupOrphans()
         challenges.evaluateAll()
         await payments.retryPending()
         await payments.checkIfNeeded()

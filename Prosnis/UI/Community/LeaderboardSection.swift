@@ -50,6 +50,10 @@ struct LeaderboardSection: View {
                         .listRowBackground(row.profile.id == settings.data.profile.id ? Theme.accent.opacity(0.18) : Theme.card)
                     }
                 }
+            } else if social.errorText != nil {
+                Section {
+                    Button("Повторить загрузку") { Task { await social.loadLeaderboard(kind) } }
+                }
             } else {
                 ProgressView().frame(maxWidth: .infinity)
             }

@@ -224,7 +224,11 @@ final class DemoBackend: SocialBackend, SyncBackend {
     // MARK: - Таблицы и статистика
 
     func leaderboard(_ kind: LeaderboardKind) async throws -> Leaderboard {
-        let snapshot = ProgressEngine.compute(entries: JournalStore.shared.realEntries, challenges: ChallengeStore.shared.challenges)
+        let privacy = AppSettings.shared.data.privacy
+        let snapshot = ProgressEngine.compute(
+            entries: PublicStatusBuilder.shareableEntries(JournalStore.shared.realEntries, privacy: privacy),
+            challenges: PublicStatusBuilder.shareableChallenges(ChallengeStore.shared.challenges, privacy: privacy)
+        )
         var people: [(UserProfile, Int)] = state.friends.compactMap { friend in
             guard let status = friend.status else { return nil }
             switch kind {

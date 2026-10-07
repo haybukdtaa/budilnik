@@ -5,6 +5,8 @@ struct AlarmListView: View {
     @EnvironmentObject private var store: AlarmStore
     @EnvironmentObject private var journal: JournalStore
     @EnvironmentObject private var settings: AppSettings
+    // Наблюдаем за утренней проверкой: от неё зависит значок блокировки.
+    @EnvironmentObject private var wake: WakeCoordinator
     @State private var editing: AlarmItem?
     @State private var showBedtime = false
 
@@ -158,7 +160,11 @@ private struct AlarmRow: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                if alarm.needsDatedSchedule, let next {
+                if store.isScheduleFailed(alarm) {
+                    Label("Не поставлен в систему: проверьте разрешение на будильники", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else if alarm.needsDatedSchedule, let next {
                     Text("Ближайший: \(Format.weekday(next)), \(Format.time(next))")
                         .font(.caption)
                         .foregroundStyle(.secondary)

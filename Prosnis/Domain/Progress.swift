@@ -145,12 +145,13 @@ enum ProgressEngine {
 
             for entry in dayEntries where entry.outcome == .success {
                 var gained = ProgressEngine.xp(forSuccessWithStreak: daySuccess ? streak : 0)
-                if entry.routineComplete { fullRoutines += 1 }
+                if entry.routineComplete && (entry.routineTotal ?? 0) > 0 { fullRoutines += 1 }
                 gained += 2 * (entry.routineDone?.count ?? 0)
                 totalXP += gained
                 xpByEntry[entry.id] = gained
 
-                if calendar.component(.hour, from: entry.date) < 6 { earlyWakes += 1 }
+                // Утра с намазом в публичный значок не идут: он выдавал бы религиозную практику.
+                if entry.isPrayer != true && calendar.component(.hour, from: entry.date) < 6 { earlyWakes += 1 }
                 if entry.isPrayer == true { fajrWakes += 1 }
                 if let kind = entry.taskKind { taskKinds.insert(kind) }
 

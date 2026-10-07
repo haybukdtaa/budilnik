@@ -73,18 +73,11 @@ final class WakeCoordinator: ObservableObject {
     /// Вызывается из интента, когда на звонке нажали «Выключить».
     func handleStop(alarmID: UUID?, isRecheck: Bool) {
         guard let alarmID else { return }
-        let now = Date()
+        let now = TrustedClock.now
 
         if isRecheck {
-            guard var current = session, current.alarmID == alarmID, current.phase == .waiting else { return }
-            current.stage = 2
-            current.phase = .task
-            current.ringDate = current.recheckDate ?? now
-            current.sentence = SentenceBank.random(excluding: current.sentence)
-            current.events.append(JournalEvent(date: current.ringDate, text: "Прозвенела повторная проверка"))
-            current.events.append(JournalEvent(date: now, text: "Нажато «Выключить»"))
-            setSession(current)
-            evaluate(now)
+            guard let current = session, current.alarmID == alarmID, current.phase == .waiting else { return }
+            startStageTwo(current, now: now, note: "Нажато «Выключить»")
             return
         }
 
@@ -101,6 +94,7 @@ final class WakeCoordinator: ObservableObject {
             if !queue.contains(alarm.id) {
                 queue.append(alarm.id)
                 current.queuedAlarmIDs = queue
+                current.queuedRings = (current.queuedRings ?? [:]).merging([alarm.id.uuidString: ring]) { _, new in new }
                 current.events.append(JournalEvent(date: now, text: "Во время проверки прозвенел будильник «\(alarm.displayTitle)», его задание начнётся следом"))
                 setSession(current)
             }
@@ -110,7 +104,23 @@ final class WakeCoordinator: ObservableObject {
         begin(alarm: alarm, ring: ring, now: now, note: "Нажато «Выключить»")
     }
 
-    private func begin(alarm: AlarmItem, ring: Date, now: Date, note: String, queue: [UUID]? = nil) {
+    /// Переводит сессию на вторую проверку.
+    private func startStageTwo(_ value: WakeSession, now: Date, note: String) {
+        var current = value
+        current.stage = 2
+        current.phase = .task
+        current.ringDate = current.recheckDate ?? now
+        current.sentence = SentenceBank.random(excluding: current.sentence)
+        current.events.append(JournalEvent(date: current.ringDate, text: "Прозвенела повторная проверка"))
+        current.events.append(JournalEvent(date: now, text: note))
+        setSession(current)
+        evaluate(now)
+    }
+
+    private func begin(
+        alarm: AlarmItem, ring: Date, now: Date, note: String,
+        queue: [UUID]? = nil, queuedRings: [String: Date]? = nil, originalRing: Date? = nil
+    ) {
         var kind = alarm.effectiveTask
         if kind == .qr && (alarm.qrCode ?? "").isEmpty { kind = .typing }
         let stake = alarm.stakeEnabled ? alarm.stakeAmount : 0
@@ -137,7 +147,9 @@ final class WakeCoordinator: ObservableObject {
             module: alarm.effectiveModule,
             isPrayer: alarm.isPrayerRelated,
             paymentRef: reference,
-            queuedAlarmIDs: queue
+            queuedAlarmIDs: queue,
+            queuedRings: queuedRings,
+            originalRing: originalRing
         ))
         if let reference {
             Task { await PaymentsStore.shared.hold(amount: stake, reference: reference) }
@@ -149,33 +161,47 @@ final class WakeCoordinator: ObservableObject {
     /// когда его открыли вручную в течение 10 минут после звонка.
     private func lateStart(_ now: Date) {
         guard session == nil else { return }
+        var ringing: [(AlarmItem, Date)] = []
         for alarm in AlarmStore.shared.alarms where alarm.hasTask && alarm.isEnabled {
             guard let ring = AlarmStore.shared.lastOccurrence(of: alarm, onOrBefore: now),
                   now.timeIntervalSince(ring) < WakeRules.windowSeconds,
-                  ring > (alarm.createdAt ?? .distantPast),
+                  // Звонок был после последнего изменения будильника (включение тоже изменение).
+                  ring > AlarmStore.changedAt(alarm),
                   !JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring) else { continue }
             if let once = ScheduleCalculator.onceDate(for: alarm, context: context),
                abs(once.timeIntervalSince(ring)) >= 60 { continue }
-
-            begin(alarm: alarm, ring: ring, now: now, note: "Приложение открыто вручную после звонка")
-            return
+            ringing.append((alarm, ring))
         }
+        ringing.sort { $0.1 < $1.1 }
+        guard let (first, firstRing) = ringing.first else { return }
+        // Остальные прозвеневшие будильники ждут в очереди, а не считаются проспанными.
+        let rest = ringing.dropFirst()
+        begin(
+            alarm: first, ring: firstRing, now: now, note: "Приложение открыто вручную после звонка",
+            queue: rest.isEmpty ? nil : rest.map(\.0.id),
+            queuedRings: rest.isEmpty ? nil : Dictionary(uniqueKeysWithValues: rest.map { ($0.0.id.uuidString, $0.1) })
+        )
     }
 
     /// Запускает задание будильника, который прозвенел во время предыдущей проверки.
     /// Время на задание отсчитывается с этого момента: человек был занят первой проверкой.
-    private func startQueued(_ queue: [UUID], now: Date) {
+    private func startQueued(_ queue: [UUID], rings: [String: Date], now: Date) {
         var remaining = queue
         while !remaining.isEmpty {
             let id = remaining.removeFirst()
             guard let alarm = AlarmStore.shared.alarms.first(where: { $0.id == id }),
                   alarm.hasTask, alarm.isEnabled else { continue }
-            let ring = AlarmStore.shared.lastOccurrence(of: alarm, onOrBefore: now) ?? now
+            let ring = rings[id.uuidString] ?? AlarmStore.shared.lastOccurrence(of: alarm, onOrBefore: now) ?? now
             if JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring) { continue }
+            // Давно прозвеневший будильник уже не запускаем: его звонок сверка запишет как пропуск.
+            if WakeRules.isQueuedRingStale(ring, now: now) { continue }
+            let restRings = rings.filter { key, _ in remaining.contains { $0.uuidString == key } }
             begin(
                 alarm: alarm, ring: now, now: now,
                 note: "Будильник прозвенел в \(WakeCoordinator.clock(ring)) во время другой проверки, задание начато после неё",
-                queue: remaining.isEmpty ? nil : remaining
+                queue: remaining.isEmpty ? nil : remaining,
+                queuedRings: remaining.isEmpty ? nil : restRings,
+                originalRing: ring
             )
             return
         }
@@ -184,7 +210,7 @@ final class WakeCoordinator: ObservableObject {
     /// Быстрая проверка всего сценария: повторная проверка через минуту, а не через 10.
     func startDemo(task: TaskKind = .typing) {
         guard session == nil else { return }
-        let now = Date()
+        let now = TrustedClock.now
         setSession(WakeSession(
             alarmID: UUID(),
             alarmTitle: "Проверка",
@@ -208,8 +234,20 @@ final class WakeCoordinator: ObservableObject {
     // MARK: - Ход задания
 
     /// Проверяет сроки. Вызывается раз в секунду, пока открыт экран.
-    func evaluate(_ now: Date = Date()) {
+    func evaluate(_ now: Date = TrustedClock.now) {
         guard let current = session else { return }
+        // Повторный звонок мог не открыть приложение: если оно открыто, начинаем вторую проверку сами.
+        if current.phase == .waiting, let recheck = current.recheckDate,
+           WakeRules.shouldStartRecheckInApp(recheckDate: recheck, now: now) {
+            if let recheckID = current.recheckAlarmID {
+                service.stop(id: recheckID)
+                service.cancel(id: recheckID)
+            }
+            var updated = current
+            updated.recheckAlarmID = nil
+            startStageTwo(updated, now: now, note: "Вторая проверка начата в приложении")
+            return
+        }
         switch current.phase {
         case .task:
             if now >= current.deadline {
@@ -227,7 +265,7 @@ final class WakeCoordinator: ObservableObject {
     }
 
     /// Задание выполнено.
-    func submit(_ now: Date = Date()) {
+    func submit(_ now: Date = TrustedClock.now) {
         guard var current = session, current.phase == .task else { return }
         if now > current.deadline {
             evaluate(now)
@@ -269,7 +307,7 @@ final class WakeCoordinator: ObservableObject {
     func switchToTyping(reason: String) {
         guard var current = session, current.phase == .task, current.taskKind != .typing else { return }
         current.taskKind = .typing
-        current.events.append(JournalEvent(date: Date(), text: reason))
+        current.events.append(JournalEvent(date: TrustedClock.now, text: reason))
         setSession(current)
     }
 
@@ -286,7 +324,7 @@ final class WakeCoordinator: ObservableObject {
         let before = ProgressEngine.compute(entries: JournalStore.shared.realEntries, challenges: ChallengeStore.shared.challenges)
 
         let entry = JournalEntry(
-            date: finished.startDate,
+            date: finished.originalRing ?? finished.startDate,
             alarmID: finished.isDemo ? nil : finished.alarmID,
             alarmTitle: finished.alarmTitle,
             timeText: finished.timeText,
@@ -321,7 +359,7 @@ final class WakeCoordinator: ObservableObject {
             )
         }
 
-        startQueued(finished.queuedAlarmIDs ?? [], now: Date())
+        startQueued(finished.queuedAlarmIDs ?? [], rings: finished.queuedRings ?? [:], now: TrustedClock.now)
 
         // Экран задания закроется сам; утро покажется после этого (см. RootView). Иначе показываем сразу.
         if !wasOnTaskScreen { presentPendingMorning() }
@@ -347,7 +385,7 @@ final class WakeCoordinator: ObservableObject {
     /// Находит утра, когда задание так и не начали, и записывает их в журнал.
     /// Проверяются звонки, у которых уже вышло время на задание; отметка сверки сдвигается
     /// ровно до проверенного момента, поэтому ни один звонок не теряется.
-    func reconcile(now: Date = Date()) {
+    func reconcile(now: Date = TrustedClock.now) {
         reloadIfNeeded()
         evaluate(now)
         lateStart(now)
@@ -362,11 +400,11 @@ final class WakeCoordinator: ObservableObject {
             if checkUntil > lastCheck {
                 for alarm in AlarmStore.shared.alarms where alarm.stakeEnabled && alarm.isEnabled {
                     // Изменения будильника после звонка не делают тот звонок пропущенным.
-                    let changedAt = max(alarm.createdAt ?? .distantPast, alarm.updatedAt ?? .distantPast)
-                    let from = max(lastCheck, changedAt)
+                    let from = max(lastCheck, AlarmStore.changedAt(alarm))
                     for ring in ScheduleCalculator.effectiveOccurrences(for: alarm, from: from, to: checkUntil, context: context) {
                         if let active = session, active.alarmID == alarm.id,
-                           abs(active.startDate.timeIntervalSince(ring)) < 3600 { continue }
+                           abs(active.startDate.timeIntervalSince(ring)) < 3600
+                            || abs((active.originalRing ?? active.startDate).timeIntervalSince(ring)) < 60 { continue }
                         if isQueued(alarm.id) { continue }
                         if JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring) { continue }
                         recordMissed(alarm: alarm, ring: ring)

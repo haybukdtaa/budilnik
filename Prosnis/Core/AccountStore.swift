@@ -30,6 +30,13 @@ final class AccountStore: ObservableObject {
     /// Удаляет аккаунт на сервере (если он есть) и все данные на телефоне.
     /// Возвращает текст ошибки, если сервер не подтвердил удаление: тогда на телефоне ничего не трогается.
     func deleteAccountAndData() async -> String? {
+        if WakeCoordinator.shared.session != nil {
+            return "Сейчас идёт утренняя проверка. Удалить данные можно после её окончания."
+        }
+        await PaymentsStore.shared.retryPending()
+        if PaymentsStore.shared.hasOpenOperations {
+            return "Есть незавершённые операции по ставкам. Попробуйте позже, когда они завершатся."
+        }
         let backend = BackendRegistry.current
         if backend.isOnline && !backend.isDemo {
             do {

@@ -95,17 +95,34 @@ struct ModuleSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { EditButton() }
         .onAppear { items = settings.checklist(for: module) }
-        .onChange(of: items) { _, value in settings.setChecklist(value, for: module) }
+        .onChange(of: items) { _, value in
+            // Первое заполнение списка не должно сохранять чек-лист по умолчанию как свой.
+            guard value != settings.checklist(for: module) else { return }
+            settings.setChecklist(value, for: module)
+        }
     }
 }
 
 /// Настройки расчёта Фаджра.
 struct PrayerSettingsView: View {
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var store: AlarmStore
+
+    /// Будильник на Фаджр со ставкой закрыт: менять расчёт нельзя, иначе звонок можно сдвинуть или убрать.
+    private var lockedByStake: Bool {
+        store.alarms.contains { $0.isFajr && $0.stakeEnabled && store.isLocked($0) }
+    }
 
     var body: some View {
         let prayer = settings.data.prayer
         Form {
+            if lockedByStake {
+                Section {
+                    Label("Настройки закрыты: будильник на Фаджр со ставкой зазвонит меньше чем через 2 часа или идёт проверка.", systemImage: "lock.fill")
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+            Group {
             Section("Город") {
                 Picker("Город", selection: $settings.data.prayer.cityID) {
                     ForEach(City.all) { Text($0.name).tag($0.id) }
@@ -148,6 +165,8 @@ struct PrayerSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            }
+            .disabled(lockedByStake)
         }
         .navigationTitle("Фаджр")
         .navigationBarTitleDisplayMode(.inline)

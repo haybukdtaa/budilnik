@@ -111,9 +111,8 @@ struct WallpaperPickerView: View {
             errorText = "Не удалось загрузить фото"
             return
         }
-        if case .photo(let old) = selection {
-            WallpaperStorage.delete(old)
-        }
+        // Старое фото не удаляем здесь: изменение ещё могут отменить. Его уберёт сохранение будильника
+        // или уборка неиспользуемых файлов.
         selection = .photo(name)
     }
 }

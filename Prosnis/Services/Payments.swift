@@ -96,6 +96,9 @@ final class PaymentsStore: ObservableObject {
     private var pendingRefunds: [UUID: Int] = [:]
     private var loadFailed = false
     private let file = FileStore<State>("payments")
+    /// Блокировки, которые сейчас выполняются: повторный вызов ждёт их, а не блокирует второй раз.
+    private var holdTasks: [UUID: Task<Bool, Never>] = [:]
+    private var isRetrying = false
 
     private init() { load() }
 
@@ -140,20 +143,33 @@ final class PaymentsStore: ObservableObject {
         save()
     }
 
-    func hasHold(_ reference: UUID) -> Bool { holds[reference] != nil }
+    func hasHold(_ reference: UUID) -> Bool { holds[reference] != nil || holdTasks[reference] != nil }
 
-    /// Блокирует ставку по заранее выданной ссылке. Повторный вызов с той же ссылкой ничего не делает.
+    /// Есть ли незавершённые денежные операции (тогда удалять данные нельзя).
+    var hasOpenOperations: Bool {
+        !holds.isEmpty || !pendingOutcomes.isEmpty || !pendingRefunds.isEmpty || !holdTasks.isEmpty
+    }
+
+    /// Блокирует ставку по заранее выданной ссылке. Повторный и одновременный вызов с той же ссылкой
+    /// не создаёт вторую блокировку.
     @discardableResult
     func hold(amount: Int, reference: UUID) async -> Bool {
         guard amount > 0 else { return false }
         if holds[reference] != nil { return true }
-        guard let hold = try? await provider.hold(amount: amount, reference: reference) else { return false }
-        holds[reference] = hold
-        record(.hold, amount: amount, reference: reference)
-        if let outcome = pendingOutcomes[reference] {
+        if let running = holdTasks[reference] { return await running.value }
+        let task = Task { () -> Bool in
+            guard let hold = try? await provider.hold(amount: amount, reference: reference) else { return false }
+            holds[reference] = hold
+            record(.hold, amount: amount, reference: reference)
+            return true
+        }
+        holdTasks[reference] = task
+        let placed = await task.value
+        holdTasks[reference] = nil
+        if placed, let outcome = pendingOutcomes[reference] {
             await settle(reference: reference, success: outcome.success, amount: outcome.amount)
         }
-        return true
+        return placed
     }
 
     /// Завершает утро: при успехе снимает блокировку, при провале списывает.
@@ -184,8 +200,15 @@ final class PaymentsStore: ObservableObject {
 
     /// Повторяет всё незавершённое: блокировки без итога, итоги без блокировки, неудавшиеся возвраты.
     func retryPending() async {
+        guard !isRetrying else { return }
+        isRetrying = true
+        defer { isRetrying = false }
+
         for (reference, outcome) in pendingOutcomes {
-            if holds[reference] != nil {
+            if holdTasks[reference] != nil {
+                // Блокировка ещё идёт: итог применится, когда она завершится.
+                continue
+            } else if holds[reference] != nil {
                 await settle(reference: reference, success: outcome.success, amount: outcome.amount)
             } else if outcome.success {
                 // Утро успешное, а блокировки так и не было: делать ничего не нужно.
@@ -199,11 +222,25 @@ final class PaymentsStore: ObservableObject {
         for (reference, amount) in pendingRefunds {
             await performRefund(reference: reference, amount: amount)
         }
+
+        // Блокировки без итога и без идущего утра старше суток снимаются: деньги не должны висеть.
+        let activeReference = WakeCoordinator.shared.session?.paymentRef
+        let now = Date()
+        for (reference, hold) in holds
+        where pendingOutcomes[reference] == nil && reference != activeReference && now.timeIntervalSince(hold.createdAt) > 86400 {
+            await settle(reference: reference, success: true, amount: hold.amount)
+        }
     }
 
     /// Возврат по спору. Если списание ещё не прошло, вместо него снимается блокировка.
     func refund(reference: UUID, amount: Int) {
         Task {
+            if holdTasks[reference] != nil {
+                // Блокировка ещё идёт: когда завершится, вместо списания снимется.
+                pendingOutcomes[reference] = PendingOutcome(success: true, amount: amount)
+                save()
+                return
+            }
             if holds[reference] != nil {
                 pendingOutcomes[reference] = PendingOutcome(success: true, amount: amount)
                 await settle(reference: reference, success: true, amount: amount)
@@ -219,6 +256,12 @@ final class PaymentsStore: ObservableObject {
     }
 
     private func performRefund(reference: UUID, amount: Int) async {
+        // Уже возвращено (например, повторная попытка после сбоя связи совпала с другой).
+        if ledger.contains(where: { $0.reference == reference && $0.kind == .refund }) {
+            pendingRefunds[reference] = nil
+            save()
+            return
+        }
         do {
             try await provider.refund(reference: reference, amount: amount)
             pendingRefunds[reference] = nil

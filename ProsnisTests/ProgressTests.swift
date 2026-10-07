@@ -63,12 +63,19 @@ final class ProgressEngineTests: XCTestCase {
     }
 
     func testPrivatePrayerBadge() {
-        let entries = (1...7).map { T.entry(T.date(2026, 9, $0, 4), .success, isPrayer: true) }
-        let snapshot = ProgressEngine.compute(entries: entries, challenges: [], now: T.date(2026, 9, 8), calendar: T.calendar)
+        let entries = (1...12).map { T.entry(T.date(2026, 9, $0, 4), .success, isPrayer: true) }
+        let snapshot = ProgressEngine.compute(entries: entries, challenges: [], now: T.date(2026, 9, 13), calendar: T.calendar)
         let fajr = snapshot.unlocked.first { $0.id == "fajr_7" }
         XCTAssertNotNil(fajr)
         XCTAssertTrue(fajr!.badge.isPrivate)
-        XCTAssertTrue(snapshot.unlocked.contains { $0.id == "early_bird" } == false)
+        // 12 подъёмов до 6:00, но все на Фаджр: публичный значок не должен выдавать намаз.
+        XCTAssertFalse(snapshot.unlocked.contains { $0.id == "early_bird" })
+    }
+
+    func testEarlyBirdFromOrdinaryMornings() {
+        let entries = (1...10).map { T.entry(T.date(2026, 9, $0, 5, 30), .success) }
+        let snapshot = ProgressEngine.compute(entries: entries, challenges: [], now: T.date(2026, 9, 11), calendar: T.calendar)
+        XCTAssertTrue(snapshot.unlocked.contains { $0.id == "early_bird" })
     }
 
     func testWeekSummary() {
@@ -136,6 +143,20 @@ final class ChallengeEvaluatorTests: XCTestCase {
         let done = T.entry(T.date(2026, 9, 2, 7), .success, routineDone: ["a", "b"], routineTotal: 2)
         let ok = ChallengeEvaluator.evaluate(challenge, entries: [done], now: T.date(2026, 9, 3, 8), calendar: T.calendar)
         XCTAssertEqual(ok.status, .active)
+    }
+
+    func testEmptyChecklistCountsAsDone() {
+        let challenge = Challenge(title: "Чек-лист", goal: .routine, durationDays: 7, startDate: T.date(2026, 9, 1))
+        let entry = T.entry(T.date(2026, 9, 2, 7), .success, routineDone: [], routineTotal: 0)
+        let result = ChallengeEvaluator.evaluate(challenge, entries: [entry], now: T.date(2026, 9, 3, 8), calendar: T.calendar)
+        XCTAssertEqual(result.status, .active)
+    }
+
+    func testOrdinaryChallengeIgnoresPrayerMornings() {
+        let challenge = Challenge(title: "Без провалов", goal: .noMisses, durationDays: 7, startDate: T.date(2026, 9, 1))
+        let result = ChallengeEvaluator.evaluate(challenge, entries: [T.entry(T.date(2026, 9, 2, 4), .failed, isPrayer: true)],
+                                                 now: T.date(2026, 9, 3), calendar: T.calendar)
+        XCTAssertEqual(result.status, .active, "Утро на Фаджр не должно попадать в обычный челлендж")
     }
 
     func testMorningsBeforeChallengeStartAreIgnored() {

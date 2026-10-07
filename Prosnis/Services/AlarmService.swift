@@ -24,12 +24,16 @@ final class AlarmService {
         var dates: [String: [Date]] = [:]
         /// Будильники, которые в последний раз поставить не удалось.
         var failed: Set<String> = []
+        /// Проверочные звонки: их не трогает уборка «призраков», пока не прозвенят.
+        var tests: [UUID: Date]? = [:]
     }
 
     private var registry: Registry
     private let registryFile = FileStore<Registry>("scheduled_alarms")
     /// Идущие перестановки: следующая для того же будильника ждёт окончания предыдущей.
     private var inFlight: [UUID: Task<String?, Never>] = [:]
+    /// Растёт при полном удалении данных: начатые до него перестановки прекращаются.
+    private var generation = 0
 
     private init() {
         registry = registryFile.load() ?? Registry()
@@ -97,6 +101,7 @@ final class AlarmService {
 
     /// Снимает вообще все будильники приложения (при удалении данных).
     func cancelEverything() {
+        generation += 1
         inFlight.values.forEach { $0.cancel() }
         inFlight = [:]
         if let all = try? manager.alarms {
@@ -113,6 +118,34 @@ final class AlarmService {
         try? manager.cancel(id: id)
     }
 
+    /// Останавливает звонок (будильник при этом может остаться в расписании).
+    func stop(id: UUID) {
+        try? manager.stop(id: id)
+    }
+
+    /// Удаляет будильник после всех идущих перестановок, чтобы ни одна из них не поставила его снова.
+    func remove(_ id: UUID) async {
+        let previous = inFlight[id]
+        _ = await previous?.value
+        cancelAll(for: id)
+    }
+
+    func isFailed(_ id: UUID) -> Bool { registry.failed.contains(id.uuidString) }
+
+    /// Снимает системные будильники, которых нет ни у одного нашего будильника («призраки» после сбоев).
+    func pruneOrphans(known: Set<UUID>) {
+        guard let all = try? manager.alarms else { return }
+        let now = Date()
+        var tests = registry.tests ?? [:]
+        tests = tests.filter { now.timeIntervalSince($0.value) < 3600 }
+        registry.tests = tests
+        let registered = Set(registry.ids.values.flatMap { $0 })
+        for alarm in all where !known.contains(alarm.id) && !registered.contains(alarm.id) && tests[alarm.id] == nil {
+            try? manager.cancel(id: alarm.id)
+        }
+        saveRegistry()
+    }
+
     /// Стоял ли будильник в системе на это время. Если нет, пропуск не считается провалом.
     func wasScheduled(_ item: AlarmItem, ring: Date) -> Bool {
         let key = item.id.uuidString
@@ -127,10 +160,11 @@ final class AlarmService {
     /// Возвращает текст ошибки или nil.
     func sync(_ item: AlarmItem, context: ScheduleContext) async -> String? {
         let previous = inFlight[item.id]
+        let startedGeneration = generation
         let task = Task { () -> String? in
             _ = await previous?.value
-            if Task.isCancelled { return nil }
-            return await self.performSync(item, context: context)
+            if Task.isCancelled || startedGeneration != self.generation { return nil }
+            return await self.performSync(item, context: context, generation: startedGeneration)
         }
         inFlight[item.id] = task
         let result = await task.value
@@ -143,7 +177,14 @@ final class AlarmService {
         saveRegistry()
     }
 
-    private func performSync(_ item: AlarmItem, context: ScheduleContext) async -> String? {
+    /// Будильник ещё нужен: не удалён, не выключен, данные не стёрты.
+    private func stillWanted(_ item: AlarmItem, generation: Int) -> Bool {
+        generation == self.generation
+            && !Task.isCancelled
+            && AlarmStore.shared.alarms.contains { $0.id == item.id && $0.isEnabled }
+    }
+
+    private func performSync(_ item: AlarmItem, context: ScheduleContext, generation: Int) async -> String? {
         cancelAll(for: item.id)
         let key = item.id.uuidString
         guard item.isEnabled else {
@@ -154,6 +195,7 @@ final class AlarmService {
             markFailed(key, true)
             return "Нет разрешения на будильники. Включите его в Настройках iPhone."
         }
+        guard stillWanted(item, generation: generation) else { return nil }
         let sound = SoundLibrary.option(item.soundID).fileName
 
         if item.needsDatedSchedule {
@@ -166,6 +208,7 @@ final class AlarmService {
             )
             var failed = false
             for date in dates {
+                guard stillWanted(item, generation: generation) else { break }
                 let systemID = UUID()
                 let configuration = AlarmManager.AlarmConfiguration.alarm(
                     schedule: .fixed(date),
@@ -175,6 +218,11 @@ final class AlarmService {
                 )
                 do {
                     _ = try await manager.schedule(id: systemID, configuration: configuration)
+                    guard stillWanted(item, generation: generation) else {
+                        // Пока ставили, будильник удалили или выключили: снимаем то, что успели поставить.
+                        try? manager.cancel(id: systemID)
+                        break
+                    }
                     // Записываем сразу: если параллельно начнётся отмена, она увидит этот будильник.
                     registry.ids[key, default: []].append(systemID)
                     registry.dates[key, default: []].append(date)
@@ -202,6 +250,10 @@ final class AlarmService {
         )
         do {
             _ = try await manager.schedule(id: item.id, configuration: configuration)
+            guard stillWanted(item, generation: generation) else {
+                try? manager.cancel(id: item.id)
+                return nil
+            }
             markFailed(key, false)
             return nil
         } catch {
@@ -239,8 +291,13 @@ final class AlarmService {
             attributes: attributes(title: "Проверка"),
             sound: .default
         )
+        let testID = UUID()
         do {
-            _ = try await manager.schedule(id: UUID(), configuration: configuration)
+            _ = try await manager.schedule(id: testID, configuration: configuration)
+            var tests = registry.tests ?? [:]
+            tests[testID] = fireDate
+            registry.tests = tests
+            saveRegistry()
             let formatter = DateFormatter()
             formatter.timeStyle = .medium
             return "Проверочный звонок в \(formatter.string(from: fireDate)). Заблокируйте телефон и ждите."

@@ -25,6 +25,13 @@ final class AlarmStore: ObservableObject {
 
     var isAuthorized: Bool { service.isAuthorized }
 
+    /// Когда будильник в последний раз создан, включён или изменён. Звонки до этого момента не считаются.
+    static func changedAt(_ item: AlarmItem) -> Date {
+        max(item.createdAt ?? .distantPast, item.updatedAt ?? .distantPast)
+    }
+
+    func isScheduleFailed(_ item: AlarmItem) -> Bool { item.isEnabled && service.isFailed(item.id) }
+
     private var context: ScheduleContext { AppSettings.shared.scheduleContext }
 
     private func load() {
@@ -66,7 +73,7 @@ final class AlarmStore: ObservableObject {
         // Звонок только что был, а утро ещё не записано: менять нельзя, иначе можно уйти от ставки.
         if let last = lastOccurrence(of: item, onOrBefore: now),
            now.timeIntervalSince(last) < WakeRules.windowSeconds + 60,
-           last > (item.createdAt ?? .distantPast),
+           last > AlarmStore.changedAt(item),
            !JournalStore.shared.hasEntry(alarmID: item.id, near: last) {
             return true
         }
@@ -87,10 +94,11 @@ final class AlarmStore: ObservableObject {
             return false
         }
         var item = draft
-        item.updatedAt = Date()
+        let now = TrustedClock.now
+        item.updatedAt = now
         if item.weekdays.isEmpty && item.effectiveHolidayMode != .workCalendar {
             // Одноразовый будильник взводится заново при каждом сохранении: звонит в ближайшее время, а не в прошлое.
-            item.createdAt = Date()
+            item.createdAt = now
         }
         if !AppSettings.shared.data.isAdult { item.stakeEnabled = false }
         if item.effectiveTask == .qr && (item.qrCode ?? "").isEmpty { item.taskKind = .typing }
@@ -116,7 +124,8 @@ final class AlarmStore: ObservableObject {
             showLockedMessage()
             return
         }
-        service.cancelAll(for: item.id)
+        let id = item.id
+        Task { await service.remove(id) }
         if case .photo(let name) = item.wallpaper {
             WallpaperStorage.delete(name)
         }
@@ -151,6 +160,26 @@ final class AlarmStore: ObservableObject {
         for item in alarms where item.isEnabled && item.needsDatedSchedule {
             sync(item)
         }
+    }
+
+    /// Переставляет будильники, которые не удалось поставить (например, разрешение дали позже).
+    func resyncFailed() {
+        guard service.isAuthorized else { return }
+        for item in alarms where isScheduleFailed(item) {
+            sync(item)
+        }
+    }
+
+    /// Убирает системные будильники-«призраки» и фото фонов, которые больше ни к чему не относятся.
+    func cleanupOrphans() {
+        var known = Set(alarms.map(\.id))
+        if let recheck = WakeCoordinator.shared.session?.recheckAlarmID { known.insert(recheck) }
+        service.pruneOrphans(known: known)
+        let used = Set(alarms.compactMap { alarm -> String? in
+            if case .photo(let name) = alarm.wallpaper { return name }
+            return nil
+        })
+        WallpaperStorage.deleteAll(except: used)
     }
 
     func runTest() {

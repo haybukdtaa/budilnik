@@ -7,6 +7,20 @@ enum WakeRules {
     static let recheckDelay: TimeInterval = 600
     /// За сколько до звонка будильник со ставкой закрыт для изменений.
     static let lockSeconds: TimeInterval = 2 * 3600
+    /// Будильник из очереди старше этого уже не запускается: человек явно уснул, звонок идёт в пропуски.
+    static let queueStaleSeconds: TimeInterval = 2 * windowSeconds + recheckDelay
+    /// Сколько ждать, что повторный звонок сам откроет приложение, прежде чем начать проверку из приложения.
+    static let recheckGraceSeconds: TimeInterval = 20
+
+    /// Пора ли начать вторую проверку из самого приложения (если повторный звонок не открыл его).
+    static func shouldStartRecheckInApp(recheckDate: Date, now: Date) -> Bool {
+        now >= recheckDate.addingTimeInterval(recheckGraceSeconds) && now < recheckDate.addingTimeInterval(windowSeconds)
+    }
+
+    /// Не устарел ли будильник из очереди.
+    static func isQueuedRingStale(_ ring: Date, now: Date) -> Bool {
+        now.timeIntervalSince(ring) > queueStaleSeconds
+    }
 }
 
 enum WakePhase: String, Codable {
@@ -41,6 +55,10 @@ struct WakeSession: Codable {
     var paymentRef: UUID?
     /// Будильники, которые прозвенели во время этой проверки: их задание начнётся следом.
     var queuedAlarmIDs: [UUID]?
+    /// Когда прозвенел каждый будильник из очереди (ключ — id будильника).
+    var queuedRings: [String: Date]?
+    /// Для задания, начатого из очереди: настоящее время звонка.
+    var originalRing: Date?
 
     var deadline: Date { ringDate.addingTimeInterval(WakeRules.windowSeconds) }
 }

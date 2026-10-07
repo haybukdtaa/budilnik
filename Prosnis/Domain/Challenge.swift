@@ -92,7 +92,9 @@ enum ChallengeEvaluator {
         // Утра до момента создания челленджа (даже в тот же день) не учитываются.
         let relevant = entries
             .filter { $0.counts && $0.date >= challenge.startDate && (end == nil || $0.date < end!) }
-            .filter { challenge.goal != .prayer || $0.isPrayer == true }
+            // Челлендж по Фаджру смотрит только утра с намазом, остальные — только обычные утра.
+            // Так сведения о намазе не попадают в обычные челленджи, которые уходят на сервер.
+            .filter { challenge.goal == .prayer ? $0.isPrayer == true : $0.isPrayer != true }
             .sorted { $0.date < $1.date }
 
         var successDays = Set<Date>()

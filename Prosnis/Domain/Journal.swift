@@ -54,8 +54,9 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     }
 
     var counts: Bool { isDemo != true && outcome != .technical }
+    /// Чек-лист выполнен. Пустой чек-лист (все пункты удалены) считается выполненным.
     var routineComplete: Bool {
-        guard let total = routineTotal, total > 0 else { return false }
+        guard let total = routineTotal else { return false }
         return (routineDone?.count ?? 0) >= total
     }
 }
@@ -123,6 +124,18 @@ final class JournalStore: ObservableObject {
         needsMerge = result.state == .unreadable
     }
 
+    /// Если при запуске журнал был закрыт (телефон не разблокирован), перечитывает и сливает его.
+    func reloadIfNeeded() {
+        guard needsMerge else { return }
+        let result = file.loadWithState()
+        guard result.state != .unreadable else { return }
+        let known = Set(entries.map(\.id))
+        entries += (result.value ?? []).filter { !known.contains($0.id) }
+        entries.sort { $0.date > $1.date }
+        needsMerge = false
+        if result.state == .loaded { file.save(entries) }
+    }
+
     private func save() {
         if needsMerge {
             let result = file.loadWithState()
@@ -179,9 +192,8 @@ final class JournalStore: ObservableObject {
         stats.successes = month.filter { $0.outcome == .success }.count
         stats.saved = month.filter { $0.outcome == .success }.reduce(0) { $0 + $1.stake }
         stats.lost = month.reduce(0) { $0 + $1.charged }
-        for entry in counted {
-            if entry.outcome == .success { stats.streak += 1 } else { break }
-        }
+        // Серия считается так же, как во вкладке «Прогресс»: по утрам, а не по будильникам.
+        stats.streak = ProgressEngine.compute(entries: counted, challenges: [], now: now).currentStreak
         return stats
     }
 
