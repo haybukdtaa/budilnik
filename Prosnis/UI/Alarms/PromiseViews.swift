@@ -113,6 +113,8 @@ struct PromiseEditView: View {
     @State private var agreed = false
     @State private var message: String?
     @State private var showTerms = false
+    /// Номер последнего запроса доступа: поздний ответ на отменённый запрос игнорируется.
+    @State private var accessRequest = 0
 
     /// Ближайшие 22:00, до которых больше двух часов.
     static func defaultStart() -> Date {
@@ -129,13 +131,19 @@ struct PromiseEditView: View {
             Form {
                 Section {
                     TextField("Название", text: $title)
-                    DatePicker("Начало", selection: $start, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                    DatePicker("Начало", selection: $start, in: Date().addingTimeInterval(PromiseRules.minLead)..., displayedComponents: [.date, .hourAndMinute])
                     Picker("Окно", selection: $windowMinutes) {
                         ForEach(PromiseRules.windows, id: \.self) { Text("\($0) минут").tag($0) }
                     }
                     Stepper("Не меньше \(minSteps) шагов", value: $minSteps, in: 500...50000, step: 500)
                 } footer: {
-                    Text("Нужно набрать шаги с \(Format.time(start)) до \(Format.time(end)). Не набрали — ставка спишется.")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Нужно набрать шаги с \(Format.time(start)) до \(Format.time(end)). Не набрали — ставка спишется.")
+                        if PromiseRules.isLocked(StepPromise(start: start, end: end), now: Date()) {
+                            Text("До начала меньше 2 часов: после создания обещание уже нельзя будет изменить или удалить.")
+                                .foregroundStyle(Theme.accent)
+                        }
+                    }
                 }
 
                 Section {
@@ -159,13 +167,17 @@ struct PromiseEditView: View {
                     Toggle("Приложение может считать мои шаги", isOn: Binding(
                         get: { agreed },
                         set: { isOn in
+                            accessRequest += 1
                             guard isOn else {
                                 agreed = false
                                 return
                             }
+                            let request = accessRequest
                             Task {
-                                agreed = await StepCounting.requestAccess()
-                                message = agreed ? nil : "Нет доступа к данным о движении. Разрешите его в Настройках iPhone → Prosnis."
+                                let granted = await StepCounting.requestAccess()
+                                guard request == accessRequest else { return }
+                                agreed = granted
+                                message = granted ? nil : "Нет доступа к данным о движении. Разрешите его в Настройках iPhone → Prosnis."
                             }
                         }
                     ))
@@ -201,6 +213,12 @@ struct PromiseEditView: View {
     private func save() {
         guard StepCounting.isAvailable else {
             message = "На этом телефоне счётчик шагов недоступен."
+            return
+        }
+        // Доступ могли выключить после того, как поставили галочку.
+        guard StepCounting.hasAccess else {
+            agreed = false
+            message = "Нет доступа к данным о движении. Разрешите его в Настройках iPhone → Prosnis и поставьте галочку снова."
             return
         }
         if StakeTerms.needsConsent(settings.data.stakeConsent, amount: stake) {

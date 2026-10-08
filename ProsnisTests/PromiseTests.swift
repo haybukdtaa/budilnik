@@ -21,6 +21,14 @@ final class PromiseTests: XCTestCase {
         XCTAssertEqual(PromiseRules.resolve(promise(), read: .steps(5000), now: now), .kept(steps: 5000), "Ровно норма — выполнено")
     }
 
+    func testShortGraceAfterTheWindowBeforeDeciding() {
+        let atEnd = T.date(2026, 10, 8, 23, 31)
+        XCTAssertNil(PromiseRules.resolve(promise(), read: .steps(4900), now: atEnd), "Последние шаги ещё могут дойти")
+        XCTAssertEqual(PromiseRules.resolve(promise(), read: .steps(5100), now: atEnd), .kept(steps: 5100))
+        XCTAssertEqual(PromiseRules.resolve(promise(), read: .steps(4900), now: T.date(2026, 10, 8, 23, 33)),
+                       .broken(.notEnough, steps: 4900))
+    }
+
     func testDeniedAccessIsTheUsersChoice() {
         XCTAssertNil(PromiseRules.resolve(promise(), read: .denied, now: T.date(2026, 10, 8, 22, 40)), "Пока окно идёт — ждём")
         XCTAssertEqual(PromiseRules.resolve(promise(), read: .denied, now: T.date(2026, 10, 9, 8, 0)), .broken(.denied, steps: nil))

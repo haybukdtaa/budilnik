@@ -2,10 +2,30 @@ import CoreMotion
 import Foundation
 import UserNotifications
 
+/// Ответ можно отдать только один раз: либо данные, либо таймаут.
+private final class ResumeOnce<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Never>?
+
+    init(_ continuation: CheckedContinuation<Value, Never>) { self.continuation = continuation }
+
+    func resume(_ value: Value) {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        lock.unlock()
+        pending?.resume(returning: value)
+    }
+}
+
 /// Чтение шагов с телефона. Данные не покидают устройство.
 @MainActor
 enum StepCounting {
     static var isAvailable: Bool { CMPedometer.isStepCountingAvailable() }
+    /// Доступ к данным о движении уже выдан.
+    static var hasAccess: Bool { CMPedometer.authorizationStatus() == .authorized }
+    /// Дольше этого запрос к счётчику не ждём.
+    static let timeout: TimeInterval = 15
 
     /// Просит доступ к данным о движении (пробным запросом). false — доступа нет.
     static func requestAccess() async -> Bool {
@@ -27,24 +47,27 @@ enum StepCounting {
     /// Шаги за промежуток [from, to].
     static func read(from: Date, to: Date) async -> StepRead {
         guard isAvailable else { return .unavailable }
+        // Системный запрос доступа при чтении не показываем: доступ спрашивается при создании обещания.
         switch CMPedometer.authorizationStatus() {
-        case .denied, .restricted: return .denied
+        case .denied, .restricted, .notDetermined: return .denied
         default: break
         }
         let pedometer = CMPedometer()
         return await withCheckedContinuation { continuation in
+            let once = ResumeOnce(continuation)
             pedometer.queryPedometerData(from: from, to: to) { data, error in
                 withExtendedLifetime(pedometer) {
                     if let data {
-                        continuation.resume(returning: .steps(data.numberOfSteps.intValue))
+                        once.resume(.steps(data.numberOfSteps.intValue))
                     } else if let error = error as NSError?, error.domain == "CMErrorDomain",
                               error.code == 105 { // CMErrorMotionActivityNotAuthorized
-                        continuation.resume(returning: .denied)
+                        once.resume(.denied)
                     } else {
-                        continuation.resume(returning: .unavailable)
+                        once.resume(.unavailable)
                     }
                 }
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { once.resume(.unavailable) }
         }
     }
 }
@@ -132,14 +155,24 @@ final class PromiseStore: ObservableObject {
             guard promises.contains(where: { $0.id == promise.id }) else { continue }
             var read: StepRead?
             if now <= PromiseRules.verifyDeadline(promise) {
-                let windowOpen = now < promise.end
-                if windowOpen, !force, let last = lastCheck[promise.id], now.timeIntervalSince(last) < 55 { continue }
+                // Идущее окно — раз в минуту, после окна — раз в пять минут (если чтение не удаётся).
+                let gap: TimeInterval = now < promise.end ? 55 : 300
+                if !force, let last = lastCheck[promise.id], now.timeIntervalSince(last) < gap { continue }
                 lastCheck[promise.id] = now
                 read = await StepCounting.read(from: promise.start, to: min(now, promise.end))
-                if case .steps(let count) = read { liveSteps[promise.id] = count }
-                if read == .unavailable { mark(promise.id, readFailed: true) }
+                switch read {
+                case .steps(let count)?:
+                    liveSteps[promise.id] = count
+                    mark(promise.id, readFailed: false)
+                case .denied?:
+                    mark(promise.id, readFailed: false)
+                case .unavailable?:
+                    mark(promise.id, readFailed: true)
+                case nil:
+                    break
+                }
             }
-            let current = promises.first { $0.id == promise.id } ?? promise
+            guard let current = promises.first(where: { $0.id == promise.id }) else { continue }
             if let resolution = PromiseRules.resolve(current, read: read, now: now) {
                 apply(resolution, to: current)
             }
@@ -154,12 +187,6 @@ final class PromiseStore: ObservableObject {
 
     /// Итог обещания: запись в дневник, деньги, уведомления.
     private func apply(_ resolution: PromiseResolution, to promise: StepPromise) {
-        promises.removeAll { $0.id == promise.id }
-        liveSteps[promise.id] = nil
-        lastCheck[promise.id] = nil
-        save()
-        cancelNotifications(promise.id)
-
         let outcome: Outcome
         var reference: UUID?
         switch resolution {
@@ -171,7 +198,10 @@ final class PromiseStore: ObservableObject {
         }
         var events = [JournalEvent(date: promise.start, text: "Обещание: \(promise.windowText), не меньше \(promise.minSteps) шагов")]
         events.append(JournalEvent(date: TrustedClock.now, text: PromiseRules.eventText(resolution, promise: promise)))
+        // Запись в дневник — первой, с номером обещания: если приложение закроют между шагами, итог не потеряется и не задвоится.
+        if !JournalStore.shared.entries.contains(where: { $0.id == promise.id }) {
         JournalStore.shared.add(JournalEntry(
+            id: promise.id,
             date: promise.start,
             alarmTitle: promise.title,
             timeText: promise.windowText,
@@ -190,11 +220,23 @@ final class PromiseStore: ObservableObject {
             PaymentsStore.shared.markOutcome(reference: reference, success: false, amount: amount)
             Task { await PaymentsStore.shared.hold(amount: amount, reference: reference) }
         }
+        }
+        promises.removeAll { $0.id == promise.id }
+        liveSteps[promise.id] = nil
+        lastCheck[promise.id] = nil
+        save()
+        cancelNotifications(promise.id)
     }
 
     // MARK: - Уведомления (тихие)
 
-    private func ids(_ id: UUID) -> [String] { ["promise-start-\(id.uuidString)", "promise-end-\(id.uuidString)"] }
+    /// Дни после окна, когда напоминаем открыть приложение (крайний срок проверки — через 6 дней).
+    private static let reminderDays = [1, 3, 5]
+
+    private func ids(_ id: UUID) -> [String] {
+        ["promise-start-\(id.uuidString)", "promise-end-\(id.uuidString)"]
+            + PromiseStore.reminderDays.map { "promise-check-\($0)-\(id.uuidString)" }
+    }
 
     private func scheduleNotifications(_ promise: StepPromise) async {
         let center = UNUserNotificationCenter.current()
@@ -214,6 +256,13 @@ final class PromiseStore: ObservableObject {
                   "«\(promise.title)»: нужно \(promise.minSteps) шагов до \(Format.time(promise.end)).", at: promise.start)
         await add(names[1], "Окно закончилось",
                   "Откройте приложение — посчитаем шаги.", at: promise.end)
+        for (index, days) in PromiseStore.reminderDays.enumerated() {
+            let last = days == PromiseStore.reminderDays.last
+            await add(names[2 + index], "Шаги ещё не посчитаны",
+                      last ? "Завтра шаги за «\(promise.title)» уже нельзя будет проверить: откройте приложение сегодня."
+                           : "Откройте приложение — посчитаем шаги за «\(promise.title)».",
+                      at: promise.end.addingTimeInterval(Double(days) * 86400 + 9 * 3600))
+        }
     }
 
     private func cancelNotifications(_ id: UUID) {

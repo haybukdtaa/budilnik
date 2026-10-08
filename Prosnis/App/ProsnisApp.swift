@@ -57,8 +57,11 @@ struct ProsnisApp: App {
         challenges.reloadIfNeeded()
         payments.reloadIfNeeded()
         wake.reconcile()
-        await PromiseStore.shared.reconcile(force: true)
-        await PromiseStore.shared.restoreNotifications()
+        // Чтение шагов может занять время: остальное при открытии его не ждёт.
+        Task {
+            await PromiseStore.shared.reconcile(force: true)
+            await PromiseStore.shared.restoreNotifications()
+        }
         store.refreshExpected()
         store.refreshDatedAlarms()
         store.resyncFailed()
@@ -282,7 +285,7 @@ struct RootView: View {
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 30_000_000_000)
                     wake.reconcile()
-                    await PromiseStore.shared.reconcile()
+                    Task { await PromiseStore.shared.reconcile() }
                 }
             }
         }

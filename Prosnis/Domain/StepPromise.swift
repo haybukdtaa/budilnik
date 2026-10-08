@@ -48,6 +48,8 @@ enum PromiseRules {
     /// Шаги за окно проверяются не позже чем через столько дней: телефон хранит данные о шагах неделю.
     static let verifyDays = 6
     static let windows: [Int] = [30, 60, 90, 120, 180]
+    /// Сколько ждать после конца окна, прежде чем решать «не хватило»: последние шаги доходят до счётчика не сразу.
+    static let grace: TimeInterval = 120
 
     static func isLocked(_ promise: StepPromise, now: Date) -> Bool {
         now >= promise.start.addingTimeInterval(-lockSeconds)
@@ -68,9 +70,9 @@ enum PromiseRules {
         switch read {
         case .steps(let count):
             if count >= promise.minSteps { return .kept(steps: count) }
-            return now >= promise.end ? .broken(.notEnough, steps: count) : nil
+            return now >= promise.end.addingTimeInterval(grace) ? .broken(.notEnough, steps: count) : nil
         case .denied:
-            return now >= promise.end ? .broken(.denied, steps: nil) : nil
+            return now >= promise.end.addingTimeInterval(grace) ? .broken(.denied, steps: nil) : nil
         case .unavailable, nil:
             return nil
         }
