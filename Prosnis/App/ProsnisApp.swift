@@ -15,6 +15,7 @@ struct ProsnisApp: App {
 
     init() {
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
+        Theme.applyAppearance()
     }
 
     var body: some Scene {
@@ -28,7 +29,9 @@ struct ProsnisApp: App {
                 .environmentObject(social)
                 .environmentObject(payments)
                 .environmentObject(sync)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
+                .font(.app(.body))
+                .foregroundStyle(Theme.ink)
                 .tint(Theme.accent)
                 .task { await becameActive() }
                 .onChange(of: scenePhase) { _, phase in
@@ -176,11 +179,12 @@ struct RootView: View {
                 if let session = wake.session {
                     WakeTaskView(session: session)
                         .preferredColorScheme(.dark)
+                        .foregroundStyle(.primary)
                 }
             }
             .sheet(item: $wake.morning) { state in
                 MorningView(state: state)
-                    .preferredColorScheme(.dark)
+                    .preferredColorScheme(.light)
             }
             .onAppear {
                 guard let screenshot = RootView.screenshotTab else { return }

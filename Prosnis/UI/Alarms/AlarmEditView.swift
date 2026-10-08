@@ -208,11 +208,11 @@ struct AlarmEditView: View {
                     let today = settings.scheduleContext
                     if let next = ScheduleCalculator.nextOccurrence(for: draft, after: Date(), context: today) {
                         Text("Ближайший звонок: \(Format.weekday(next)), \(Format.time(next))")
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                     } else {
                         Text("В ближайшие дни время не определяется. Проверьте город в настройках модуля.")
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(.orange)
                     }
                 }
@@ -273,10 +273,10 @@ struct AlarmEditView: View {
                     if isOn { draft.weekdays.remove(day) } else { draft.weekdays.insert(day) }
                 } label: {
                     Text(Weekdays.short[day - 1])
-                        .font(.footnote.weight(.semibold))
+                        .font(.app(.footnote).weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 38)
                         .background(isOn ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.card), in: Circle())
-                        .foregroundStyle(isOn ? Color.black : Color.secondary)
+                        .foregroundStyle(isOn ? Color.white : Color.secondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -306,7 +306,7 @@ struct AlarmEditView: View {
                 }
                 if let permissionMessage {
                     Text(permissionMessage)
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.orange)
                 }
                 if draft.effectiveTask == .qr {
@@ -316,13 +316,13 @@ struct AlarmEditView: View {
                     } else {
                         Button("Зарегистрировать код") { showScanner = true }
                         Text("Наклейте QR-код или возьмите штрихкод с упаковки в другой комнате (ванная, кухня) и отсканируйте его сейчас. Утром нужно будет дойти до него.")
-                            .font(.footnote)
+                            .font(.app(.footnote))
                             .foregroundStyle(.secondary)
                     }
                 }
                 if draft.stakeEnabled {
                     Label("Повторная проверка: обязательна со ставкой", systemImage: "checkmark.shield")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 } else {
                     Toggle("Повторная проверка через 10 минут", isOn: Binding(
@@ -332,7 +332,7 @@ struct AlarmEditView: View {
                 }
                 if draft.stakeEnabled && !draft.effectiveTask.requiresGettingUp {
                     Text("Для будильника со ставкой лучше «Сканировать код» или «Пройти шаги»: их нельзя выполнить, лёжа в кровати.")
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.orange)
                 }
             }
@@ -358,17 +358,17 @@ struct AlarmEditView: View {
                     }
                     if draft.stakeAmount <= 0 {
                         Label("Укажите сумму больше нуля", systemImage: "exclamationmark.circle")
-                            .font(.footnote)
+                            .font(.app(.footnote))
                             .foregroundStyle(.orange)
                     } else if draft.stakeAmount >= 3000 {
                         Label("Крупная сумма. Убедитесь, что это осознанно.", systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
+                            .font(.app(.footnote))
                             .foregroundStyle(.orange)
                     }
                     if let hint = StakeAdvisor.hint(entries: journal.realEntries, current: draft.stakeAmount) {
                         VStack(alignment: .leading, spacing: 8) {
                             Label(hint.text, systemImage: "lightbulb")
-                                .font(.subheadline)
+                                .font(.app(.subheadline))
                                 .foregroundStyle(.secondary)
                             if let suggested = hint.suggested {
                                 Button("Поставить \(suggested) ₽") { draft.stakeAmount = suggested }
@@ -466,7 +466,7 @@ struct AlarmEditView: View {
                     .font(.system(size: draft.isFajr ? 40 : 54, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                 Text(draft.displayTitle)
-                    .font(.headline)
+                    .font(.app(.headline))
             }
             .foregroundStyle(.white)
             .shadow(radius: 6)

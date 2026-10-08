@@ -58,12 +58,12 @@ struct StoryChapterView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("\(series.title) · глава \(index + 1) из \(series.chapters.count)")
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                 Text(chapter.title)
-                    .font(.title.bold())
+                    .font(.app(.title).bold())
                 Text(chapter.text)
-                    .font(.body)
+                    .font(.app(.body))
                     .lineSpacing(5)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,33 +83,33 @@ struct HoursWonCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Часы, которые вы выиграли", systemImage: "hourglass").font(.headline)
+            Label("Часы, которые вы выиграли", systemImage: "hourglass").font(.app(.headline))
             if let baseline = settings.data.usualWakeMinutes, !editing {
                 let calendar = Calendar.current
                 let monthStart = calendar.dateInterval(of: .month, for: Date())?.start ?? Date()
                 let minutes = HoursWon.total(entries: journal.realEntries, usualWakeMinutes: baseline,
                                              from: monthStart, to: Date().addingTimeInterval(86400))
                 Text("+\(HoursWon.text(minutes: minutes)) утра в этом месяце")
-                    .font(.title2.bold())
+                    .font(.app(.title2).bold())
                     .foregroundStyle(Theme.accentGradient)
                 let equivalents = HoursWon.equivalents(minutes: minutes)
                 if equivalents.isEmpty {
                     Text("Считаем по сравнению с тем, когда вы вставали раньше (\(String(format: "%02d:%02d", baseline / 60, baseline % 60))). Каждое раннее утро добавляет время.")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 } else {
                     Text("Это примерно " + equivalents.joined(separator: ", или "))
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 }
                 Button("Изменить прежнее время подъёма") {
                     usual = calendar.date(bySettingHour: baseline / 60, minute: baseline % 60, second: 0, of: Date()) ?? Date()
                     editing = true
                 }
-                .font(.footnote)
+                .font(.app(.footnote))
             } else {
                 Text("Во сколько вы обычно вставали до приложения? По этому времени посчитаем, сколько утра вы выиграли.")
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                 DatePicker("Обычно вставал(а) в", selection: $usual, displayedComponents: .hourAndMinute)
                 Button("Сохранить") {

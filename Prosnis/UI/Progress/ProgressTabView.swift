@@ -77,8 +77,8 @@ struct ProgressTabView: View {
             HStack {
                 Image(systemName: icon).foregroundStyle(Theme.accent).frame(width: 28)
                 VStack(alignment: .leading) {
-                    Text(title).font(.headline)
-                    Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                    Text(title).font(.app(.headline))
+                    Text(detail).font(.app(.subheadline)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.right").foregroundStyle(.secondary)
@@ -97,27 +97,27 @@ struct ProgressTabView: View {
                         .frame(width: 120, height: 140)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(species.map { "\($0.title) · дерево №\(tree.index + 1)" } ?? "Дерево №\(tree.index + 1)")
-                            .font(.footnote)
+                            .font(.app(.footnote))
                             .foregroundStyle(.secondary)
-                        Text(tree.title).font(.title3.bold())
+                        Text(tree.title).font(.app(.title3).bold())
                         Text(tree.isLastStage
                              ? "До переезда в сад: \(Words.wakes(tree.wakesToNext))"
                              : "До следующей стадии: \(Words.wakes(tree.wakesToNext))")
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                         if tree.fruits {
-                            Label("Плоды: месяц без провалов", systemImage: "sparkles").font(.caption).foregroundStyle(.green)
+                            Label("Плоды: месяц без провалов", systemImage: "sparkles").font(.app(.caption)).foregroundStyle(.green)
                         } else if tree.flowers {
                             Label("Цветёт: неделя без провалов. Плоды через \(Words.days(max(0, TreeState.fruitsStreak - snapshot.currentStreak)))",
-                                  systemImage: "camera.macro").font(.caption).foregroundStyle(.pink)
+                                  systemImage: "camera.macro").font(.app(.caption)).foregroundStyle(.pink)
                         } else if tree.wilt == 0 && tree.stage > 0 {
                             Text("Ещё \(Words.days(max(0, TreeState.flowersStreak - snapshot.currentStreak))) без провалов — и дерево зацветёт")
-                                .font(.caption)
+                                .font(.app(.caption))
                                 .foregroundStyle(.secondary)
                         }
                         if tree.wilt > 0 {
                             Text("Листья вянут от недавних провалов. Несколько подъёмов подряд вернут цвет.")
-                                .font(.caption)
+                                .font(.app(.caption))
                                 .foregroundStyle(.orange)
                         }
                     }
@@ -151,8 +151,8 @@ struct ProgressTabView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(snapshot.title).font(.title3.bold())
-                            Text("Уровень \(snapshot.level)").font(.caption).foregroundStyle(.secondary)
+                            Text(snapshot.title).font(.app(.title3).bold())
+                            Text("Уровень \(snapshot.level)").font(.app(.caption)).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Text("\(snapshot.unlocked.count) значков")
@@ -161,10 +161,10 @@ struct ProgressTabView: View {
                     }
                     ProgressView(value: snapshot.levelProgress).tint(Theme.accent)
                     Text("\(snapshot.xp) опыта · до следующего уровня \(snapshot.xpForNextLevel)")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                     Text("Серия \(snapshot.currentStreak) · рекорд \(snapshot.longestStreak) · всего подъёмов \(snapshot.totalWakes)")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -177,7 +177,7 @@ struct ProgressTabView: View {
         let last = snapshot.lastWeek
         return card {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Итоги недели").font(.headline)
+                Text("Итоги недели").font(.app(.headline))
                 if week.mornings == 0 {
                     Text("На этой неделе будильников с заданием ещё не было.")
                         .foregroundStyle(.secondary)
@@ -191,7 +191,7 @@ struct ProgressTabView: View {
                 }
                 if last.mornings > 0 {
                     Text("Прошлая неделя: \(last.successes) из \(last.mornings)")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -202,7 +202,7 @@ struct ProgressTabView: View {
         card {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Челленджи").font(.headline)
+                    Text("Челленджи").font(.app(.headline))
                     Spacer()
                     Button {
                         showNewChallenge = true
@@ -232,26 +232,26 @@ struct ChallengeRow: View {
         let progress = challenges.progress(for: challenge)
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(challenge.title).font(.subheadline.weight(.semibold))
+                Text(challenge.title).font(.app(.subheadline).weight(.semibold))
                 if challenge.isPrivate {
-                    Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary)
+                    Image(systemName: "lock.fill").font(.app(.caption)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(challenge.status.title).font(.caption).foregroundStyle(.secondary)
+                Text(challenge.status.title).font(.app(.caption)).foregroundStyle(.secondary)
             }
             if let days = challenge.durationDays {
                 ProgressView(value: min(1, Double(progress.daysPassed) / Double(days))).tint(Theme.accent)
                 Text("День \(min(progress.daysPassed, days)) из \(days) · подъёмов \(progress.successDays)")
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             } else {
                 Text("Бессрочный · идёт \(Words.days(progress.daysPassed)) · подъёмов \(progress.successDays)")
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
             if challenge.status == .active {
                 Button("Остановить", role: .destructive) { confirmStop = true }
-                    .font(.caption)
+                    .font(.app(.caption))
             }
         }
         .padding(.vertical, 4)
@@ -287,7 +287,7 @@ struct ChallengeEditView: View {
                     Picker("Цель", selection: $goal) {
                         ForEach(goals) { Text($0.title).tag($0) }
                     }
-                    Text(goal.detail).font(.footnote).foregroundStyle(.secondary)
+                    Text(goal.detail).font(.app(.footnote)).foregroundStyle(.secondary)
                     if goal == .wakeBefore {
                         DatePicker("Встать не позже", selection: $wakeBefore, displayedComponents: .hourAndMinute)
                             .environment(\.locale, Locale(identifier: "ru_RU"))
@@ -357,8 +357,8 @@ struct SpeciesPickerView: View {
                             } label: {
                                 VStack(spacing: 6) {
                                     TreeView(stage: 6, wilt: 0, species: species, flowers: true).frame(height: 130)
-                                    Text(species.title).font(.headline)
-                                    Text(species.detail).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                                    Text(species.title).font(.app(.headline))
+                                    Text(species.detail).font(.app(.caption)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                                 }
                                 .padding(10)
                                 .frame(maxWidth: .infinity)
@@ -421,14 +421,14 @@ struct GardenView: View {
             VStack(spacing: 8) {
                 if let selected {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(selected.species.title) №\(selected.index + 1)").font(.headline)
+                        Text("\(selected.species.title) №\(selected.index + 1)").font(.app(.headline))
                         if selected.isCurrent && !showingPreview {
                             Text("Растёт сейчас: \(TreeState.stageTitles[min(selected.stage, 7)]), \(snapshot.tree.progress) из \(TreeState.cycle) подъёмов")
-                                .font(.subheadline).foregroundStyle(.secondary)
+                                .font(.app(.subheadline)).foregroundStyle(.secondary)
                         } else if let date = selected.grownAt {
-                            Text("Выросло \(Format.fullDate(date))").font(.subheadline).foregroundStyle(.secondary)
+                            Text("Выросло \(Format.fullDate(date))").font(.app(.subheadline)).foregroundStyle(.secondary)
                         } else {
-                            Text(TreeState.stageTitles[min(selected.stage, 7)]).font(.subheadline).foregroundStyle(.secondary)
+                            Text(TreeState.stageTitles[min(selected.stage, 7)]).font(.app(.subheadline)).foregroundStyle(.secondary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -440,7 +440,7 @@ struct GardenView: View {
                          : (snapshot.garden.isEmpty
                             ? "Первое дерево переедет в сад после \(TreeState.cycle) подъёмов. Сейчас у него \(snapshot.tree.progress)."
                             : "В саду \(snapshot.garden.count) \(HoursWon.plural(snapshot.garden.count, "дерево", "дерева", "деревьев")). Коснитесь дерева, чтобы узнать о нём."))
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .multilineTextAlignment(.center)
                         .padding(12)
                         .frame(maxWidth: .infinity)
@@ -489,8 +489,8 @@ struct GardenListView: View {
                     HStack {
                         TreeView(stage: 7, wilt: 0, species: species, flowers: true, fruits: true).frame(width: 44, height: 50)
                         VStack(alignment: .leading) {
-                            Text("\(species.title) №\(tree.index + 1)").font(.subheadline.weight(.semibold))
-                            Text("выросло \(Format.fullDate(tree.date))").font(.caption).foregroundStyle(.secondary)
+                            Text("\(species.title) №\(tree.index + 1)").font(.app(.subheadline).weight(.semibold))
+                            Text("выросло \(Format.fullDate(tree.date))").font(.app(.caption)).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -500,8 +500,8 @@ struct GardenListView: View {
                              flowers: snapshot.tree.flowers, fruits: snapshot.tree.fruits)
                         .frame(width: 44, height: 50)
                     VStack(alignment: .leading) {
-                        Text("Растёт сейчас").font(.subheadline.weight(.semibold))
-                        Text("\(snapshot.tree.progress) из \(TreeState.cycle) подъёмов").font(.caption).foregroundStyle(.secondary)
+                        Text("Растёт сейчас").font(.app(.subheadline).weight(.semibold))
+                        Text("\(snapshot.tree.progress) из \(TreeState.cycle) подъёмов").font(.app(.caption)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -523,8 +523,8 @@ struct TreePreviewView: View {
                     ForEach(0..<8, id: \.self) { stage in
                         VStack {
                             TreeView(stage: stage, wilt: 0).frame(height: 140)
-                            Text(TreeState.stageTitles[stage]).font(.subheadline.weight(.semibold))
-                            Text(Words.wakes(TreeState.thresholds[stage])).font(.caption).foregroundStyle(.secondary)
+                            Text(TreeState.stageTitles[stage]).font(.app(.subheadline).weight(.semibold))
+                            Text(Words.wakes(TreeState.thresholds[stage])).font(.app(.caption)).foregroundStyle(.secondary)
                         }
                         .padding(10)
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))

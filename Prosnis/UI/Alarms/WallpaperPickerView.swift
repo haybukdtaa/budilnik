@@ -17,8 +17,8 @@ struct WallpaperPickerView: View {
                     ZStack {
                         Theme.card
                         VStack(spacing: 6) {
-                            Image(systemName: "plus").font(.title2)
-                            Text("Своё фото").font(.footnote)
+                            Image(systemName: "plus").font(.app(.title2))
+                            Text("Своё фото").font(.app(.footnote))
                         }
                         .foregroundStyle(Theme.accent)
                     }
@@ -62,9 +62,9 @@ struct WallpaperPickerView: View {
                 .clipped()
                 .opacity(0.35)
             VStack(spacing: 6) {
-                Image(systemName: "lock.fill").font(.title2)
-                Text(Theme.wallpaperNames[index]).font(.footnote.weight(.semibold))
-                Text("За приглашённого друга").font(.caption2)
+                Image(systemName: "lock.fill").font(.app(.title2))
+                Text(Theme.wallpaperNames[index]).font(.app(.footnote).weight(.semibold))
+                Text("За приглашённого друга").font(.app(.caption2))
             }
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
@@ -82,13 +82,13 @@ struct WallpaperPickerView: View {
                     .frame(maxWidth: .infinity)
                     .clipped()
                 Text(title)
-                    .font(.footnote.weight(.semibold))
+                    .font(.app(.footnote).weight(.semibold))
                     .foregroundStyle(.white)
                     .shadow(radius: 4)
                     .padding(10)
                 if selection == wallpaper {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.title3)
+                        .font(.app(.title3))
                         .foregroundStyle(.white)
                         .padding(8)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)

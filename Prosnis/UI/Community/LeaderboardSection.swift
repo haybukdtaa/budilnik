@@ -12,7 +12,7 @@ struct LeaderboardSection: View {
                     ForEach(LeaderboardKind.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                Text(kind.detail).font(.footnote).foregroundStyle(.secondary)
+                Text(kind.detail).font(.app(.footnote)).foregroundStyle(.secondary)
             }
 
             if !settings.data.privacy.joinLeaderboards {
@@ -29,18 +29,18 @@ struct LeaderboardSection: View {
                             Image(systemName: "crown.fill").foregroundStyle(.yellow)
                             AvatarView(profile: record.profile, size: 34)
                             VStack(alignment: .leading) {
-                                Text(record.profile.displayName).font(.headline)
-                                Text("Держится с \(Format.dateTime(record.since))").font(.caption).foregroundStyle(.secondary)
+                                Text(record.profile.displayName).font(.app(.headline))
+                                Text("Держится с \(Format.dateTime(record.since))").font(.app(.caption)).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text("\(record.value)").font(.title3.bold())
+                            Text("\(record.value)").font(.app(.title3).bold())
                         }
                     }
                 }
                 Section("Лучшие") {
                     ForEach(board.rows) { row in
                         HStack(spacing: 12) {
-                            Text("\(row.rank)").font(.headline).frame(width: 30)
+                            Text("\(row.rank)").font(.app(.headline)).frame(width: 30)
                             AvatarView(profile: row.profile, size: 32)
                             Text(row.profile.displayName + (row.profile.id == settings.data.profile.id ? " (вы)" : ""))
                                 .fontWeight(row.profile.id == settings.data.profile.id ? .bold : .regular)
@@ -69,17 +69,17 @@ struct RegionSection: View {
             if AppConfig.regionCommunities.isEmpty {
                 Section {
                     Text("Сообщества регионов появятся позже")
-                        .font(.headline)
+                        .font(.app(.headline))
                     Text("Здесь будут ссылки на модерируемые группы для своего региона. Общий чат с незнакомыми людьми мы сознательно не делаем внутри приложения: он требует постоянной модерации и отдельных обязательств по закону.")
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                 }
             } else {
                 ForEach(AppConfig.regionCommunities) { link in
                     Link(destination: link.url) {
                         VStack(alignment: .leading) {
-                            Text(link.title).font(.headline)
-                            Text(link.region).font(.caption).foregroundStyle(.secondary)
+                            Text(link.title).font(.app(.headline))
+                            Text(link.region).font(.app(.caption)).foregroundStyle(.secondary)
                         }
                     }
                 }

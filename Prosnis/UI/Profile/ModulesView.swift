@@ -15,7 +15,7 @@ struct ModulesView: View {
                         Label {
                             VStack(alignment: .leading) {
                                 Text(module.title)
-                                Text(module.subtitle).font(.caption).foregroundStyle(.secondary)
+                                Text(module.subtitle).font(.app(.caption)).foregroundStyle(.secondary)
                             }
                         } icon: {
                             Image(systemName: module.icon)
@@ -157,12 +157,12 @@ struct PrayerSettingsView: View {
                             Image(systemName: "moon.haze").foregroundStyle(.secondary)
                         }
                         Text("восход \(day.sunrise.map(Format.time) ?? "—")")
-                            .font(.caption)
+                            .font(.app(.caption))
                             .foregroundStyle(.secondary)
                     }
                 }
                 Text("Значок луны: время по правилу высоких широт.")
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
             }

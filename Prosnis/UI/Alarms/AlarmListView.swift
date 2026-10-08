@@ -47,7 +47,7 @@ struct AlarmListView: View {
                         item.module = settings.data.modules.first ?? .basic
                         editing = item
                     } label: {
-                        Image(systemName: "plus.circle.fill").font(.title2)
+                        Image(systemName: "plus.circle.fill").font(.app(.title2))
                     }
                 }
             }
@@ -56,11 +56,11 @@ struct AlarmListView: View {
                     showBedtime = true
                 } label: {
                     Label("Ложусь спать", systemImage: "moon.stars.fill")
-                        .font(.headline)
+                        .font(.app(.headline))
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 16))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.white)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -118,7 +118,7 @@ struct AlarmListView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(Theme.accent)
             Text("Пока нет будильников")
-                .font(.title3.bold())
+                .font(.app(.title3).bold())
             Text("Нажмите «+», чтобы добавить первый")
                 .foregroundStyle(.secondary)
         }
@@ -157,16 +157,16 @@ private struct AlarmRow: View {
                         Image(systemName: "lock.fill")
                     }
                 }
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 if store.isScheduleFailed(alarm) {
                     Label("Не поставлен в систему: проверьте разрешение на будильники", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.orange)
                 } else if alarm.needsDatedSchedule, let next {
                     Text("Ближайший: \(Format.weekday(next)), \(Format.time(next))")
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                 }
             }

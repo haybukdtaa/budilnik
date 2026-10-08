@@ -21,21 +21,21 @@ struct ChronicleView: View {
                     let item = snapshot.unlocked.first { $0.id == badge.id }
                     HStack(spacing: 12) {
                         Image(systemName: badge.icon)
-                            .font(.title3)
+                            .font(.app(.title3))
                             .frame(width: 32)
                             .foregroundStyle(unlockedIDs.contains(badge.id) ? Theme.accent : Color.secondary)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 4) {
-                                Text(badge.title).font(.subheadline.weight(.semibold))
+                                Text(badge.title).font(.app(.subheadline).weight(.semibold))
                                 if badge.isPrivate {
-                                    Image(systemName: "lock.fill").font(.caption2).foregroundStyle(.secondary)
+                                    Image(systemName: "lock.fill").font(.app(.caption2)).foregroundStyle(.secondary)
                                 }
                             }
-                            Text(badge.detail).font(.caption).foregroundStyle(.secondary)
+                            Text(badge.detail).font(.app(.caption)).foregroundStyle(.secondary)
                         }
                         Spacer()
                         if let item {
-                            Text(Format.dateTime(item.date)).font(.caption2).foregroundStyle(.secondary)
+                            Text(Format.dateTime(item.date)).font(.app(.caption2)).foregroundStyle(.secondary)
                         }
                     }
                     .opacity(item == nil ? 0.5 : 1)
@@ -48,10 +48,10 @@ struct ChronicleView: View {
                 } else {
                     ForEach(challenges.finished) { challenge in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(challenge.title).font(.subheadline.weight(.semibold))
+                            Text(challenge.title).font(.app(.subheadline).weight(.semibold))
                             Text("\(challenge.status.title) · с \(Format.dateTime(challenge.startDate))" +
                                  (challenge.endedAt.map { " по \(Format.dateTime($0))" } ?? ""))
-                                .font(.caption)
+                                .font(.app(.caption))
                                 .foregroundStyle(.secondary)
                         }
                     }

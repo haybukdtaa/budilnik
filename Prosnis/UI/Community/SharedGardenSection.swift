@@ -10,9 +10,9 @@ struct SharedGardenSection: View {
         ScrollView {
             VStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Растите дерево вместе").font(.headline)
+                    Text("Растите дерево вместе").font(.app(.headline))
                     Text("Каждое ваше успешное утро поливает общее дерево. Если кто-то проспал, дерево не вянет — просто в этот день растёт меньше. А если полили все, оно растёт вдвое быстрее. Друзья видят, полили ли вы сегодня и сколько раз всего. Время будильника и деньги им не видны.")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -58,19 +58,19 @@ private struct GardenCard: View {
                 TreeView(stage: garden.stage, wilt: 0, species: garden.species)
                     .frame(width: 100, height: 120)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(garden.name).font(.title3.bold())
+                    Text(garden.name).font(.app(.title3).bold())
                     Text("\(garden.species.title) · \(TreeState.stageTitles[min(garden.stage, 7)])")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                     Text("Сегодня полили: \(garden.wateredToday) из \(garden.members.count)")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline).weight(.semibold))
                         .foregroundStyle(garden.wateredToday == garden.members.count ? Color.green : Theme.accent)
                     if let left = garden.toNextStage {
                         Text("До следующей стадии: \(left) \(HoursWon.plural(left, "полив", "полива", "поливов"))")
-                            .font(.caption)
+                            .font(.app(.caption))
                             .foregroundStyle(.secondary)
                     } else {
-                        Text("Дерево выросло полностью!").font(.caption).foregroundStyle(.green)
+                        Text("Дерево выросло полностью!").font(.app(.caption)).foregroundStyle(.green)
                     }
                 }
                 Spacer(minLength: 0)
@@ -81,10 +81,10 @@ private struct GardenCard: View {
                     AvatarView(profile: member.profile, size: 30)
                     Text(member.profile.id == settings.data.profile.id ? "Вы" : member.profile.displayName)
                     if member.isOwner {
-                        Image(systemName: "crown.fill").font(.caption).foregroundStyle(.yellow)
+                        Image(systemName: "crown.fill").font(.app(.caption)).foregroundStyle(.yellow)
                     }
                     Spacer()
-                    Text("\(member.waterings)").font(.caption).foregroundStyle(.secondary)
+                    Text("\(member.waterings)").font(.app(.caption)).foregroundStyle(.secondary)
                     Image(systemName: member.wateredToday ? "drop.fill" : "drop")
                         .foregroundStyle(member.wateredToday ? Color.blue : Color.secondary)
                 }
@@ -96,11 +96,11 @@ private struct GardenCard: View {
                         Label("Позвать друга · \(garden.inviteCode)", systemImage: "person.badge.plus")
                     }
                 } else {
-                    Text("В саду максимум \(SharedGarden.maxMembers) человек").font(.caption).foregroundStyle(.secondary)
+                    Text("В саду максимум \(SharedGarden.maxMembers) человек").font(.app(.caption)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Выйти", role: .destructive) { confirmLeave = true }
-                    .font(.footnote)
+                    .font(.app(.footnote))
             }
         }
         .padding(16)

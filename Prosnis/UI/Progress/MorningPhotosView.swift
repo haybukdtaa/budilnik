@@ -42,7 +42,7 @@ struct MorningPhotoCard: View {
     var body: some View {
         let day = AppSettings.dayKey(date)
         VStack(alignment: .leading, spacing: 10) {
-            Label("Утреннее фото", systemImage: "camera").font(.headline)
+            Label("Утреннее фото", systemImage: "camera").font(.app(.headline))
             if photos.days.contains(day), let image = photos.image(for: day) {
                 Image(uiImage: image)
                     .resizable()
@@ -50,10 +50,10 @@ struct MorningPhotoCard: View {
                     .frame(height: 180)
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                Button("Переснять") { showCamera = true }.font(.footnote)
+                Button("Переснять") { showCamera = true }.font(.app(.footnote))
             } else {
                 Text("Рассвет, кофе, вид из окна — одно фото в день. В конце месяца соберём из них ролик «Мой месяц утром». Фото хранятся только на телефоне.")
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                 Button("Сделать фото") { showCamera = true }
                     .buttonStyle(.bordered)
@@ -104,7 +104,7 @@ struct MorningPhotosView: View {
                                     .clipped()
                                     .overlay(alignment: .bottomLeading) {
                                         Text(Format.dayKey(day))
-                                            .font(.caption2.bold())
+                                            .font(.app(.caption2).bold())
                                             .padding(4)
                                             .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
                                             .padding(4)
@@ -141,7 +141,7 @@ struct MorningPhotosView: View {
                         .disabled(exporting)
                     }
                     if let exportError {
-                        Text(exportError).font(.footnote).foregroundStyle(.orange)
+                        Text(exportError).font(.app(.footnote)).foregroundStyle(.orange)
                     }
                 }
             }
@@ -208,7 +208,7 @@ struct SlideshowView: View {
                 VStack {
                     Spacer()
                     Text(Format.dayKey(days[index]))
-                        .font(.headline)
+                        .font(.app(.headline))
                         .padding(8)
                         .background(.black.opacity(0.5), in: Capsule())
                         .padding(.bottom, 40)
@@ -219,7 +219,7 @@ struct SlideshowView: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark.circle.fill").font(.title).foregroundStyle(.white.opacity(0.8))
+                Image(systemName: "xmark.circle.fill").font(.app(.title)).foregroundStyle(.white.opacity(0.8))
             }
             .padding()
         }

@@ -51,17 +51,17 @@ struct SavedCard: View {
         let stats = journal.monthStats()
         VStack(alignment: .leading, spacing: 6) {
             Text("За этот месяц")
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
             Text("Сохранено \(stats.saved) ₽")
-                .font(.title2.bold())
+                .font(.app(.title2).bold())
                 .foregroundStyle(Theme.accentGradient)
             Text("Встали вовремя \(stats.successes) из \(stats.total)" + (stats.streak > 1 ? " · серия \(stats.streak)" : ""))
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
             if stats.lost > 0 {
                 Text("Списано: \(stats.lost) ₽")
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
             }
         }
@@ -83,7 +83,7 @@ struct JournalListView: View {
                     Image(systemName: "list.bullet.rectangle")
                         .font(.system(size: 52))
                         .foregroundStyle(Theme.accent)
-                    Text("Дневник пока пуст").font(.title3.bold())
+                    Text("Дневник пока пуст").font(.app(.title3).bold())
                     Text("Здесь появится каждое утро: что произошло и почему списали или нет.")
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
@@ -141,17 +141,17 @@ private struct JournalRow: View {
         let (title, color) = outcomeTitle(entry)
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                Text(Format.dateTime(entry.date)).font(.headline)
+                Text(Format.dateTime(entry.date)).font(.app(.headline))
                 Text("\(entry.alarmTitle) · \(entry.timeText)" + (entry.isDemo == true ? " · тест" : ""))
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(color)
+                Text(title).font(.app(.subheadline).weight(.semibold)).foregroundStyle(color)
                 if entry.outcome == .failed && entry.stake > 0 {
                     Text(entry.dispute == .refunded ? "0 ₽" : "−\(entry.stake) ₽")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 }
             }

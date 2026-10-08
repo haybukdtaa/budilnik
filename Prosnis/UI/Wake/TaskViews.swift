@@ -12,7 +12,7 @@ struct TypingTaskView: View {
     var body: some View {
         VStack(spacing: 14) {
             Text("Напечатайте предложение без ошибок")
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.white.opacity(0.8))
             ScrollView {
                 Text(styledSentence)
@@ -60,7 +60,7 @@ struct MathTaskView: View {
     var body: some View {
         VStack(spacing: 14) {
             Text("Пример \(min(index + 1, problems.count)) из \(problems.count)")
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.white.opacity(0.8))
             if index < problems.count {
                 Text(problems[index].text)
@@ -81,7 +81,7 @@ struct MathTaskView: View {
                         press(key)
                     } label: {
                         Text(key)
-                            .font(.title2.weight(.semibold))
+                            .font(.app(.title2).weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 54)
                             .background(key == "✓" ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.15)),
                                         in: RoundedRectangle(cornerRadius: 14))
@@ -136,10 +136,10 @@ struct MemoryTaskView: View {
     var body: some View {
         VStack(spacing: 14) {
             Text("Раунд \(min(roundsDone + 1, TaskRules.memoryRounds)) из \(TaskRules.memoryRounds)")
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.white.opacity(0.8))
             Text(message)
-                .font(.headline)
+                .font(.app(.headline))
                 .foregroundStyle(.white)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                 ForEach(0..<MemorySequence.gridSize, id: \.self) { cell in
@@ -214,7 +214,7 @@ struct QRTaskView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18))
 
             Text(status)
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
         }
@@ -287,14 +287,14 @@ struct StepsTaskView: View {
                         .font(.system(size: 54, weight: .bold, design: .rounded))
                         .monospacedDigit()
                     Text("из \(goal) шагов")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                 }
                 .foregroundStyle(.white)
             }
             .frame(width: 220, height: 220)
 
             Text("Встаньте и пройдитесь с телефоном в руке")
-                .font(.headline)
+                .font(.app(.headline))
                 .foregroundStyle(.white)
         }
         .onAppear { counter.start(onUnavailable: onUnavailable) }

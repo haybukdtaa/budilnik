@@ -23,8 +23,8 @@ struct RecoveryCodeView: View {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                         ForEach(Array(words.enumerated()), id: \.offset) { index, word in
                             HStack(spacing: 4) {
-                                Text("\(index + 1).").font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                                Text(word).font(.body.weight(.medium))
+                                Text("\(index + 1).").font(.app(.caption)).foregroundStyle(.secondary).monospacedDigit()
+                                Text(word).font(.app(.body).weight(.medium))
                                 Spacer(minLength: 0)
                             }
                         }
@@ -113,7 +113,7 @@ struct FriendNumberRow: View {
                     }
                     Spacer()
                     if AppConfig.serverURL == nil {
-                        Text("демо").font(.caption).foregroundStyle(.secondary)
+                        Text("демо").font(.app(.caption)).foregroundStyle(.secondary)
                     }
                 }
             }

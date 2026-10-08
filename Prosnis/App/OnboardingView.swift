@@ -37,11 +37,11 @@ struct OnboardingView: View {
                 }
             } label: {
                 Text(page < 3 ? "Дальше" : "Начать")
-                    .font(.headline)
+                    .font(.app(.headline))
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 16))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.white)
             }
             .padding(16)
         }
@@ -55,7 +55,7 @@ struct OnboardingView: View {
                 .font(.system(size: 72))
                 .foregroundStyle(Theme.accent)
             Text(title)
-                .font(.title.bold())
+                .font(.app(.title).bold())
                 .multilineTextAlignment(.center)
             Text(text)
                 .multilineTextAlignment(.center)
@@ -68,7 +68,7 @@ struct OnboardingView: View {
     private var modulesPage: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Для чего вам будильник?")
-                .font(.title2.bold())
+                .font(.app(.title2).bold())
                 .padding(.top, 32)
             Text("Можно выбрать несколько. Изменить можно в Профиле.")
                 .foregroundStyle(.secondary)
@@ -79,8 +79,8 @@ struct OnboardingView: View {
                     HStack(spacing: 12) {
                         Image(systemName: module.icon).frame(width: 28)
                         VStack(alignment: .leading) {
-                            Text(module.title).font(.headline)
-                            Text(module.subtitle).font(.caption).foregroundStyle(.secondary)
+                            Text(module.title).font(.app(.headline))
+                            Text(module.subtitle).font(.app(.caption)).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Image(systemName: modules.contains(module) ? "checkmark.circle.fill" : "circle")
@@ -93,7 +93,7 @@ struct OnboardingView: View {
             }
             if modules.contains(.prayer) {
                 Text("Всё, что связано с намазом, остаётся на телефоне, пока вы сами не разрешите иное.")
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -104,7 +104,7 @@ struct OnboardingView: View {
     private var profilePage: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Пара деталей")
-                .font(.title2.bold())
+                .font(.app(.title2).bold())
                 .padding(.top, 32)
             TextField("Ваше имя для друзей", text: $name)
                 .padding(12)
@@ -115,7 +115,7 @@ struct OnboardingView: View {
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
             Toggle("Мне \(AppConfig.adultAge) лет или больше", isOn: $isAdult)
             Text("Нужно для ставок и чатов. Без этого будильник, задания и прогресс работают полностью.")
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
             Button("Разрешить будильники") {
                 Task {
@@ -127,7 +127,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.bordered)
             if let permissionText {
-                Text(permissionText).font(.footnote).foregroundStyle(.secondary)
+                Text(permissionText).font(.app(.footnote)).foregroundStyle(.secondary)
             }
             Spacer()
         }

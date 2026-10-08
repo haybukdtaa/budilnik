@@ -54,7 +54,7 @@ struct BedtimeView: View {
                         dismiss()
                     } label: {
                         Text("Спокойной ночи")
-                            .font(.headline)
+                            .font(.app(.headline))
                             .frame(maxWidth: .infinity)
                     }
                 }

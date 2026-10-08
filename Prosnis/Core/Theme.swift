@@ -1,15 +1,96 @@
+import CoreText
 import SwiftUI
 import UIKit
 
+extension Font {
+    /// Шрифт приложения для стиля текста: Lora для заголовков, Manrope для остального.
+    static func app(_ style: Font.TextStyle) -> Font {
+        let ui: UIFont.TextStyle
+        switch style {
+        case .largeTitle: ui = .largeTitle
+        case .title: ui = .title1
+        case .title2: ui = .title2
+        case .title3: ui = .title3
+        case .headline: ui = .headline
+        case .subheadline: ui = .subheadline
+        case .callout: ui = .callout
+        case .footnote: ui = .footnote
+        case .caption: ui = .caption1
+        case .caption2: ui = .caption2
+        default: ui = .body
+        }
+        return Font(Theme.uiFont(for: ui))
+    }
+}
+
 enum Theme {
-    static let background = Color(red: 0.04, green: 0.04, blue: 0.06)
-    static let card = Color(red: 0.09, green: 0.09, blue: 0.12)
-    static let accent = Color(red: 1.0, green: 0.54, blue: 0.24)
+    /// Фон «Небо на рассвете»: персиковый сверху, сиреневый в середине, голубой внизу.
+    static let skyTop = Color(red: 0.976, green: 0.788, blue: 0.714)
+    static let skyMiddle = Color(red: 0.910, green: 0.765, blue: 0.878)
+    static let skyBottom = Color(red: 0.725, green: 0.784, blue: 0.949)
+    static let background = LinearGradient(colors: [skyTop, skyMiddle, skyBottom], startPoint: .top, endPoint: .bottom)
+    /// Полупрозрачные белые карточки поверх неба.
+    static let card = Color.white.opacity(0.58)
+    /// Тёмный сливовый текст вместо чёрного.
+    static let ink = Color(red: 0.165, green: 0.141, blue: 0.251)
+    static let accent = Color(red: 0.482, green: 0.361, blue: 0.788)
     static let accentGradient = LinearGradient(
-        colors: [Color(red: 1.0, green: 0.62, blue: 0.25), Color(red: 1.0, green: 0.36, blue: 0.30)],
+        colors: [Color(red: 0.58, green: 0.45, blue: 0.88), Color(red: 0.482, green: 0.361, blue: 0.788)],
         startPoint: .leading,
         endPoint: .trailing
     )
+    static let leaf = Color(red: 0.365, green: 0.643, blue: 0.541)
+
+    /// Шрифт с нужной толщиной. Lora и Manrope — переменные шрифты: толщина задаётся осью «wght».
+    static func uiFont(_ family: String, size: CGFloat, weight: CGFloat) -> UIFont {
+        let wght = 0x7767_6874 // 'wght'
+        let descriptor = UIFontDescriptor(fontAttributes: [
+            .family: family,
+            UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): [wght: weight],
+        ])
+        return UIFont(descriptor: descriptor, size: size)
+    }
+
+    /// Заголовки — Lora (с засечками, как в книге), остальное — Manrope.
+    static func uiFont(for style: UIFont.TextStyle) -> UIFont {
+        let font: UIFont
+        switch style {
+        case .largeTitle: font = uiFont("Lora", size: 34, weight: 500)
+        case .title1: font = uiFont("Lora", size: 28, weight: 500)
+        case .title2: font = uiFont("Lora", size: 22, weight: 500)
+        case .title3: font = uiFont("Lora", size: 20, weight: 500)
+        case .headline: font = uiFont("Manrope", size: 17, weight: 650)
+        case .subheadline: font = uiFont("Manrope", size: 15, weight: 450)
+        case .callout: font = uiFont("Manrope", size: 16, weight: 450)
+        case .footnote: font = uiFont("Manrope", size: 13, weight: 450)
+        case .caption1: font = uiFont("Manrope", size: 12, weight: 500)
+        case .caption2: font = uiFont("Manrope", size: 11, weight: 500)
+        default: font = uiFont("Manrope", size: 17, weight: 450)
+        }
+        // Крупный шрифт из настроек iPhone тоже работает.
+        return UIFontMetrics(forTextStyle: style).scaledFont(for: font)
+    }
+
+    /// Внешний вид навигации и вкладок в новом стиле.
+    @MainActor
+    static func applyAppearance() {
+        let bar = UINavigationBarAppearance()
+        bar.configureWithTransparentBackground()
+        let ink = UIColor(ink)
+        bar.largeTitleTextAttributes = [.font: uiFont(for: .largeTitle), .foregroundColor: ink]
+        bar.titleTextAttributes = [.font: uiFont("Lora", size: 18, weight: 500), .foregroundColor: ink]
+        UINavigationBar.appearance().standardAppearance = bar
+        UINavigationBar.appearance().scrollEdgeAppearance = bar
+        UINavigationBar.appearance().compactAppearance = bar
+        let tabItem = UITabBarItemAppearance()
+        tabItem.normal.titleTextAttributes = [.font: uiFont("Manrope", size: 11, weight: 600)]
+        tabItem.selected.titleTextAttributes = [.font: uiFont("Manrope", size: 11, weight: 700)]
+        let tabs = UITabBarAppearance()
+        tabs.configureWithDefaultBackground()
+        tabs.stackedLayoutAppearance = tabItem
+        UITabBar.appearance().standardAppearance = tabs
+        UITabBar.appearance().scrollEdgeAppearance = tabs
+    }
 
     /// Готовые фоны будильника.
     static let wallpaperNames = ["Рассвет", "Океан", "Лес", "Ночь", "Закат", "Лёд", "Аврора"]

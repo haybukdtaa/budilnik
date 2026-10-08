@@ -21,7 +21,7 @@ struct ProfileView: View {
                         HStack(spacing: 14) {
                             AvatarView(profile: settings.data.profile, size: 56)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(settings.data.profile.displayName).font(.title3.bold())
+                                Text(settings.data.profile.displayName).font(.app(.title3).bold())
                                 Text("\(snapshot.title) · уровень \(snapshot.level) · серия \(snapshot.currentStreak)")
                                     .foregroundStyle(.secondary)
                             }
@@ -36,7 +36,7 @@ struct ProfileView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Label("Зачем я встаю", systemImage: "heart.text.square")
                             Text(settings.wakeReason.map { "«\($0)»" } ?? "Напишите свою причину: она будет на экране задания и утром")
-                                .font(.caption)
+                                .font(.app(.caption))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
                         }
@@ -51,7 +51,7 @@ struct ProfileView: View {
                             Label("Код восстановления", systemImage: "key")
                             if !settings.data.recoverySaved {
                                 Text("Запишите \(RecoveryPhrase.wordCount) слов: без них аккаунт не вернуть на новом телефоне")
-                                    .font(.caption)
+                                    .font(.app(.caption))
                                     .foregroundStyle(.orange)
                             }
                         }
@@ -112,7 +112,7 @@ struct ProfileView: View {
                             .foregroundStyle(.secondary)
                     }
                     Text("Производственный календарь РФ заложен на 2026 и 2027 годы (постановление № 1187 от 17.09.2026). Для других лет учитываются праздники и обычные переносы.")
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -190,7 +190,7 @@ struct ProfileEditView: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 10) {
                     ForEach(ProfileEditView.avatars, id: \.self) { emoji in
                         Text(emoji)
-                            .font(.title2)
+                            .font(.app(.title2))
                             .frame(width: 36, height: 36)
                             .background(settings.data.profile.avatar == emoji ? Theme.accent.opacity(0.35) : Color.clear, in: Circle())
                             .onTapGesture { settings.data.profile.avatar = emoji }
@@ -256,7 +256,7 @@ struct PaymentsView: View {
                             .foregroundStyle(status.isOK ? Color.green : Color.orange)
                         VStack(alignment: .leading) {
                             Text(status.message)
-                            Text("Проверено \(Format.dateTime(status.checkedAt))").font(.caption).foregroundStyle(.secondary)
+                            Text("Проверено \(Format.dateTime(status.checkedAt))").font(.app(.caption)).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -283,7 +283,7 @@ struct PaymentsView: View {
                         VStack(alignment: .leading) {
                             Text(record.kind.title)
                             Text(Format.dateTime(record.date) + (record.isTraining ? " · тренировка" : ""))
-                                .font(.caption)
+                                .font(.app(.caption))
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()

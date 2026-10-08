@@ -22,7 +22,7 @@ struct MorningView: View {
                 VStack(spacing: 16) {
                     VStack(spacing: 4) {
                         Text("Доброе утро!")
-                            .font(.largeTitle.bold())
+                            .font(.app(.largeTitle).bold())
                         Text(Format.dateTime(state.startedAt))
                             .foregroundStyle(.secondary)
                         if let reason = settings.wakeReason {
@@ -43,12 +43,12 @@ struct MorningView: View {
                         } label: {
                             card {
                                 HStack(spacing: 12) {
-                                    Image(systemName: "book.fill").font(.title2).foregroundStyle(Theme.accent)
+                                    Image(systemName: "book.fill").font(.app(.title2)).foregroundStyle(Theme.accent)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Открыта глава \(index + 1): «\(series.chapters[index].title)»")
-                                            .font(.headline)
+                                            .font(.app(.headline))
                                             .multilineTextAlignment(.leading)
-                                        Text(series.title).font(.subheadline).foregroundStyle(.secondary)
+                                        Text(series.title).font(.app(.subheadline)).foregroundStyle(.secondary)
                                     }
                                     Spacer(minLength: 0)
                                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
@@ -63,7 +63,7 @@ struct MorningView: View {
                     if !checklist.isEmpty {
                         card {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("Утренний чек-лист").font(.headline)
+                                Text("Утренний чек-лист").font(.app(.headline))
                                 ForEach(checklist, id: \.self) { item in
                                     Button {
                                         if done.contains(item) { done.remove(item) } else { done.insert(item) }
@@ -78,7 +78,7 @@ struct MorningView: View {
                                     .buttonStyle(.plain)
                                 }
                                 Text("+2 опыта за каждый пункт")
-                                    .font(.caption)
+                                    .font(.app(.caption))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -92,11 +92,11 @@ struct MorningView: View {
                         wake.finishMorning()
                     } label: {
                         Text("Готово")
-                            .font(.headline)
+                            .font(.app(.headline))
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 16))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                     }
                 }
                 .padding(16)
@@ -119,7 +119,7 @@ struct MorningView: View {
                     .frame(width: 110, height: 130)
                 VStack(alignment: .leading, spacing: 6) {
                     if gained > 0 {
-                        Text("+\(gained) опыта").font(.title2.bold()).foregroundStyle(Theme.accentGradient)
+                        Text("+\(gained) опыта").font(.app(.title2).bold()).foregroundStyle(Theme.accentGradient)
                     }
                     if Titles.changed(fromLevel: state.levelBefore, toLevel: snapshot.level) {
                         Label("Новое звание: \(snapshot.title)", systemImage: "arrow.up.circle.fill")
@@ -131,25 +131,25 @@ struct MorningView: View {
                         .foregroundStyle(.secondary)
                     if movedToGarden {
                         Text("Дерево выросло и переехало в ваш сад! Сажаем новое.")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.app(.subheadline).weight(.semibold))
                             .foregroundStyle(.green)
                     } else if tree.stage > state.treeStageBefore {
                         Text("Дерево выросло: \(tree.title)")
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(.green)
                     } else {
                         Text(tree.title)
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                     }
                     if tree.fruits && !state.fruitsBefore {
-                        Text("Появились плоды: месяц без провалов").font(.subheadline).foregroundStyle(.green)
+                        Text("Появились плоды: месяц без провалов").font(.app(.subheadline)).foregroundStyle(.green)
                     } else if tree.flowers && !state.flowersBefore {
-                        Text("Дерево зацвело: неделя без провалов").font(.subheadline).foregroundStyle(.pink)
+                        Text("Дерево зацвело: неделя без провалов").font(.app(.subheadline)).foregroundStyle(.pink)
                     }
                     ForEach(newBadges) { item in
                         Label("Значок: \(item.badge.title)", systemImage: item.badge.icon)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.app(.subheadline).weight(.semibold))
                             .foregroundStyle(Theme.accent)
                     }
                 }
@@ -195,7 +195,7 @@ private struct ProgramCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: icon).font(.headline)
+            Label(title, systemImage: icon).font(.app(.headline))
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -276,7 +276,7 @@ struct PrayerTodayView: View {
             }
             if day.fajrAdjusted {
                 Text("Время Фаджра посчитано по правилу высоких широт.")
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
         }

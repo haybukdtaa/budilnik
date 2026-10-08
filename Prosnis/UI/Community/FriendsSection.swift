@@ -46,7 +46,7 @@ struct FriendsSection: View {
                     ForEach(social.friendRequests) { request in
                         HStack(spacing: 12) {
                             AvatarView(profile: request.from, size: 34)
-                            Text(request.from.displayName).font(.subheadline.weight(.semibold))
+                            Text(request.from.displayName).font(.app(.subheadline).weight(.semibold))
                             Spacer()
                             Button("Принять") { Task { await social.answer(request, accept: true) } }
                                 .buttonStyle(.borderedProminent)
@@ -69,8 +69,8 @@ struct FriendsSection: View {
                         HStack(spacing: 12) {
                             AvatarView(profile: notice.friend, size: 34)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("\(notice.friend.displayName) проспал(а)").font(.subheadline.weight(.semibold))
-                                Text(Format.dayKey(notice.day)).font(.caption).foregroundStyle(.secondary)
+                                Text("\(notice.friend.displayName) проспал(а)").font(.app(.subheadline).weight(.semibold))
+                                Text(Format.dayKey(notice.day)).font(.app(.caption)).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -92,7 +92,7 @@ struct FriendsSection: View {
                         HStack(spacing: 12) {
                             AvatarView(profile: friend.profile)
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(friend.profile.displayName).font(.headline)
+                                Text(friend.profile.displayName).font(.app(.headline))
                                 StatusLine(status: friend.status)
                             }
                             Spacer()
@@ -109,9 +109,9 @@ struct FriendsSection: View {
                 Section("Парные челленджи") {
                     ForEach(social.pairs) { pair in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("\(pair.title) · с \(pair.partner.displayName)").font(.subheadline.weight(.semibold))
+                            Text("\(pair.title) · с \(pair.partner.displayName)").font(.app(.subheadline).weight(.semibold))
                             Text("Вы: \(pair.myDays) из \(pair.durationDays) · \(pair.partner.displayName): \(pair.partnerDays) из \(pair.durationDays)")
-                                .font(.caption)
+                                .font(.app(.caption))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -125,8 +125,8 @@ struct FriendsSection: View {
                             Image(systemName: reward.unlocked ? "gift.fill" : "lock.fill")
                                 .foregroundStyle(reward.unlocked ? Theme.accent : Color.secondary)
                             VStack(alignment: .leading) {
-                                Text(reward.title).font(.subheadline.weight(.semibold))
-                                Text(reward.detail).font(.caption).foregroundStyle(.secondary)
+                                Text(reward.title).font(.app(.subheadline).weight(.semibold))
+                                Text(reward.detail).font(.app(.caption)).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -205,8 +205,8 @@ struct FriendDetailView: View {
                     HStack(spacing: 14) {
                         AvatarView(profile: friend.profile, size: 64)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(friend.profile.displayName).font(.title2.bold())
-                            Text("Друзья с \(Format.dateTime(friend.since))").font(.caption).foregroundStyle(.secondary)
+                            Text(friend.profile.displayName).font(.app(.title2).bold())
+                            Text("Друзья с \(Format.dateTime(friend.since))").font(.app(.caption)).foregroundStyle(.secondary)
                         }
                     }
                     StatusLine(status: friend.status)
@@ -322,7 +322,7 @@ struct PairCreateView: View {
                 TextField("Название", text: $title)
                 Stepper("Дней: \(days)", value: $days, in: 3...365)
                 Text("Оба должны не сорваться. Прогресс виден вам обоим. Чтобы было честно, засчитываются только утра с повторной проверкой: включите её в будильнике, если он без ставки.")
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
             }
             .navigationTitle("Вместе с \(friend.profile.displayName)")

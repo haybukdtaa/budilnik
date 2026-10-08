@@ -14,7 +14,7 @@ struct WakeTaskView: View {
 
             VStack(spacing: 14) {
                 Text(session.stage == 1 ? "Задание 1 из 2" : "Повторная проверка · задание 2 из 2")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.app(.subheadline).weight(.semibold))
                     .foregroundStyle(.white.opacity(0.8))
 
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -28,7 +28,7 @@ struct WakeTaskView: View {
                 if let reason = settings.wakeReason {
                     // Две строки максимум и низший приоритет: задание важнее, его нельзя сжимать.
                     Text("«\(reason)»")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .italic()
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
@@ -37,7 +37,7 @@ struct WakeTaskView: View {
                 }
 
                 Label(session.taskKind.title, systemImage: session.taskKind.icon)
-                    .font(.headline)
+                    .font(.app(.headline))
                     .foregroundStyle(.white)
 
                 taskBody
@@ -91,9 +91,9 @@ struct RecheckBanner: View {
             let remaining = max(0, Int(target.timeIntervalSince(context.date)))
             VStack(spacing: 2) {
                 Text("Повторная проверка через \(String(format: "%02d:%02d", remaining / 60, remaining % 60))")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.app(.subheadline).weight(.semibold))
                 Text("Не засыпайте: будильник зазвонит снова")
-                    .font(.caption)
+                    .font(.app(.caption))
             }
             .foregroundStyle(.black)
             .frame(maxWidth: .infinity)

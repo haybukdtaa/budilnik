@@ -101,7 +101,7 @@ final class GardenSceneController: NSObject {
 
     // Камера по орбите вокруг центра сада.
     private var azimuth: Float = 0.7
-    private var elevation: Float = 0.38
+    private var elevation: Float = 0.5
     private var distance: Float = 9
     private var minDistance: Float = 3
     private var maxDistance: Float = 30
@@ -165,7 +165,7 @@ final class GardenSceneController: NSObject {
         if daytime == .night || daytime == .evening { addFireflies(radius: groundRadius, count: daytime == .night ? 26 : 10) }
 
         maxDistance = max(12, groundRadius * 3.2)
-        distance = min(maxDistance, max(6.5, groundRadius * 2.2))
+        distance = min(maxDistance, max(8, groundRadius * 2.9))
         target = SIMD3(0, grown.isEmpty ? 0.7 : 1.1, 0)
         root.addChild(camera)
         camera.camera.fieldOfViewInDegrees = 48
@@ -205,7 +205,7 @@ final class GardenSceneController: NSObject {
         // Мягкая подсветка с другой стороны, чтобы тени не были чёрными.
         let fill = DirectionalLight()
         fill.light.color = GardenPalette.fillColor(daytime)
-        fill.light.intensity = GardenPalette.sunIntensity(daytime) * 0.35
+        fill.light.intensity = GardenPalette.sunIntensity(daytime) * 0.6
         fill.look(at: .zero, from: [-radius, 4, -radius * 1.2], relativeTo: nil)
         root.addChild(fill)
     }
@@ -350,7 +350,7 @@ enum GardenPalette {
     static func sky(_ time: GardenDaytime) -> UIColor {
         switch time {
         case .dawn: return UIColor(red: 0.97, green: 0.86, blue: 0.80, alpha: 1)
-        case .day: return UIColor(red: 0.84, green: 0.90, blue: 0.93, alpha: 1)
+        case .day: return UIColor(red: 0.89, green: 0.86, blue: 0.95, alpha: 1)
         case .evening: return UIColor(red: 0.95, green: 0.78, blue: 0.68, alpha: 1)
         case .night: return UIColor(red: 0.13, green: 0.15, blue: 0.22, alpha: 1)
         }
@@ -412,7 +412,7 @@ enum GardenTreeBuilder {
         }
         let s = scale(spec)
         let height = trunkHeight(spec)
-        let radius = (spec.species == .palm ? 0.05 : 0.06) + 0.09 * s
+        let radius = (spec.species == .palm ? 0.04 : 0.045) + 0.055 * s
         let trunk = GardenMeshes.make(GardenMeshes.cylinder, GardenPalette.matte(trunkColor(spec.species)), [radius, height, radius])
         trunk.position.y = height / 2
         tree.addChild(trunk)
@@ -490,7 +490,7 @@ enum GardenTreeBuilder {
         case .birch: return UIColor(red: 0.93, green: 0.91, blue: 0.87, alpha: 1)
         case .palm: return UIColor(red: 0.69, green: 0.55, blue: 0.40, alpha: 1)
         case .sakura: return UIColor(red: 0.43, green: 0.32, blue: 0.29, alpha: 1)
-        default: return UIColor(red: 0.53, green: 0.41, blue: 0.31, alpha: 1)
+        default: return UIColor(red: 0.62, green: 0.49, blue: 0.39, alpha: 1)
         }
     }
 

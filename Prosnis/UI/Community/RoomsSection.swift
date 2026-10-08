@@ -41,13 +41,13 @@ struct RoomsSection: View {
                     RoomDetailView(roomID: room.id)
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(room.name).font(.headline)
+                        Text(room.name).font(.app(.headline))
                         Text(room.topic ?? "\(room.members.count) участников")
-                            .font(.caption)
+                            .font(.app(.caption))
                             .foregroundStyle(.secondary)
                         let woke = room.members.filter { $0.status?.woke == true && Calendar.current.isDateInToday($0.status!.day) }.count
                         Text("Сегодня встали \(woke) из \(room.members.count)")
-                            .font(.caption)
+                            .font(.app(.caption))
                             .foregroundStyle(Theme.accent)
                     }
                 }
@@ -137,11 +137,11 @@ struct RoomDetailView: View {
         if let room {
             List {
                 Section {
-                    if let topic = room.topic { Text(topic).font(.headline) }
+                    if let topic = room.topic { Text(topic).font(.app(.headline)) }
                     if let target = room.targetWakeMinutes {
                         Label("Цель: встать до \(String(format: "%02d:%02d", target / 60, target % 60))", systemImage: "target")
                     }
-                    if let rules = room.rules { Text(rules).font(.footnote).foregroundStyle(.secondary) }
+                    if let rules = room.rules { Text(rules).font(.app(.footnote)).foregroundStyle(.secondary) }
                     HStack {
                         Text("Код: \(room.inviteCode)").font(.system(.body, design: .monospaced))
                         Spacer()
@@ -159,7 +159,7 @@ struct RoomDetailView: View {
                                     TreeView(stage: member.status?.treeStage ?? 0, wilt: 0,
                                              species: member.status?.treeSpecies ?? .oak)
                                         .frame(width: 70, height: 80)
-                                    Text(member.profile.displayName).font(.caption2)
+                                    Text(member.profile.displayName).font(.app(.caption2))
                                 }
                             }
                         }
@@ -245,14 +245,14 @@ struct ChatView: View {
                             if !(await social.send(value, to: conversation)) && text.isEmpty { text = value }
                         }
                     } label: {
-                        Image(systemName: "arrow.up.circle.fill").font(.title)
+                        Image(systemName: "arrow.up.circle.fill").font(.app(.title))
                     }
                     .disabled(!ContentFilter.isSendable(text))
                 }
                 .padding(12)
             } else {
                 Text("Чаты доступны с \(AppConfig.adultAge) лет. Подтвердить возраст можно в Профиле.")
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .padding(12)
             }
@@ -269,14 +269,14 @@ struct ChatView: View {
             if mine { Spacer(minLength: 40) }
             VStack(alignment: mine ? .trailing : .leading, spacing: 2) {
                 if !mine {
-                    Text(message.author.displayName).font(.caption2).foregroundStyle(.secondary)
+                    Text(message.author.displayName).font(.app(.caption2)).foregroundStyle(.secondary)
                 }
                 Text(message.text)
                     .padding(10)
                     .background(mine ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.card),
                                 in: RoundedRectangle(cornerRadius: 14))
-                    .foregroundStyle(mine ? Color.black : Color.primary)
-                Text(Format.time(message.sentAt)).font(.caption2).foregroundStyle(.secondary)
+                    .foregroundStyle(mine ? Color.white : Color.primary)
+                Text(Format.time(message.sentAt)).font(.app(.caption2)).foregroundStyle(.secondary)
             }
             .contextMenu {
                 if !mine {

@@ -46,11 +46,11 @@ struct CommunityView: View {
                 if social.isDemo {
                     ToolbarItem(placement: .topBarTrailing) {
                         Text("ДЕМО")
-                            .font(.caption.bold())
+                            .font(.app(.caption).bold())
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Theme.accent, in: Capsule())
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                     }
                 }
             }
@@ -77,7 +77,7 @@ struct OfflineBanner: View {
                     .font(.system(size: 52))
                     .foregroundStyle(Theme.accent)
                 Text("Друзья, комнаты и таблицы заработают, когда подключим сервер")
-                    .font(.title3.bold())
+                    .font(.app(.title3).bold())
                     .multilineTextAlignment(.center)
                 Text("Приложение уже готово к нему. Чтобы посмотреть, как это будет выглядеть, включите демо-режим: в нём вымышленные люди, а ваши настоящие данные никуда не уходят.")
                     .multilineTextAlignment(.center)
@@ -97,10 +97,10 @@ struct StatsCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "sunrise.fill").font(.title2).foregroundStyle(Theme.accent)
+            Image(systemName: "sunrise.fill").font(.app(.title2)).foregroundStyle(Theme.accent)
             VStack(alignment: .leading) {
-                Text("Сегодня встали \(stats.wokeToday.formatted()) человек").font(.subheadline.weight(.semibold))
-                Text("Идёт челленджей: \(stats.activeChallenges.formatted())").font(.caption).foregroundStyle(.secondary)
+                Text("Сегодня встали \(stats.wokeToday.formatted()) человек").font(.app(.subheadline).weight(.semibold))
+                Text("Идёт челленджей: \(stats.activeChallenges.formatted())").font(.app(.caption)).foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -141,10 +141,10 @@ struct StatusLine: View {
                     Text(Titles.title(forLevel: level)).foregroundStyle(.secondary)
                 }
             }
-            .font(.caption)
+            .font(.app(.caption))
         } else {
             Text("Статус скрыт или ещё не обновлялся")
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
         }
     }
