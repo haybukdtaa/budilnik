@@ -151,6 +151,20 @@ final class HTTPBackend: SocialBackend, SyncBackend {
         try await get("v1/witness-notices", as: [WitnessNotice].self)
     }
 
+    private struct DayBody: Codable { var day: String }
+
+    func gardens() async throws -> [SharedGarden] { try await get("v1/gardens", as: [SharedGarden].self) }
+    func createGarden(_ draft: GardenDraft) async throws -> SharedGarden {
+        try await send("POST", "v1/gardens", body: draft, as: SharedGarden.self)
+    }
+    func joinGarden(code: String) async throws -> SharedGarden {
+        try await send("POST", "v1/gardens/join", body: CodeBody(code: code), as: SharedGarden.self)
+    }
+    func leaveGarden(_ id: UUID) async throws { try await call("POST", "v1/gardens/\(id.uuidString)/leave", body: Empty()) }
+    func waterGardens(day: String) async throws -> [SharedGarden] {
+        try await send("POST", "v1/me/water", body: DayBody(day: day), as: [SharedGarden].self)
+    }
+
     /// Регистрация устройства без пароля: id пользователя + секрет из связки ключей → токен.
     /// Повторный вызов с тем же секретом возвращает тот же аккаунт.
     func register(profile: UserProfile, secret: String) async throws -> String {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct ProsnisApp: App {
@@ -11,6 +12,10 @@ struct ProsnisApp: App {
     @StateObject private var payments = PaymentsStore.shared
     @StateObject private var sync = SyncEngine.shared
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        UNUserNotificationCenter.current().delegate = NotificationRouter.shared
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -58,6 +63,8 @@ struct ProsnisApp: App {
         await payments.retryPending()
         await payments.checkIfNeeded()
         social.sendPendingWitnessNotice()
+        social.sendPendingGardenWater()
+        await WeeklyNotification.update(enabled: settings.data.weeklySummaryOn)
         await AccountStore.shared.ensureSignedIn()
         let backend = BackendRegistry.current
         if backend.isOnline && !backend.isDemo {
@@ -76,6 +83,8 @@ struct RootView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var wake: WakeCoordinator
     @ObservedObject private var alarmStore = AlarmStore.shared
+    @ObservedObject private var router = NotificationRouter.shared
+    @State private var tab = 0
     /// Человек закрыл условия, не согласившись: до следующего запуска не спрашиваем.
     @State private var consentPostponed = false
 
@@ -89,8 +98,9 @@ struct RootView: View {
         if !settings.data.onboardingDone {
             OnboardingView()
         } else {
-            TabView {
+            TabView(selection: $tab) {
                 AlarmListView()
+                    .tag(0)
                     .tabItem { Label("Будильники", systemImage: "alarm") }
                     .sheet(isPresented: Binding(
                         get: { reconsentAmount != nil },
@@ -103,10 +113,16 @@ struct RootView: View {
                     }
                 ProgressTabView()
                     .tabItem { Label("Прогресс", systemImage: "chart.line.uptrend.xyaxis") }
+                    .tag(1)
+                    .sheet(isPresented: $router.showWeekly) {
+                        NavigationStack { WeeklySummaryView() }
+                    }
                 CommunityView()
                     .tabItem { Label("Сообщество", systemImage: "person.3") }
+                    .tag(2)
                 ProfileView()
                     .tabItem { Label("Профиль", systemImage: "person.crop.circle") }
+                    .tag(3)
             }
             .overlay(alignment: .top) {
                 if let session = wake.session, session.phase == .waiting {
@@ -128,6 +144,9 @@ struct RootView: View {
             .sheet(item: $wake.morning) { state in
                 MorningView(state: state)
                     .preferredColorScheme(.dark)
+            }
+            .onChange(of: router.showWeekly) { _, show in
+                if show { tab = 1 }
             }
             .task {
                 // Пока приложение открыто, сверка идёт каждые 30 секунд: звонок мог прийти, пока экран был включён.

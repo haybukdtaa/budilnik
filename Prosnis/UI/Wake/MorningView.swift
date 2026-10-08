@@ -36,6 +36,30 @@ struct MorningView: View {
 
                     rewards(snapshot)
 
+                    if let index = StoryLibrary.chapterOpened(module: state.module, entries: journal.realEntries) {
+                        let series = StoryLibrary.series(for: state.module)
+                        NavigationLink {
+                            StoryChapterView(series: series, index: index)
+                        } label: {
+                            card {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "book.fill").font(.title2).foregroundStyle(Theme.accent)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Открыта глава \(index + 1): «\(series.chapters[index].title)»")
+                                            .font(.headline)
+                                            .multilineTextAlignment(.leading)
+                                        Text(series.title).font(.subheadline).foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    MorningPhotoCard(date: state.startedAt)
+
                     if !checklist.isEmpty {
                         card {
                             VStack(alignment: .leading, spacing: 10) {

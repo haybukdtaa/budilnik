@@ -67,6 +67,8 @@ enum AppFiles {
                 try? manager.removeItem(at: item)
             }
         }
+        // Записи своего голоса лежат вне Documents (в Library/Sounds).
+        VoiceLibrary.wipeFiles()
         if let domain = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: domain)
         }

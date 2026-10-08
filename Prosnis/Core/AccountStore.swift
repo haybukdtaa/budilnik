@@ -103,6 +103,9 @@ final class AccountStore: ObservableObject {
         AppSettings.shared.reload()
         SocialStore.shared.resetAfterWipe()
         DemoBackend.shared.reload()
+        VoiceLibrary.shared.reload()
+        MorningPhotoStore.shared.reload()
+        await WeeklyNotification.update(enabled: false)
         // Последним: перезагрузки выше могли поставить изменения в очередь.
         SyncEngine.shared.clear()
         return nil

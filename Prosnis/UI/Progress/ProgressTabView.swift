@@ -16,7 +16,25 @@ struct ProgressTabView: View {
                 VStack(spacing: 14) {
                     treeCard(snapshot)
                     levelCard(snapshot)
-                    weekCard(snapshot)
+                    NavigationLink {
+                        WeeklySummaryView()
+                    } label: {
+                        weekCard(snapshot)
+                    }
+                    .buttonStyle(.plain)
+                    HoursWonCard()
+                    NavigationLink {
+                        StoriesView()
+                    } label: {
+                        row(icon: "book.fill", title: "Утренние истории", detail: "Глава за каждое успешное утро")
+                    }
+                    .buttonStyle(.plain)
+                    NavigationLink {
+                        MorningPhotosView()
+                    } label: {
+                        row(icon: "photo.on.rectangle", title: "Мои утра", detail: "Фото дня и ролик за месяц")
+                    }
+                    .buttonStyle(.plain)
                     if journal.realEntries.contains(where: { $0.stake > 0 }) {
                         SavedCard()
                     }

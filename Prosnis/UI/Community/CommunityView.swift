@@ -7,6 +7,7 @@ struct CommunityView: View {
 
     enum Part: String, CaseIterable, Identifiable {
         case friends = "Друзья"
+        case garden = "Сад"
         case rooms = "Комнаты"
         case leaderboards = "Таблицы"
         case region = "Регион"
@@ -32,6 +33,7 @@ struct CommunityView: View {
                 } else {
                     switch section {
                     case .friends: FriendsSection()
+                    case .garden: SharedGardenSection()
                     case .rooms: RoomsSection()
                     case .leaderboards: LeaderboardSection()
                     case .region: EmptyView()

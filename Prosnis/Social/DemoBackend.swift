@@ -15,6 +15,10 @@ final class DemoBackend: SocialBackend, SyncBackend {
         var messages: [String: [ChatMessage]]
         var pairs: [PairChallenge]
         var myStatus: PublicStatus?
+        /// Общие сады (nil у демо-данных старых версий).
+        var gardens: [SharedGarden]?
+        /// День, которым я уже поливал сады.
+        var wateredDay: String?
     }
 
     private var state: State
@@ -112,7 +116,7 @@ final class DemoBackend: SocialBackend, SyncBackend {
                           startDate: now.addingTimeInterval(-5 * 86400), myDays: 0, partnerDays: 5, status: .active),
         ]
 
-        return State(friends: friends, rooms: [family, club], messages: messages, pairs: pairs, myStatus: nil)
+        return State(friends: friends, rooms: [family, club], messages: messages, pairs: pairs, myStatus: nil, gardens: nil, wateredDay: nil)
     }
 
     private static func key(_ conversation: ConversationID) -> String {
@@ -317,6 +321,77 @@ final class DemoBackend: SocialBackend, SyncBackend {
 
     func notifyWitnesses(_ notice: MissedMorningNotice) async throws {
         // Вымышленные друзья: сообщение никуда не уходит.
+    }
+
+    // MARK: - Общие сады
+
+    private func demoGardens() -> [SharedGarden] {
+        if let gardens = state.gardens { return gardens }
+        let people = state.friends.prefix(2).map(\.profile)
+        var members = people.enumerated().map { index, profile in
+            GardenMember(profile: profile, wateredToday: index == 0, waterings: 24 - index * 6, isOwner: index == 0)
+        }
+        members.append(GardenMember(profile: me, wateredToday: false, waterings: 0, isOwner: false))
+        let garden = SharedGarden(
+            id: UUID(), name: "Утренний сад", species: .sakura, inviteCode: "SAD5KQ",
+            members: members, growth: 41, createdAt: Date().addingTimeInterval(-30 * 86400)
+        )
+        state.gardens = [garden]
+        save()
+        return [garden]
+    }
+
+    func gardens() async throws -> [SharedGarden] { demoGardens() }
+
+    func createGarden(_ draft: GardenDraft) async throws -> SharedGarden {
+        let garden = SharedGarden(
+            id: UUID(), name: draft.name, species: draft.species, inviteCode: makeCode(),
+            members: [GardenMember(profile: me, wateredToday: false, waterings: 0, isOwner: true)],
+            growth: 0, createdAt: Date()
+        )
+        state.gardens = demoGardens() + [garden]
+        save()
+        return garden
+    }
+
+    func joinGarden(code: String) async throws -> SharedGarden {
+        guard let cleaned = validCode(code) else { throw BackendError.invalidCode }
+        var all = demoGardens()
+        if let existing = all.first(where: { $0.inviteCode == cleaned }) { return existing }
+        let garden = SharedGarden(
+            id: UUID(), name: "Сад \(cleaned)", species: .oak, inviteCode: cleaned,
+            members: [
+                GardenMember(profile: DemoBackend.person("Хозяин сада", "🌳"), wateredToday: true, waterings: 5, isOwner: true),
+                GardenMember(profile: me, wateredToday: false, waterings: 0, isOwner: false),
+            ],
+            growth: 5, createdAt: Date()
+        )
+        all.append(garden)
+        state.gardens = all
+        save()
+        return garden
+    }
+
+    func leaveGarden(_ id: UUID) async throws {
+        state.gardens = demoGardens().filter { $0.id != id }
+        save()
+    }
+
+    func waterGardens(day: String) async throws -> [SharedGarden] {
+        var all = demoGardens()
+        guard state.wateredDay != day else { return all }
+        for gardenIndex in all.indices {
+            guard let memberIndex = all[gardenIndex].members.firstIndex(where: { $0.profile.id == me.id }),
+                  !all[gardenIndex].members[memberIndex].wateredToday else { continue }
+            let before = all[gardenIndex].wateredToday
+            all[gardenIndex].growth += SharedGarden.growthForWatering(wateredBefore: before, members: all[gardenIndex].members.count)
+            all[gardenIndex].members[memberIndex].wateredToday = true
+            all[gardenIndex].members[memberIndex].waterings += 1
+        }
+        state.gardens = all
+        state.wateredDay = day
+        save()
+        return all
     }
 
     func witnessNotices() async throws -> [WitnessNotice] {

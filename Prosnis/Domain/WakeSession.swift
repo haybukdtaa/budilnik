@@ -67,6 +67,10 @@ struct WakeSession: Codable {
     var queuedRings: [String: Date]?
     /// Для задания, начатого из очереди: настоящее время звонка.
     var originalRing: Date?
+    /// Будет ли повторная проверка. nil — данные старой версии, где она была всегда.
+    var withRecheck: Bool?
+
+    var needsRecheck: Bool { withRecheck != false }
 
     var deadline: Date { ringDate.addingTimeInterval(WakeRules.windowSeconds) }
 }

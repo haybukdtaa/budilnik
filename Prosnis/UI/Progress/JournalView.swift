@@ -187,8 +187,15 @@ struct JournalDetailView: View {
                             Text("\(entry.charged) ₽").foregroundStyle(.secondary)
                         }
                     }
+                    if entry.outcome == .success {
+                        HStack {
+                            Text("Повторная проверка")
+                            Spacer()
+                            Text(entry.rechecked == false ? "не было" : "пройдена").foregroundStyle(.secondary)
+                        }
+                    }
                 } footer: {
-                    if entry.isTraining {
+                    if entry.isTraining && entry.stake > 0 {
                         Text("Тренировка: деньги не списывались.")
                     }
                 }

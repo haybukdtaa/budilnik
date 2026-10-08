@@ -278,7 +278,7 @@ struct PairCreateView: View {
             Form {
                 TextField("Название", text: $title)
                 Stepper("Дней: \(days)", value: $days, in: 3...365)
-                Text("Оба должны не сорваться. Прогресс виден вам обоим.")
+                Text("Оба должны не сорваться. Прогресс виден вам обоим. Чтобы было честно, засчитываются только утра с повторной проверкой: включите её в будильнике, если он без ставки.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

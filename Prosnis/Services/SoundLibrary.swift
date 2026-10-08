@@ -11,12 +11,20 @@ enum SoundCategory: String, CaseIterable {
 struct SoundOption: Identifiable, Hashable {
     let id: String // совпадает с именем файла без расширения
     let title: String
-    let category: SoundCategory
+    let category: SoundCategory?
+    /// Своя запись голоса (лежит в Library/Sounds, а не в приложении).
+    var isVoice = false
 
-    var fileName: String { id + ".wav" }
+    var fileName: String { id + (isVoice ? ".caf" : ".wav") }
+
+    var url: URL? {
+        isVoice ? VoiceLibrary.fileURL(soundID: id) : Bundle.main.url(forResource: id, withExtension: "wav")
+    }
 }
 
 enum SoundLibrary {
+    static let defaultID = "classic_beep"
+
     static let all: [SoundOption] = [
         SoundOption(id: "melody_morning", title: "Утро", category: .melodies),
         SoundOption(id: "melody_chimes", title: "Колокольчики", category: .melodies),
@@ -31,8 +39,21 @@ enum SoundLibrary {
         SoundOption(id: "rising_tone", title: "Нарастающий тон", category: .signals),
     ]
 
+    /// Звук по id. Своя запись, если её файл на месте; иначе — встроенный звук или классический сигнал.
+    @MainActor
     static func option(_ id: String) -> SoundOption {
-        all.first { $0.id == id } ?? all.first { $0.id == "classic_beep" }!
+        if VoiceLibrary.isVoice(id) {
+            if let recording = VoiceLibrary.shared.recording(soundID: id),
+               FileManager.default.fileExists(atPath: VoiceLibrary.fileURL(soundID: id).path) {
+                return SoundOption(id: id, title: recording.title, category: nil, isVoice: true)
+            }
+            return builtIn(defaultID)
+        }
+        return builtIn(id)
+    }
+
+    static func builtIn(_ id: String) -> SoundOption {
+        all.first { $0.id == id } ?? all.first { $0.id == defaultID }!
     }
 
     static func options(in category: SoundCategory) -> [SoundOption] {
@@ -48,7 +69,7 @@ final class SoundPreview {
 
     func play(_ option: SoundOption) {
         stop()
-        guard let url = Bundle.main.url(forResource: option.id, withExtension: "wav") else { return }
+        guard let url = option.url else { return }
         try? AVAudioSession.sharedInstance().setCategory(.playback)
         try? AVAudioSession.sharedInstance().setActive(true)
         player = try? AVAudioPlayer(contentsOf: url)

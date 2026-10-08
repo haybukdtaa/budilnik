@@ -47,6 +47,8 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var routineTotal: Int?
     /// Ссылка на платёжную операцию по ставке этого утра.
     var paymentRef: UUID?
+    /// Была ли повторная проверка. false — утро без неё (будильник без ставки). nil — старые записи и пропуски.
+    var rechecked: Bool?
 
     /// Сколько реально списано по этой записи.
     var charged: Int {

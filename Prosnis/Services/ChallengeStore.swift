@@ -83,6 +83,7 @@ enum AppEvents {
         ChallengeStore.shared.evaluateAll()
         if isNew {
             SocialStore.shared.notifyWitnesses(about: entry)
+            SocialStore.shared.waterGardens(after: entry)
         }
         let mayLeave = entry.isPrayer != true || AppSettings.shared.data.privacy.syncPrayerData
         if entry.isDemo != true && mayLeave {

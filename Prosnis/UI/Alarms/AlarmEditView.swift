@@ -320,6 +320,16 @@ struct AlarmEditView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                if draft.stakeEnabled {
+                    Label("Повторная проверка: обязательна со ставкой", systemImage: "checkmark.shield")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Toggle("Повторная проверка через 10 минут", isOn: Binding(
+                        get: { draft.recheckEnabled == true },
+                        set: { draft.recheckEnabled = $0 }
+                    ))
+                }
                 if draft.stakeEnabled && !draft.effectiveTask.requiresGettingUp {
                     Text("Для будильника со ставкой лучше «Сканировать код» или «Пройти шаги»: их нельзя выполнить, лёжа в кровати.")
                         .font(.footnote)
@@ -327,7 +337,7 @@ struct AlarmEditView: View {
                 }
             }
         } footer: {
-            Text("Чтобы выключить будильник, нужно выполнить задание, а через 10 минут пройти повторную проверку. Со ставкой задание обязательно.")
+            Text("Чтобы выключить будильник, нужно выполнить задание. Повторная проверка через 10 минут ловит «выполнил и лёг обратно»: со ставкой она обязательна, без ставки — по желанию. В парных челленджах с друзьями засчитываются только утра с повторной проверкой.")
         }
     }
 

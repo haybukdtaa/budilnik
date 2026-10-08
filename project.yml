@@ -18,7 +18,9 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSAlarmKitUsageDescription: "Приложению нужно разрешение, чтобы будильник звонил вовремя, даже когда телефон заблокирован или в режиме «Не беспокоить»."
-        NSCameraUsageDescription: "Камера нужна для задания «Сканировать код»: утром вы сканируете код, который заранее зарегистрировали в другой комнате."
+        NSCameraUsageDescription: "Камера нужна для задания «Сканировать код» и для утреннего фото дня. Фото хранятся только на телефоне."
+        NSMicrophoneUsageDescription: "Микрофон нужен, чтобы записать свой голос и поставить его на будильник. Запись хранится только на телефоне."
+        NSPhotoLibraryAddUsageDescription: "Чтобы сохранить ролик «Мои утра» в Фото."
         NSMotionUsageDescription: "Счётчик шагов нужен для задания «Пройти шаги» и утренней программы «Спорт»."
     settings:
       base:

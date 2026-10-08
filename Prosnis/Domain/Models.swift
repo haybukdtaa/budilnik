@@ -78,9 +78,13 @@ struct AlarmItem: Identifiable, Codable, Equatable {
     var holidayMode: HolidayMode? = .off
     /// Смещение от времени Фаджра в минутах. nil = обычный будильник по часам.
     var fajrOffset: Int?
+    /// Повторная проверка через 10 минут у будильника без ставки. Со ставкой она обязательна всегда.
+    var recheckEnabled: Bool?
 
     /// Нужно ли выполнять задание, чтобы выключить будильник.
     var hasTask: Bool { stakeEnabled || taskEnabled == true }
+    /// Будет ли повторная проверка (без учёта согласия на ставку: его проверяет WakeCoordinator).
+    var wantsRecheck: Bool { stakeEnabled || recheckEnabled == true }
     var isFajr: Bool { fajrOffset != nil }
     var effectiveTask: TaskKind { taskKind ?? .typing }
     var effectiveModule: WakeModule { module ?? .basic }

@@ -175,6 +175,8 @@ final class WakeCoordinator: ObservableObject {
         // Ставка действует только при согласии с текущими условиями.
         let stake = AlarmStore.shared.isStakeActive(alarm) ? alarm.stakeAmount : 0
         let reference: UUID? = stake > 0 ? UUID() : nil
+        // Со ставкой повторная проверка обязательна; без ставки — если человек её включил.
+        let withRecheck = stake > 0 || alarm.recheckEnabled == true
 
         setSession(WakeSession(
             alarmID: alarm.id,
@@ -199,7 +201,8 @@ final class WakeCoordinator: ObservableObject {
             paymentRef: reference,
             queuedAlarmIDs: queue,
             queuedRings: queuedRings,
-            originalRing: originalRing
+            originalRing: originalRing,
+            withRecheck: withRecheck
         ))
         if let reference {
             Task { await PaymentsStore.shared.hold(amount: stake, reference: reference) }
@@ -347,6 +350,14 @@ final class WakeCoordinator: ObservableObject {
             return
         }
 
+        if !current.needsRecheck {
+            // Будильник без ставки и без повторной проверки: утро засчитано сразу.
+            current.events.append(JournalEvent(date: now, text: "Задание выполнено"))
+            emit(.taskDone, session: current, at: now)
+            finish(current, outcome: .success)
+            return
+        }
+
         let recheckAt = now.addingTimeInterval(current.recheckDelay)
         current.events.append(JournalEvent(date: now, text: "Задание выполнено"))
         current.phase = .waiting
@@ -432,7 +443,8 @@ final class WakeCoordinator: ObservableObject {
             module: finished.module,
             isPrayer: finished.isPrayer ? true : nil,
             taskKind: finished.taskKind,
-            paymentRef: finished.paymentRef
+            paymentRef: finished.paymentRef,
+            rechecked: outcome == .success ? finished.needsRecheck : nil
         )
         let wasOnTaskScreen = finished.phase == .task
         setSession(nil)

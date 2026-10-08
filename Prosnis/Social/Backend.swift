@@ -59,6 +59,13 @@ protocol SocialBackend: AnyObject {
     func notifyWitnesses(_ notice: MissedMorningNotice) async throws
     /// Друзья, у которых я свидетель и которые проспали за последние дни.
     func witnessNotices() async throws -> [WitnessNotice]
+
+    func gardens() async throws -> [SharedGarden]
+    func createGarden(_ draft: GardenDraft) async throws -> SharedGarden
+    func joinGarden(code: String) async throws -> SharedGarden
+    func leaveGarden(_ id: UUID) async throws
+    /// Полить все мои сады этим утром (день «гггг-мм-дд»). Один полив в день, повтор ничего не меняет.
+    func waterGardens(day: String) async throws -> [SharedGarden]
 }
 
 /// Синхронизация локальных данных (будильники, журнал, челленджи) с сервером.
@@ -100,6 +107,11 @@ final class OfflineBackend: SocialBackend, SyncBackend {
     func deleteAccount() async throws {}
     func notifyWitnesses(_ notice: MissedMorningNotice) async throws { throw BackendError.serverUnavailable }
     func witnessNotices() async throws -> [WitnessNotice] { try unavailable() }
+    func gardens() async throws -> [SharedGarden] { try unavailable() }
+    func createGarden(_ draft: GardenDraft) async throws -> SharedGarden { try unavailable() }
+    func joinGarden(code: String) async throws -> SharedGarden { try unavailable() }
+    func leaveGarden(_ id: UUID) async throws { throw BackendError.serverUnavailable }
+    func waterGardens(day: String) async throws -> [SharedGarden] { try unavailable() }
 
     func push(_ items: [OutboxItem]) async throws -> [UUID] { try unavailable() }
     func serverTime() async throws -> Date { try unavailable() }

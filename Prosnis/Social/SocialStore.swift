@@ -15,6 +15,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var messages: [ConversationID: [ChatMessage]] = [:]
     @Published private(set) var invite: Invite?
     @Published private(set) var witnessNotices: [WitnessNotice] = []
+    @Published private(set) var gardens: [SharedGarden] = []
     @Published private(set) var isLoading = false
     @Published var errorText: String?
 
@@ -49,6 +50,7 @@ final class SocialStore: ObservableObject {
         // Отдельно: сервер без этого раздела не должен ломать всё остальное.
         let blocked = Set(AppSettings.shared.data.blockedUsers)
         witnessNotices = ((try? await backend.witnessNotices()) ?? []).filter { !blocked.contains($0.friend.id) }
+        if let loaded = try? await backend.gardens() { gardens = loaded }
         let unlocked = rewards.filter(\.unlocked).map(\.id)
         if Set(unlocked) != Set(AppSettings.shared.data.unlockedRewards) {
             AppSettings.shared.data.unlockedRewards = unlocked
@@ -65,6 +67,7 @@ final class SocialStore: ObservableObject {
         messages = [:]
         invite = nil
         witnessNotices = []
+        gardens = []
     }
 
     // MARK: - Друзья
@@ -215,6 +218,66 @@ final class SocialStore: ObservableObject {
         await run {
             let pair = try await backend.createPairChallenge(with: friend.id, title: title, days: days)
             pairs.append(pair)
+        }
+    }
+
+    // MARK: - Общие сады
+
+    func createGarden(_ draft: GardenDraft) async -> Bool {
+        var ok = false
+        await run {
+            let garden = try await backend.createGarden(draft)
+            gardens.append(garden)
+            ok = true
+        }
+        return ok
+    }
+
+    func joinGarden(code: String) async -> Bool {
+        var ok = false
+        await run {
+            let garden = try await backend.joinGarden(code: code)
+            if !gardens.contains(where: { $0.id == garden.id }) { gardens.append(garden) }
+            ok = true
+        }
+        return ok
+    }
+
+    func leaveGarden(_ garden: SharedGarden) async {
+        await run {
+            try await backend.leaveGarden(garden.id)
+            gardens.removeAll { $0.id == garden.id }
+        }
+    }
+
+    /// Успешное утро поливает общие сады. Без сети полив ждёт следующего открытия (не дольше суток).
+    func waterGardens(after entry: JournalEntry) {
+        let settings = AppSettings.shared.data
+        guard GardenPolicy.shouldWater(entry: entry, privacy: settings.privacy, now: Date(),
+                                       lastWateredDay: settings.lastGardenWaterDay) else { return }
+        let day = WitnessPolicy.dayKey(entry.date)
+        AppSettings.shared.data.lastGardenWaterDay = day
+        AppSettings.shared.data.pendingGardenWaterDay = day
+        sendPendingGardenWater()
+    }
+
+    func sendPendingGardenWater() {
+        guard let day = AppSettings.shared.data.pendingGardenWaterDay else { return }
+        if day < WitnessPolicy.dayKey(Date().addingTimeInterval(-WitnessPolicy.freshness)) {
+            AppSettings.shared.data.pendingGardenWaterDay = nil
+            return
+        }
+        let backend = self.backend
+        guard backend.isOnline else { return }
+        Task {
+            do {
+                gardens = try await backend.waterGardens(day: day)
+                if AppSettings.shared.data.pendingGardenWaterDay == day {
+                    AppSettings.shared.data.pendingGardenWaterDay = nil
+                }
+            } catch {
+                // Останется в очереди: повторим при следующем открытии.
+            }
         }
     }
 

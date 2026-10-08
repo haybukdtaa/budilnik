@@ -32,6 +32,14 @@ struct SettingsData: Codable, Equatable {
     var pendingWitnessNotice: MissedMorningNotice?
     /// Согласие с условиями ставки.
     var stakeConsent: StakeConsent?
+    /// Во сколько человек обычно вставал до приложения (минуты от полуночи) — для «выигранных часов».
+    var usualWakeMinutes: Int?
+    /// Присылать итоги недели по воскресеньям.
+    var weeklySummaryOn = false
+    /// День («гггг-мм-дд»), которым ещё не удалось полить общие сады (нет сети).
+    var pendingGardenWaterDay: String?
+    /// Последний день, которым поливали общие сады.
+    var lastGardenWaterDay: String?
 
     init() {}
 
@@ -59,6 +67,10 @@ struct SettingsData: Codable, Equatable {
         lastWitnessNoticeDay = try c.decodeIfPresent(String.self, forKey: .lastWitnessNoticeDay)
         pendingWitnessNotice = try c.decodeIfPresent(MissedMorningNotice.self, forKey: .pendingWitnessNotice)
         stakeConsent = try c.decodeIfPresent(StakeConsent.self, forKey: .stakeConsent)
+        usualWakeMinutes = try c.decodeIfPresent(Int.self, forKey: .usualWakeMinutes)
+        weeklySummaryOn = try c.decodeIfPresent(Bool.self, forKey: .weeklySummaryOn) ?? base.weeklySummaryOn
+        pendingGardenWaterDay = try c.decodeIfPresent(String.self, forKey: .pendingGardenWaterDay)
+        lastGardenWaterDay = try c.decodeIfPresent(String.self, forKey: .lastGardenWaterDay)
     }
 }
 
