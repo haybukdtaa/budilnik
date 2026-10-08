@@ -4,7 +4,7 @@ import UserNotifications
 /// Воскресное напоминание посмотреть итоги недели.
 @MainActor
 enum WeeklyNotification {
-    static let identifier = "weekly-summary"
+    nonisolated static let identifier = "weekly-summary"
 
     static func update(enabled: Bool) async {
         let center = UNUserNotificationCenter.current()

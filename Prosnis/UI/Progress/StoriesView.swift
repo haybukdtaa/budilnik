@@ -164,9 +164,12 @@ struct WeeklySummaryView: View {
                     get: { settings.data.weeklySummaryOn },
                     set: { isOn in
                         Task {
-                            if isOn && !(await DeadlineNotifications.requestPermission()) {
-                                permissionDenied = true
-                                return
+                            if isOn {
+                                let granted = await DeadlineNotifications.requestPermission()
+                                if !granted {
+                                    permissionDenied = true
+                                    return
+                                }
                             }
                             settings.data.weeklySummaryOn = isOn
                             await WeeklyNotification.update(enabled: isOn)
