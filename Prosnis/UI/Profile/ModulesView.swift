@@ -125,7 +125,8 @@ struct PrayerSettingsView: View {
     @State private var entered = Date()
     @State private var message: String?
     @State private var messageIsError = false
-    @State private var didSetInitial = false
+    /// Человек сам поменял время в поле. До этого поле показывает расчёт для выбранного города.
+    @State private var edited = false
 
     /// Будильник на Фаджр со ставкой закрыт: менять расчёт нельзя, иначе звонок можно сдвинуть или убрать.
     private var lockedByStake: Bool {
@@ -155,7 +156,13 @@ struct PrayerSettingsView: View {
                     Text("Введите один раз время Фаджра на сегодня из источника, которому вы доверяете. Мы подберём угол и дальше будем считать по нему каждый день — и зимой, и летом.")
                         .font(.app(.footnote))
                         .foregroundStyle(.secondary)
-                    DatePicker("Фаджр сегодня у вас", selection: $entered, displayedComponents: .hourAndMinute)
+                    DatePicker("Фаджр сегодня у вас", selection: Binding(
+                        get: { edited ? entered : wallClock(PrayerTimes.day(for: Date(), settings: prayer).fajr, zone: prayer.city.timeZone) },
+                        set: { value in
+                            entered = value
+                            edited = true
+                        }
+                    ), displayedComponents: .hourAndMinute)
                     Button("Подобрать") { calibrate() }
                     if let message {
                         Label(message, systemImage: messageIsError ? "exclamationmark.circle" : "checkmark.circle")
@@ -221,15 +228,9 @@ struct PrayerSettingsView: View {
         }
         .navigationTitle("Фаджр")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            guard !didSetInitial else { return }
-            didSetInitial = true
-            entered = wallClock(PrayerTimes.day(for: Date(), settings: prayer).fajr, zone: prayer.city.timeZone)
-        }
-        // Сменили город — в поле подставляется расчётное время уже для него.
+        // Сменили город — поле снова показывает расчёт уже для него.
         .onChange(of: settings.data.prayer.cityID) { _, _ in
-            let current = settings.data.prayer
-            entered = wallClock(PrayerTimes.day(for: Date(), settings: current).fajr, zone: current.city.timeZone)
+            edited = false
             message = nil
         }
     }
@@ -252,7 +253,9 @@ struct PrayerSettingsView: View {
     }
 
     private func calibrate() {
-        let parts = Calendar.current.dateComponents([.hour, .minute], from: entered)
+        let prayerNow = settings.data.prayer
+        let chosen = edited ? entered : wallClock(PrayerTimes.day(for: Date(), settings: prayerNow).fajr, zone: prayerNow.city.timeZone)
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: chosen)
         let minutes = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
         let now = Date()
         let prayer = settings.data.prayer
