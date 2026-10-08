@@ -68,6 +68,7 @@ struct ProsnisApp: App {
         await WeeklyNotification.update(enabled: settings.data.weeklySummaryOn)
         AccountStore.shared.ensureIdentity()
         await AccountStore.shared.ensureSignedIn()
+        await AccountStore.shared.mergeRestoredData()
         let backend = BackendRegistry.current
         if backend.isOnline && !backend.isDemo {
             // Время сервера — самое надёжное для блокировки ставки.
@@ -90,6 +91,15 @@ struct RootView: View {
     /// Человек закрыл условия, не согласившись: до следующего запуска не спрашиваем.
     @State private var consentPostponed = false
 
+    /// Запуск с «-gardenPreview» (для снимка 3D-сада) работает только в отладочной сборке.
+    static var gardenPreviewRequested: Bool {
+        #if DEBUG
+        return CommandLine.arguments.contains("-gardenPreview")
+        #else
+        return false
+        #endif
+    }
+
     /// Условия ставки изменились: ставки не действуют, пока человек не согласится заново.
     private var reconsentAmount: Int? {
         guard !consentPostponed, wake.session == nil, wake.morning == nil else { return nil }
@@ -97,7 +107,7 @@ struct RootView: View {
     }
 
     var body: some View {
-        if CommandLine.arguments.contains("-gardenPreview") {
+        if RootView.gardenPreviewRequested {
             // Для снимка 3D-сада в автотестах: сразу сад, без приветствия.
             NavigationStack { GardenView(forcePreview: true) }
         } else if !settings.data.onboardingDone {

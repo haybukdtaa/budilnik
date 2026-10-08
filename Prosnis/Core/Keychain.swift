@@ -6,20 +6,22 @@ enum Keychain {
     private static let service = "app.prosnis.alarm"
 
     /// `migratable`: переносится на новый телефон с зашифрованной резервной копией.
-    static func set(_ value: String?, for key: String, migratable: Bool = false) {
+    /// Возвращает false, если записать не удалось (например, телефон ещё не разблокировали).
+    @discardableResult
+    static func set(_ value: String?, for key: String, migratable: Bool = false) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
         ]
         SecItemDelete(query as CFDictionary)
-        guard let value, let data = value.data(using: .utf8) else { return }
+        guard let value, let data = value.data(using: .utf8) else { return true }
         var item = query
         item[kSecValueData as String] = data
         item[kSecAttrAccessible as String] = migratable
             ? kSecAttrAccessibleAfterFirstUnlock
             : kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(item as CFDictionary, nil)
+        return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
     }
 
     static func get(_ key: String) -> String? {

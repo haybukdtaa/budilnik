@@ -110,14 +110,14 @@ paths:
         "404": { description: При restore=true такого аккаунта нет }
   /v1/me/backup:
     get:
-      summary: Данные аккаунта для восстановления на новом телефоне (будильники, дневник, челленджи)
+      summary: Данные аккаунта для восстановления на новом телефоне (профиль, приватность, будильники, дневник, челленджи)
       responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { alarms: { type: array, items: { type: object } }, journal: { type: array, items: { type: object } }, challenges: { type: array, items: { type: object } } } } } } } }
   /v1/friend-requests:
     get:
       summary: Входящие заявки в друзья
       responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { type: object, properties: { id: { type: string, format: uuid }, from: { $ref: "#/components/schemas/UserProfile" }, sentAt: { type: string, format: date-time } } } } } } } }
     post:
-      summary: Заявка по номеру. Дружба начинается только после принятия. Не больше 20 заявок в сутки; 404 — номера нет
+      summary: Заявка по номеру. Дружба начинается только после принятия. Не больше 20 заявок в сутки; после отказа — повтор тому же человеку не раньше чем через 30 дней; от заблокировавшего — не доставляется; 404 — номера нет
       requestBody: { content: { application/json: { schema: { type: object, properties: { number: { type: string } } } } } }
       responses: { "200": { description: OK } }
   /v1/friend-requests/{id}/accept:

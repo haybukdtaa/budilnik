@@ -296,7 +296,7 @@ struct ChallengeEditView: View {
                 Section("Срок") {
                     Picker("Длительность", selection: $duration) {
                         ForEach(ChallengeEditView.durations, id: \.self) { value in
-                            Text(value.map { "\($0) дней" } ?? "Бессрочно").tag(value)
+                            Text(value.map { Words.days($0) } ?? "Бессрочно").tag(value)
                         }
                     }
                 }
@@ -332,7 +332,7 @@ struct ChallengeEditView: View {
     }
 
     private var defaultTitle: String {
-        let span = duration.map { "\($0) дней" } ?? "без срока"
+        let span = duration.map { Words.days($0) } ?? "без срока"
         return "\(goal.title), \(span)"
     }
 }
@@ -524,7 +524,7 @@ struct TreePreviewView: View {
                         VStack {
                             TreeView(stage: stage, wilt: 0).frame(height: 140)
                             Text(TreeState.stageTitles[stage]).font(.subheadline.weight(.semibold))
-                            Text("\(TreeState.thresholds[stage]) подъёмов").font(.caption).foregroundStyle(.secondary)
+                            Text(Words.wakes(TreeState.thresholds[stage])).font(.caption).foregroundStyle(.secondary)
                         }
                         .padding(10)
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))

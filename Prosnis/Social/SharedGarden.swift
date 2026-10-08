@@ -76,6 +76,8 @@ struct FriendRequest: Codable, Identifiable, Equatable {
 
 /// Данные аккаунта с сервера для восстановления на новом телефоне.
 struct RestoreSnapshot: Codable {
+    var profile: UserProfile?
+    var privacy: PrivacySettings?
     var alarms: [AlarmItem]?
     var journal: [JournalEntry]?
     var challenges: [Challenge]?

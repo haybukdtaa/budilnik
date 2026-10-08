@@ -183,8 +183,7 @@ final class GardenSceneController: NSObject {
             let color = spec.species == .sakura ? GardenPalette.petal : GardenPalette.blossom
             let height = GardenTreeBuilder.trunkHeight(spec) + 0.4
             for i in 0..<(spec.species == .sakura ? 9 : 4) {
-                let petal = ModelEntity(mesh: .generateBox(size: [0.05, 0.008, 0.035], cornerRadius: 0.004),
-                                        materials: [GardenPalette.matte(color)])
+                let petal = GardenMeshes.make(GardenMeshes.box, GardenPalette.matte(color), [0.05, 0.008, 0.035])
                 let angle = Float(i) * 2.1 + Float(spec.index)
                 let origin = SIMD3<Float>(cos(angle) * 0.6, height, sin(angle) * 0.6)
                 petal.position = origin
@@ -212,13 +211,11 @@ final class GardenSceneController: NSObject {
     }
 
     private func addGround(radius: Float) {
-        let ground = ModelEntity(mesh: .generateCylinder(height: 0.24, radius: radius),
-                                 materials: [GardenPalette.matte(GardenPalette.grass(daytime))])
+        let ground = GardenMeshes.make(GardenMeshes.cylinder, GardenPalette.matte(GardenPalette.grass(daytime)), [radius, 0.24, radius])
         ground.position.y = -0.12
         root.addChild(ground)
         // Земляной край острова.
-        let soil = ModelEntity(mesh: .generateCylinder(height: 0.5, radius: radius * 0.97),
-                               materials: [GardenPalette.matte(GardenPalette.soil)])
+        let soil = GardenMeshes.make(GardenMeshes.cylinder, GardenPalette.matte(GardenPalette.soil), [radius * 0.97, 0.5, radius * 0.97])
         soil.position.y = -0.45
         root.addChild(soil)
 
@@ -229,17 +226,15 @@ final class GardenSceneController: NSObject {
             let distance = (random.next().squareRoot()) * (radius - 0.3)
             let position = SIMD3<Float>(cos(angle) * distance, 0, sin(angle) * distance)
             if length(position) < 0.9 { continue }
-            let tuft = ModelEntity(mesh: .generateCone(height: 0.12 + random.next() * 0.12, radius: 0.035),
-                                   materials: [GardenPalette.matte(GardenPalette.tuft)])
+            let tuft = GardenMeshes.make(GardenMeshes.cone, GardenPalette.matte(GardenPalette.tuft), [0.035, 0.12 + random.next() * 0.12, 0.035])
             tuft.position = position + [0, 0.06, 0]
             root.addChild(tuft)
         }
         for _ in 0..<Int(radius * 2) {
             let angle = random.next() * 2 * .pi
             let distance = 1.2 + random.next() * (radius - 1.6)
-            let stone = ModelEntity(mesh: .generateSphere(radius: 0.09 + random.next() * 0.1),
-                                    materials: [GardenPalette.matte(GardenPalette.stone)])
-            stone.scale = [1.4, 0.55, 1.1]
+            let size = 0.09 + random.next() * 0.1
+            let stone = GardenMeshes.make(GardenMeshes.sphere, GardenPalette.matte(GardenPalette.stone), [size * 1.4, size * 0.55, size * 1.1])
             stone.position = [cos(angle) * distance, 0.02, sin(angle) * distance]
             root.addChild(stone)
         }
@@ -248,7 +243,7 @@ final class GardenSceneController: NSObject {
     private func addFireflies(radius: Float, count: Int) {
         var random = SeededRandom(seed: 21)
         for i in 0..<count {
-            let fly = ModelEntity(mesh: .generateSphere(radius: 0.025), materials: [UnlitMaterial(color: GardenPalette.firefly)])
+            let fly = GardenMeshes.make(GardenMeshes.sphere, UnlitMaterial(color: GardenPalette.firefly), SIMD3(repeating: 0.025))
             let angle = random.next() * 2 * .pi
             let distance = 0.8 + random.next() * (radius - 1)
             let center = SIMD3<Float>(cos(angle) * distance, 0.5 + random.next() * 1.6, sin(angle) * distance)
@@ -277,7 +272,7 @@ final class GardenSceneController: NSObject {
             let t = time * 0.5 + item.phase
             item.entity.position = item.center + [sin(t) * 0.35, sin(t * 1.7) * 0.2, cos(t * 0.8) * 0.35]
             let glow = 0.6 + 0.4 * sin(t * 3)
-            item.entity.scale = SIMD3(repeating: glow)
+            item.entity.scale = SIMD3(repeating: glow * 0.025)
         }
         // Пока сад не трогают, он медленно поворачивается.
         if Date().timeIntervalSince(lastTouch) > 4 {
@@ -321,8 +316,26 @@ final class GardenSceneController: NSObject {
     }
 }
 
+/// Общие формы единичного размера: каждая создаётся один раз, нужный размер задаёт масштаб.
+@MainActor
+enum GardenMeshes {
+    static let sphere = MeshResource.generateSphere(radius: 1)
+    static let cone = MeshResource.generateCone(height: 1, radius: 1)
+    static let cylinder = MeshResource.generateCylinder(height: 1, radius: 1)
+    static let box = MeshResource.generateBox(size: 1, cornerRadius: 0.1)
+
+    static func make(_ mesh: MeshResource, _ material: any Material, _ scale: SIMD3<Float>) -> ModelEntity {
+        let entity = ModelEntity(mesh: mesh, materials: [material])
+        entity.scale = scale
+        return entity
+    }
+}
+
 /// Мягкие цвета сада.
+@MainActor
 enum GardenPalette {
+    private static var materials: [String: SimpleMaterial] = [:]
+
     static let soil = UIColor(red: 0.55, green: 0.42, blue: 0.33, alpha: 1)
     static let tuft = UIColor(red: 0.52, green: 0.66, blue: 0.47, alpha: 1)
     static let stone = UIColor(red: 0.78, green: 0.76, blue: 0.72, alpha: 1)
@@ -364,12 +377,20 @@ enum GardenPalette {
         }
     }
 
+    /// Матовый материал; одинаковые цвета используют один материал.
     static func matte(_ color: UIColor) -> SimpleMaterial {
-        SimpleMaterial(color: color, roughness: .float(0.9), isMetallic: false)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let key = String(format: "%.3f-%.3f-%.3f", r, g, b)
+        if let cached = materials[key] { return cached }
+        let material = SimpleMaterial(color: color, roughness: .float(0.9), isMetallic: false)
+        materials[key] = material
+        return material
     }
 }
 
 /// Строит дерево из простых мягких форм. Вид определяет силуэт и цвета, стадия — размер.
+@MainActor
 enum GardenTreeBuilder {
     static func scale(_ spec: GardenTreeSpec) -> Float { 0.25 + 0.75 * Float(min(max(spec.stage, 0), 7)) / 7 }
 
@@ -382,10 +403,9 @@ enum GardenTreeBuilder {
         let tree = Entity()
         if spec.stage == 0 {
             // Семечко в земле.
-            let mound = ModelEntity(mesh: .generateSphere(radius: 0.18), materials: [GardenPalette.matte(GardenPalette.soil)])
-            mound.scale = [1, 0.35, 1]
+            let mound = GardenMeshes.make(GardenMeshes.sphere, GardenPalette.matte(GardenPalette.soil), [0.18, 0.063, 0.18])
             tree.addChild(mound)
-            let seed = ModelEntity(mesh: .generateSphere(radius: 0.05), materials: [GardenPalette.matte(trunkColor(spec.species))])
+            let seed = GardenMeshes.make(GardenMeshes.sphere, GardenPalette.matte(trunkColor(spec.species)), SIMD3(repeating: 0.05))
             seed.position.y = 0.06
             tree.addChild(seed)
             return tree
@@ -393,14 +413,12 @@ enum GardenTreeBuilder {
         let s = scale(spec)
         let height = trunkHeight(spec)
         let radius = (spec.species == .palm ? 0.05 : 0.06) + 0.09 * s
-        let trunk = ModelEntity(mesh: .generateCylinder(height: height, radius: radius),
-                                materials: [GardenPalette.matte(trunkColor(spec.species))])
+        let trunk = GardenMeshes.make(GardenMeshes.cylinder, GardenPalette.matte(trunkColor(spec.species)), [radius, height, radius])
         trunk.position.y = height / 2
         tree.addChild(trunk)
         if spec.species == .birch {
             for i in 0..<Int(3 + 4 * s) {
-                let mark = ModelEntity(mesh: .generateBox(size: [radius * 1.2, 0.02, radius * 0.5]),
-                                       materials: [GardenPalette.matte(UIColor(white: 0.25, alpha: 1))])
+                let mark = GardenMeshes.make(GardenMeshes.box, GardenPalette.matte(UIColor(white: 0.25, alpha: 1)), [radius * 1.2, 0.02, radius * 0.5])
                 mark.position = [0, height * (0.15 + 0.12 * Float(i)), radius * 0.7]
                 tree.addChild(mark)
             }
@@ -417,14 +435,14 @@ enum GardenTreeBuilder {
             let tiers = 2 + min(spec.stage, 4)
             for i in 0..<tiers {
                 let tierRadius = (0.85 - 0.14 * Float(i)) * s
-                let cone = ModelEntity(mesh: .generateCone(height: 0.75 * s, radius: tierRadius), materials: [leaves])
+                let cone = GardenMeshes.make(GardenMeshes.cone, leaves, [tierRadius, 0.75 * s, tierRadius])
                 cone.position.y = -0.35 * s + Float(i) * 0.38 * s
                 crown.addChild(cone)
             }
         case .palm:
             let fronds = 4 + spec.stage
             for i in 0..<fronds {
-                let frond = ModelEntity(mesh: .generateBox(size: [1.1 * s, 0.025, 0.2 * s], cornerRadius: 0.01), materials: [leaves])
+                let frond = GardenMeshes.make(GardenMeshes.box, leaves, [1.1 * s, 0.025, 0.2 * s])
                 let pivot = Entity()
                 pivot.orientation = simd_quatf(angle: Float(i) / Float(fronds) * 2 * .pi, axis: [0, 1, 0])
                     * simd_quatf(angle: -0.45, axis: [0, 0, 1])
@@ -439,7 +457,7 @@ enum GardenTreeBuilder {
             ]
             let count = min(blobs.count, 2 + spec.stage)
             for blob in blobs.prefix(count) {
-                let sphere = ModelEntity(mesh: .generateSphere(radius: blob.w * s), materials: [leaves])
+                let sphere = GardenMeshes.make(GardenMeshes.sphere, leaves, SIMD3(repeating: blob.w * s))
                 sphere.position = SIMD3(blob.x, blob.y, blob.z) * s
                 crown.addChild(sphere)
             }
@@ -461,7 +479,7 @@ enum GardenTreeBuilder {
             let theta = random.next() * 2 * .pi
             let phi = random.next() * .pi * 0.7
             let r = 0.62 * s
-            let dot = ModelEntity(mesh: .generateSphere(radius: radius), materials: [GardenPalette.matte(color)])
+            let dot = GardenMeshes.make(GardenMeshes.sphere, GardenPalette.matte(color), SIMD3(repeating: radius))
             dot.position = [r * sin(phi) * cos(theta), 0.25 * s + r * cos(phi), r * sin(phi) * sin(theta)]
             crown.addChild(dot)
         }

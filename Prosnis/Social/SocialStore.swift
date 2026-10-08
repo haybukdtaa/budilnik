@@ -241,20 +241,27 @@ final class SocialStore: ObservableObject {
             errorText = "Это ваш собственный номер."
             return false
         }
-        var ok = false
-        await run {
+        do {
             try await backend.sendFriendRequest(number: normalized)
-            ok = true
+            return true
+        } catch BackendError.notFound {
+            errorText = "Такого номера нет. Проверьте цифры."
+        } catch {
+            errorText = error.localizedDescription
         }
-        return ok
+        return false
+    }
+
+    /// Заблокировать того, кто прислал заявку: заявка отклоняется, человек больше не сможет писать.
+    func blockRequester(_ request: FriendRequest) async {
+        await block(request.from)
+        await answer(request, accept: false)
     }
 
     func answer(_ request: FriendRequest, accept: Bool) async {
         // От заблокированного человека заявку принять нельзя.
-        if accept && AppSettings.shared.isBlocked(request.from.id) {
-            friendRequests.removeAll { $0.id == request.id }
-            return
-        }
+        // От заблокированного человека заявку не принимаем — отклоняем и на сервере.
+        let accept = accept && !AppSettings.shared.isBlocked(request.from.id)
         await run {
             let friend = try await backend.answerFriendRequest(request.id, accept: accept)
             friendRequests.removeAll { $0.id == request.id }

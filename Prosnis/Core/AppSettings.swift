@@ -46,6 +46,11 @@ struct SettingsData: Codable, Equatable {
     var friendNumber: String?
     /// Человек подтвердил, что записал код восстановления.
     var recoverySaved = false
+    /// Аккаунт из кода восстановления уже создавался на этом телефоне. Если код потом пропал
+    /// (перенос без связки ключей), новый не создаётся: человек вводит свой код.
+    var identityCreated = false
+    /// Аккаунт восстановлен, но данные с сервера ещё не загрузились: повторить при открытии.
+    var pendingRestoreMerge = false
 
     init() {}
 
@@ -80,6 +85,8 @@ struct SettingsData: Codable, Equatable {
         inGardens = try c.decodeIfPresent(Bool.self, forKey: .inGardens) ?? base.inGardens
         friendNumber = try c.decodeIfPresent(String.self, forKey: .friendNumber)
         recoverySaved = try c.decodeIfPresent(Bool.self, forKey: .recoverySaved) ?? base.recoverySaved
+        identityCreated = try c.decodeIfPresent(Bool.self, forKey: .identityCreated) ?? base.identityCreated
+        pendingRestoreMerge = try c.decodeIfPresent(Bool.self, forKey: .pendingRestoreMerge) ?? base.pendingRestoreMerge
     }
 }
 

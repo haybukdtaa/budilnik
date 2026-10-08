@@ -1,6 +1,7 @@
 import Foundation
 import Security
 import SwiftUI
+import UIKit
 
 /// Аккаунт: токен сервера и удаление всех данных.
 @MainActor
@@ -10,6 +11,8 @@ final class AccountStore: ObservableObject {
     private static let tokenKey = "auth.token"
     private static let secretKey = "auth.secret"
     private static let phraseKey = "auth.phrase.v2"
+    /// Номер аккаунта, выведенный из кода (чтобы не считать PBKDF2 при каждом запуске).
+    private static let userIDKey = "auth.userid.v2"
 
     @Published private(set) var token: String?
     /// Почему не удалось войти на сервер (показывается в Профиле).
@@ -34,8 +37,12 @@ final class AccountStore: ObservableObject {
 
     /// Код восстановления из 16 слов. Создаётся один раз; из него выводятся номер аккаунта и секрет устройства.
     var recoveryWords: [String] {
-        ensureIdentity()
-        return (Keychain.get(AccountStore.phraseKey) ?? "").split(separator: " ").map(String.init)
+        (Keychain.get(AccountStore.phraseKey) ?? "").split(separator: " ").map(String.init)
+    }
+
+    /// Код восстановления пропал (перенос на новый телефон без связки ключей): нужно ввести свой код.
+    var needsRecoveryCode: Bool {
+        AppSettings.shared.data.identityCreated && Keychain.exists(AccountStore.phraseKey) == false
     }
 
     /// Номер для друзей: выданный сервером, а в демо-режиме — демонстрационный.
@@ -50,28 +57,59 @@ final class AccountStore: ObservableObject {
     /// Создаёт аккаунт из нового кода восстановления, если его ещё нет.
     /// Старый случайный секрет (версии до кода восстановления) заменяется: на сервере его ещё не было.
     func ensureIdentity() {
-        // Новый код — только если старого точно нет. Закрытая связка ключей (до первой разблокировки) — не повод.
+        // До первой разблокировки связка ключей закрыта: ничего не решаем, чтобы не создать второй аккаунт.
+        guard UIApplication.shared.isProtectedDataAvailable else { return }
+        if let phrase = Keychain.get(AccountStore.phraseKey) {
+            // Код есть (например, приложение переустановили: связка ключей пережила удаление, настройки — нет).
+            // Аккаунт всегда тот, что выводится из этого кода.
+            let userID = Keychain.get(AccountStore.userIDKey).flatMap(UUID.init(uuidString:))
+                ?? cacheUserID(for: phrase)
+            if let userID { switchProfile(to: userID) }
+            AppSettings.shared.data.identityCreated = true
+            return
+        }
         guard Keychain.exists(AccountStore.phraseKey) == false else { return }
+        // Код когда-то был, а теперь пропал: новый не создаём, человек вводит свой (см. needsRecoveryCode).
+        guard !AppSettings.shared.data.identityCreated else { return }
         let phrase = RecoveryPhrase.generate()
-        adopt(phrase: phrase)
+        _ = adopt(phrase: phrase, identity: RecoveryPhrase.identity(for: phrase))
     }
 
-    /// Делает этот код восстановления кодом текущего аккаунта.
-    private func adopt(phrase: [String]) {
-        let identity = RecoveryPhrase.identity(for: phrase)
+    private func cacheUserID(for phrase: String) -> UUID? {
+        let words = phrase.split(separator: " ").map(String.init)
+        guard words.count == RecoveryPhrase.wordCount else { return nil }
+        let userID = RecoveryPhrase.identity(for: words).userID
+        Keychain.set(userID.uuidString, for: AccountStore.userIDKey, migratable: true)
+        return userID
+    }
+
+    /// Делает этот код восстановления кодом текущего аккаунта. Аккаунт меняется,
+    /// только если всё записалось в связку ключей. Возвращает false при сбое записи.
+    private func adopt(phrase: [String], identity: (userID: UUID, secret: String)) -> Bool {
+        let text = phrase.joined(separator: " ")
         // Переносится на новый телефон с зашифрованной резервной копией; без неё — по коду.
-        Keychain.set(identity.secret, for: AccountStore.secretKey, migratable: true)
-        Keychain.set(phrase.joined(separator: " "), for: AccountStore.phraseKey, migratable: true)
-        if AppSettings.shared.data.profile.id != identity.userID {
-            AppSettings.shared.data.profile.id = identity.userID
-            AppSettings.shared.data.friendNumber = nil
-            signOut()
-        }
+        guard Keychain.set(identity.secret, for: AccountStore.secretKey, migratable: true),
+              Keychain.set(identity.userID.uuidString, for: AccountStore.userIDKey, migratable: true),
+              Keychain.set(text, for: AccountStore.phraseKey, migratable: true),
+              Keychain.get(AccountStore.phraseKey) == text else { return false }
+        switchProfile(to: identity.userID)
+        AppSettings.shared.data.identityCreated = true
+        return true
+    }
+
+    private func switchProfile(to userID: UUID) {
+        guard AppSettings.shared.data.profile.id != userID else { return }
+        AppSettings.shared.data.profile.id = userID
+        AppSettings.shared.data.friendNumber = nil
+        signOut()
+        // Демо-сообщество помнило прежний номер «меня»: начинаем его заново.
+        DemoBackend.shared.resetForNewIdentity()
     }
 
     /// Секрет устройства, выведенный из кода восстановления. nil — связка ключей закрыта (до первой разблокировки).
     private var deviceSecret: String? {
         ensureIdentity()
+        guard !needsRecoveryCode else { return nil }
         return Keychain.get(AccountStore.secretKey)
     }
 
@@ -110,43 +148,82 @@ final class AccountStore: ObservableObject {
         guard let phrase = RecoveryPhrase.parse(phraseText) else {
             return "Нужно \(RecoveryPhrase.wordCount) слов из кода восстановления. Проверьте, что все слова написаны без ошибок."
         }
-        if phrase == recoveryWords { return "Это код этого же аккаунта: восстанавливать нечего." }
+        if phrase == recoveryWords {
+            // Тот же аккаунт: если данные ещё не загрузились, догружаем.
+            guard AppSettings.shared.data.pendingRestoreMerge else { return "Это код этого же аккаунта: восстанавливать нечего." }
+            return await mergeRestoredData()
+        }
         guard !isRestoring else { return "Восстановление уже идёт." }
         if WakeCoordinator.shared.session != nil {
             return "Сейчас идёт утренняя проверка. Восстановить аккаунт можно после неё."
         }
-        // Данные этого телефона принадлежат другому аккаунту: смешивать их с восстановленным нельзя.
-        if !JournalStore.shared.realEntries.isEmpty || !AlarmStore.shared.alarms.isEmpty || !ChallengeStore.shared.challenges.isEmpty {
+        // Код пропал при переносе — данные на телефоне и так этого аккаунта. Иначе они чужие, смешивать нельзя.
+        let ownDataMissingCode = needsRecoveryCode
+        if !ownDataMissingCode && hasLocalData {
             return "На этом телефоне уже есть свои будильники или дневник. Восстановить аккаунт можно только на чистом телефоне: сначала удалите данные в Профиле."
         }
         guard let url = AppConfig.serverURL else {
             return "Сервер ещё не подключён: восстанавливать пока неоткуда. Код начнёт работать вместе с сервером."
         }
-        let identity = RecoveryPhrase.identity(for: phrase)
+        isRestoring = true
+        defer { isRestoring = false }
+        // Медленный вывод ключа — не на главном потоке.
+        let identity = await Task.detached(priority: .userInitiated) { RecoveryPhrase.identity(for: phrase) }.value
         let backend = BackendRegistry.httpBackend(url)
         var profile = AppSettings.shared.data.profile
         profile.id = identity.userID
-        isRestoring = true
-        defer { isRestoring = false }
+        let result: (token: String, number: String?)
         do {
-            let result = try await backend.register(profile: profile, secret: identity.secret, restore: true)
-            // Неотправленные изменения прежнего аккаунта не должны уйти в восстановленный.
-            SyncEngine.shared.clear()
-            adopt(phrase: phrase)
-            signIn(token: result.token)
-            if let number = result.number { AppSettings.shared.data.friendNumber = number }
-            AppSettings.shared.data.recoverySaved = true
-            let snapshot = try await backend.restoreSnapshot()
-            AlarmStore.shared.mergeRestored(snapshot.alarms ?? [])
-            JournalStore.shared.mergeRestored(snapshot.journal ?? [])
-            ChallengeStore.shared.mergeRestored(snapshot.challenges ?? [])
-            return nil
+            result = try await backend.register(profile: profile, secret: identity.secret, restore: true)
         } catch BackendError.notFound {
             return "Аккаунт с таким кодом не найден. Проверьте слова и их порядок."
         } catch BackendError.forbidden {
             return "Код не подошёл. Проверьте слова и их порядок."
         } catch {
             return "Не получилось связаться с сервером. Попробуйте позже."
+        }
+        // Пока ждали сервер, на телефоне могли появиться свои данные.
+        if !ownDataMissingCode && hasLocalData {
+            return "Пока шло восстановление, на телефоне появились свои данные. Удалите их в Профиле и повторите."
+        }
+        // Неотправленные изменения прежнего аккаунта не должны уйти в восстановленный.
+        if !ownDataMissingCode { SyncEngine.shared.clear() }
+        guard adopt(phrase: phrase, identity: identity) else {
+            return "Не удалось сохранить код на телефоне. Разблокируйте телефон и повторите."
+        }
+        signIn(token: result.token)
+        if let number = result.number { AppSettings.shared.data.friendNumber = number }
+        AppSettings.shared.data.recoverySaved = true
+        AppSettings.shared.data.pendingRestoreMerge = true
+        if let problem = await mergeRestoredData() {
+            return "Аккаунт восстановлен. \(problem)"
+        }
+        return nil
+    }
+
+    private var hasLocalData: Bool {
+        !JournalStore.shared.realEntries.isEmpty || !AlarmStore.shared.alarms.isEmpty || !ChallengeStore.shared.challenges.isEmpty
+    }
+
+    /// Загружает данные восстановленного аккаунта. Если не вышло — повторит при следующем открытии.
+    @discardableResult
+    func mergeRestoredData() async -> String? {
+        guard AppSettings.shared.data.pendingRestoreMerge, let url = AppConfig.serverURL, token != nil else { return nil }
+        do {
+            let snapshot = try await BackendRegistry.httpBackend(url).restoreSnapshot()
+            if let restored = snapshot.profile {
+                var profile = restored
+                profile.id = AppSettings.shared.data.profile.id
+                AppSettings.shared.data.profile = profile
+            }
+            if let privacy = snapshot.privacy { AppSettings.shared.data.privacy = privacy }
+            AlarmStore.shared.mergeRestored(snapshot.alarms ?? [])
+            JournalStore.shared.mergeRestored(snapshot.journal ?? [])
+            ChallengeStore.shared.mergeRestored(snapshot.challenges ?? [])
+            AppSettings.shared.data.pendingRestoreMerge = false
+            return nil
+        } catch {
+            return "Данные ещё не загрузились: попробуем снова при следующем открытии приложения."
         }
     }
 

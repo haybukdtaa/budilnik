@@ -26,6 +26,7 @@ struct FriendsSection: View {
                 TextField("PRO-000-000-000", text: $number)
                     .keyboardType(.numbersAndPunctuation)
                     .autocorrectionDisabled()
+                    .onChange(of: number) { _, value in if !value.isEmpty { requestSent = false } }
                 Button(requestSent ? "Заявка отправлена" : "Отправить заявку") {
                     Task {
                         requestSent = await social.sendFriendRequest(number: number)
@@ -51,6 +52,12 @@ struct FriendsSection: View {
                                 .buttonStyle(.borderedProminent)
                             Button("Нет") { Task { await social.answer(request, accept: false) } }
                                 .buttonStyle(.bordered)
+                        }
+                        .contextMenu {
+                            Button("Заблокировать", role: .destructive) { Task { await social.blockRequester(request) } }
+                        }
+                        .swipeActions {
+                            Button("Заблокировать", role: .destructive) { Task { await social.blockRequester(request) } }
                         }
                     }
                 }

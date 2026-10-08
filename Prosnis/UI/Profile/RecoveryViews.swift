@@ -4,10 +4,16 @@ import SwiftUI
 struct RecoveryCodeView: View {
     @EnvironmentObject private var settings: AppSettings
     @State private var revealed = false
+    @State private var words: [String] = []
 
     var body: some View {
-        let words = AccountStore.shared.recoveryWords
         List {
+            if AccountStore.shared.needsRecoveryCode {
+                Section {
+                    Label("Код этого аккаунта не перенёсся на телефон. Введите его в «Восстановить аккаунт по коду».", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+            }
             Section {
                 Text("Регистрации нет: ни телефона, ни почты. Ваш аккаунт — это эти 16 слов. Запишите их на бумаге и храните дома. На новом телефоне они вернут дерево, друзей и дневник подъёмов.")
                     .foregroundStyle(.secondary)
@@ -24,13 +30,15 @@ struct RecoveryCodeView: View {
                         }
                     }
                     .padding(.vertical, 6)
-                } else {
+                } else if words.count == RecoveryPhrase.wordCount {
                     Button("Показать код") { revealed = true }
+                } else {
+                    Text("Код сейчас недоступен. Разблокируйте телефон и откройте экран снова.").foregroundStyle(.secondary)
                 }
             } footer: {
                 Text("Никому не показывайте и не отправляйте этот код: кто его знает, тот получит доступ к аккаунту. Мы его никогда не спросим.")
             }
-            if revealed {
+            if revealed && words.count == RecoveryPhrase.wordCount {
                 Section {
                     Toggle("Я записал(а) код", isOn: $settings.data.recoverySaved)
                 }
@@ -39,6 +47,10 @@ struct RecoveryCodeView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.background)
         .navigationTitle("Код восстановления")
+        .onAppear {
+            AccountStore.shared.ensureIdentity()
+            words = AccountStore.shared.recoveryWords
+        }
     }
 }
 

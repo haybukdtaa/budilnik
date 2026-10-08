@@ -178,7 +178,14 @@ final class AlarmStore: ObservableObject {
     /// Добавляет будильники, восстановленные с сервера (которых ещё нет на телефоне), и ставит их.
     func mergeRestored(_ items: [AlarmItem]) {
         let known = Set(alarms.map(\.id))
-        let added = items.filter { !known.contains($0.id) }
+        let now = TrustedClock.now
+        // Как при сохранении: звонки до восстановления не считаются, одноразовый будильник взводится заново.
+        let added = items.filter { !known.contains($0.id) }.map { item -> AlarmItem in
+            var copy = item
+            copy.updatedAt = now
+            if copy.weekdays.isEmpty && copy.effectiveHolidayMode != .workCalendar { copy.createdAt = now }
+            return copy
+        }
         guard !added.isEmpty else { return }
         alarms += added
         sort()

@@ -34,6 +34,12 @@ final class DemoBackend: SocialBackend, SyncBackend {
         state = file.load() ?? DemoBackend.seed()
     }
 
+    /// Номер «меня» сменился (новый аккаунт из кода): вымышленное сообщество начинается заново.
+    func resetForNewIdentity() {
+        state = DemoBackend.seed()
+        file.delete()
+    }
+
     private func save() { file.save(state) }
 
     private static func person(_ name: String, _ avatar: String) -> UserProfile {
