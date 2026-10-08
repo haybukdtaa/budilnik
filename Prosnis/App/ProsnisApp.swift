@@ -31,7 +31,6 @@ struct ProsnisApp: App {
                 .environmentObject(payments)
                 .environmentObject(sync)
                 .preferredColorScheme(.light)
-                .foregroundStyle(Theme.ink)
                 .tint(Theme.accent)
                 .task { await becameActive() }
                 .onChange(of: scenePhase) { _, phase in

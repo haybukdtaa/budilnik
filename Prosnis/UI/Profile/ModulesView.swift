@@ -177,11 +177,11 @@ struct PrayerSettingsView: View {
                         HStack {
                             Text(Format.weekday(date))
                             Spacer()
-                            Text(day.fajr.map(Format.time) ?? "—").monospacedDigit()
+                            Text(day.fajr.map { cityTime($0, prayer) } ?? "—").monospacedDigit()
                             if day.fajrAdjusted {
                                 Image(systemName: "moon.haze").foregroundStyle(.secondary)
                             }
-                            Text("восход \(day.sunrise.map(Format.time) ?? "—")")
+                            Text("восход \(day.sunrise.map { cityTime($0, prayer) } ?? "—")")
                                 .font(.app(.caption))
                                 .foregroundStyle(.secondary)
                         }
@@ -226,6 +226,20 @@ struct PrayerSettingsView: View {
             didSetInitial = true
             entered = wallClock(PrayerTimes.day(for: Date(), settings: prayer).fajr, zone: prayer.city.timeZone)
         }
+        // Сменили город — в поле подставляется расчётное время уже для него.
+        .onChange(of: settings.data.prayer.cityID) { _, _ in
+            let current = settings.data.prayer
+            entered = wallClock(PrayerTimes.day(for: Date(), settings: current).fajr, zone: current.city.timeZone)
+            message = nil
+        }
+    }
+
+    /// Время по часам выбранного города, а не по часам телефона.
+    private func cityTime(_ date: Date, _ prayer: PrayerSettings) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = prayer.city.timeZone
+        return formatter.string(from: date)
     }
 
     /// Показывает время города в выборе времени (выбор работает в поясе телефона).
