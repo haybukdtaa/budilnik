@@ -383,9 +383,7 @@ struct AlarmEditView: View {
         } header: {
             Text("Ставка")
         } footer: {
-            Text(PaymentsStore.shared.isTraining
-                 ? "Сейчас ставка тренировочная: деньги не списываются. Ставку видите только вы."
-                 : "Если не встанете, сумма спишется. Ставку видите только вы.")
+            Text("Если не встанете, сумма спишется. Ставку видите только вы.")
         }
         .onChange(of: draft.stakeEnabled) { _, isOn in
             if isOn { draft.taskEnabled = true }

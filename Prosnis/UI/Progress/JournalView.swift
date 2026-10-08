@@ -14,6 +14,14 @@ enum Format {
         return formatter.string(from: date)
     }
 
+    /// «6 октября»
+    static func dayMonth(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMMM"
+        return formatter.string(from: date)
+    }
+
     /// «6 октября 2026»
     static func fullDate(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -126,10 +134,10 @@ struct JournalListView: View {
 
 private func outcomeTitle(_ entry: JournalEntry) -> (String, Color) {
     switch entry.outcome {
-    case .success: return ("Встали", .green)
+    case .success: return (entry.isPromise == true ? "Выполнено" : "Встали", .green)
     case .failed:
         if entry.dispute == .refunded { return ("Возвращено", .blue) }
-        return ("Проспали", .red)
+        return (entry.isPromise == true ? "Не выполнено" : "Проспали", .red)
     case .technical: return ("Сбой, без списания", .gray)
     }
 }
@@ -187,7 +195,7 @@ struct JournalDetailView: View {
                             Text("\(entry.charged) ₽").foregroundStyle(.secondary)
                         }
                     }
-                    if entry.outcome == .success {
+                    if entry.outcome == .success && entry.isPromise != true {
                         HStack {
                             Text("Повторная проверка")
                             Spacer()
@@ -195,9 +203,7 @@ struct JournalDetailView: View {
                         }
                     }
                 } footer: {
-                    if entry.isTraining && entry.stake > 0 {
-                        Text("Тренировка: деньги не списывались.")
-                    }
+                    EmptyView()
                 }
 
                 Section("Как это было") {

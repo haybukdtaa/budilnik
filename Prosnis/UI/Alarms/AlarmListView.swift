@@ -7,15 +7,18 @@ struct AlarmListView: View {
     @EnvironmentObject private var settings: AppSettings
     // Наблюдаем за утренней проверкой: от неё зависит значок блокировки.
     @EnvironmentObject private var wake: WakeCoordinator
+    @ObservedObject private var promises = PromiseStore.shared
     @State private var editing: AlarmItem?
     @State private var showBedtime = false
+    @State private var showPromise = false
+    @State private var openPromise: StepPromise?
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
 
-                if store.alarms.isEmpty {
+                if store.alarms.isEmpty && promises.promises.isEmpty {
                     emptyState
                 } else {
                     TimelineView(.everyMinute) { context in
@@ -42,10 +45,13 @@ struct AlarmListView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        var item = AlarmItem()
-                        item.module = settings.data.modules.first ?? .basic
-                        editing = item
+                    Menu {
+                        Button("Будильник", systemImage: "alarm") {
+                            var item = AlarmItem()
+                            item.module = settings.data.modules.first ?? .basic
+                            editing = item
+                        }
+                        Button("Обещание по шагам", systemImage: "figure.run") { showPromise = true }
                     } label: {
                         Image(systemName: "plus.circle.fill").font(.app(.title2))
                     }
@@ -71,6 +77,8 @@ struct AlarmListView: View {
             .sheet(isPresented: $showBedtime) {
                 BedtimeView()
             }
+            .sheet(isPresented: $showPromise) { PromiseEditView() }
+            .sheet(item: $openPromise) { PromiseDetailView(promise: $0) }
             .alert(
                 "Внимание",
                 isPresented: Binding(
@@ -89,6 +97,12 @@ struct AlarmListView: View {
         List {
             if !journal.realEntries.isEmpty {
                 SavedCard()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            }
+            ForEach(promises.promises) { promise in
+                PromiseRow(promise: promise, now: now) { openPromise = promise }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))

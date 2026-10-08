@@ -92,6 +92,7 @@ jobs:
           NAME=meds; shoot -screenshotTab 4
           NAME=prayer; shoot -screenshotScreen prayer
           NAME=charge; shoot -screenshotScreen charge
+          NAME=promise; shoot -screenshotScreen promise
           cd shots
           git init -q
           git checkout -q -b ci-screens

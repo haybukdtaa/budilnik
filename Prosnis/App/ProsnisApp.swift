@@ -57,6 +57,8 @@ struct ProsnisApp: App {
         challenges.reloadIfNeeded()
         payments.reloadIfNeeded()
         wake.reconcile()
+        await PromiseStore.shared.reconcile(force: true)
+        await PromiseStore.shared.restoreNotifications()
         store.refreshExpected()
         store.refreshDatedAlarms()
         store.resyncFailed()
@@ -154,6 +156,8 @@ struct RootView: View {
         if let screen = RootView.screenshotScreen {
             if screen == "charge" {
                 ChargeCardView(entry: RootView.sampleCharge, onDismiss: {}, onDispute: {})
+            } else if screen == "promise" {
+                PromiseEditView()
             } else {
                 NavigationStack { PrayerSettingsView() }
                     .onAppear {
@@ -248,6 +252,11 @@ struct RootView: View {
                 if JournalStore.shared.entries.isEmpty { JournalStore.shared.addDemoEntries() }
                 if !settings.data.useDemoSocial { settings.data.useDemoSocial = true }
                 if !settings.data.medsEnabled { settings.data.medsEnabled = true }
+                if PromiseStore.shared.promises.isEmpty {
+                    let begin = PromiseEditView.defaultStart()
+                    _ = PromiseStore.shared.add(StepPromise(title: "Пробежка", start: begin, end: begin.addingTimeInterval(90 * 60),
+                                                            minSteps: 5000, stake: 500))
+                }
                 if MedStore.shared.meds.isEmpty {
                     var vitamin = Medication(name: "Витамин D", dose: "1 капсула", form: .capsule, times: [8 * 60 + 30], meal: .after)
                     vitamin.startDate = Calendar.current.startOfDay(for: Date())
@@ -273,6 +282,7 @@ struct RootView: View {
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 30_000_000_000)
                     wake.reconcile()
+                    await PromiseStore.shared.reconcile()
                 }
             }
         }

@@ -242,6 +242,9 @@ final class AccountStore: ObservableObject {
         if AlarmStore.shared.alarms.contains(where: { AlarmStore.shared.isLocked($0) }) {
             return "Будильник со ставкой зазвонит меньше чем через 2 часа. Удалить данные можно после утра."
         }
+        if PromiseStore.shared.hasActive {
+            return "Есть обещание по шагам, которое скоро начнётся или идёт. Удалить данные можно после него."
+        }
         await PaymentsStore.shared.retryPending()
         if PaymentsStore.shared.hasOpenOperations {
             return "Есть незавершённые операции по ставкам. Попробуйте позже, когда они завершатся."
@@ -272,6 +275,8 @@ final class AccountStore: ObservableObject {
         MorningPhotoStore.shared.reload()
         MedStore.shared.reload()
         MedStore.shared.refresh()
+        PromiseStore.shared.reload()
+        await PromiseStore.shared.cancelAllNotifications()
         await WeeklyNotification.update(enabled: false)
         // Последним: перезагрузки выше могли поставить изменения в очередь.
         SyncEngine.shared.clear()

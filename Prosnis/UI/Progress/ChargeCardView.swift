@@ -14,7 +14,7 @@ struct ChargeCardView: View {
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(Theme.accent)
             VStack(spacing: 6) {
-                Text("Вы проспали").font(.app(.title))
+                Text(entry.isPromise == true ? "Обещание не выполнено" : "Вы проспали").font(.app(.title))
                 Text(Format.dateTime(entry.date))
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)

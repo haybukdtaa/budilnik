@@ -51,14 +51,16 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var rechecked: Bool?
     /// Списание ещё не показано карточкой в приложении (false). nil — показывать нечего или уже показано.
     var chargeSeen: Bool?
+    /// Обещание по шагам, а не подъём: в серию, дерево, статус друзьям и челленджи не идёт.
+    var isPromise: Bool?
 
     /// Сколько реально списано по этой записи.
     var charged: Int {
-        guard outcome == .failed, dispute != .refunded, !isTraining else { return 0 }
+        guard outcome == .failed, dispute != .refunded else { return 0 }
         return stake
     }
 
-    var counts: Bool { isDemo != true && outcome != .technical }
+    var counts: Bool { isDemo != true && outcome != .technical && isPromise != true }
     /// Чек-лист выполнен. Пустой чек-лист (все пункты удалены) считается выполненным.
     var routineComplete: Bool {
         guard let total = routineTotal else { return false }
@@ -215,7 +217,9 @@ final class JournalStore: ObservableObject {
         stats.total = month.count
         stats.successes = month.filter { $0.outcome == .success }.count
         stats.saved = month.filter { $0.outcome == .success }.reduce(0) { $0 + $1.stake }
-        stats.lost = month.reduce(0) { $0 + $1.charged }
+        // Списания по обещаниям тоже теряются деньги, хотя в серию они не входят.
+        let allMonth = entries.filter { $0.isDemo != true && calendar.isDate($0.date, equalTo: now, toGranularity: .month) }
+        stats.lost = allMonth.reduce(0) { $0 + $1.charged }
         // Серия считается так же, как во вкладке «Прогресс»: по утрам, а не по будильникам.
         stats.streak = ProgressEngine.compute(entries: counted, challenges: [], now: now).currentStreak
         return stats
