@@ -115,8 +115,10 @@ enum MissedMornings {
             candidate.recordedAt.map { $0 <= candidate.at.addingTimeInterval(-lead) } ?? false
         }
         guard let binding = known.map(\.at).min() else { return group }
+        // Более позднее время действует, только если о нём знали ещё до начала 2 часов перед обязательным.
         return group.filter { candidate in
-            candidate.at <= binding.addingTimeInterval(60) || known.contains(candidate)
+            candidate.at <= binding.addingTimeInterval(60)
+                || candidate.recordedAt.map { $0 <= binding.addingTimeInterval(-lead) } ?? false
         }
     }
 

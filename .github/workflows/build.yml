@@ -31,13 +31,13 @@ jobs:
           print(ids[-1] if ids else '')
           ")
           echo "Симулятор: $DEVICE_ID"
+          set -o pipefail
           xcodebuild test \
             -project Prosnis.xcodeproj \
             -scheme Prosnis \
             -destination "id=$DEVICE_ID" \
             -derivedDataPath build-tests \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log | grep -E ': error:|Executed [0-9]+ tests|TEST (SUCCEEDED|FAILED)' || true
-          test "${PIPESTATUS[0]}" -eq 0
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log | { grep -E ': error:|Executed [0-9]+ tests|TEST (SUCCEEDED|FAILED)' || true; }
 
       - name: Собрать без подписи
         run: |
@@ -51,8 +51,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build 2>&1 | tee build.log | grep -E ': error:|BUILD (SUCCEEDED|FAILED)' || true
-          test "${PIPESTATUS[0]}" -eq 0
+            build 2>&1 | tee build.log | { grep -E ': error:|BUILD (SUCCEEDED|FAILED)' || true; }
 
       - name: Упаковать в .ipa
         run: |
@@ -71,6 +70,8 @@ jobs:
           if [ -f test.log ]; then
             summary=$(grep -E "Executed [0-9]+ tests" test.log | tail -1 | sed 's/%/%25/g')
             echo "::notice title=Тесты::${summary:-нет данных}"
+            failed=$(grep -E "error: -\[|Test Case .* failed" test.log | sed -E 's#^.*/(Prosnis|ProsnisTests)/#/#' | sort -u | head -30 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            if [ -n "$failed" ]; then echo "::error title=Упавшие тесты::${failed}"; fi
           fi
           for f in test.log build.log; do
             [ -f "$f" ] || continue
