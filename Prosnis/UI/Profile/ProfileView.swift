@@ -21,7 +21,7 @@ struct ProfileView: View {
                         HStack(spacing: 14) {
                             AvatarView(profile: settings.data.profile, size: 56)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(settings.data.profile.displayName).font(.app(.title3).bold())
+                                Text(settings.data.profile.displayName).font(.app(.title3, weight: .bold))
                                 Text("\(snapshot.title) · уровень \(snapshot.level) · серия \(snapshot.currentStreak)")
                                     .foregroundStyle(.secondary)
                             }

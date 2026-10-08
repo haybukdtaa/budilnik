@@ -33,7 +33,7 @@ struct LeaderboardSection: View {
                                 Text("Держится с \(Format.dateTime(record.since))").font(.app(.caption)).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text("\(record.value)").font(.app(.title3).bold())
+                            Text("\(record.value)").font(.app(.title3, weight: .bold))
                         }
                     }
                 }

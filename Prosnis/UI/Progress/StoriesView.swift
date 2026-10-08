@@ -61,7 +61,7 @@ struct StoryChapterView: View {
                     .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                 Text(chapter.title)
-                    .font(.app(.title).bold())
+                    .font(.app(.title, weight: .bold))
                 Text(chapter.text)
                     .font(.app(.body))
                     .lineSpacing(5)
@@ -90,7 +90,7 @@ struct HoursWonCard: View {
                 let minutes = HoursWon.total(entries: journal.realEntries, usualWakeMinutes: baseline,
                                              from: monthStart, to: Date().addingTimeInterval(86400))
                 Text("+\(HoursWon.text(minutes: minutes)) утра в этом месяце")
-                    .font(.app(.title2).bold())
+                    .font(.app(.title2, weight: .bold))
                     .foregroundStyle(Theme.accentGradient)
                 let equivalents = HoursWon.equivalents(minutes: minutes)
                 if equivalents.isEmpty {

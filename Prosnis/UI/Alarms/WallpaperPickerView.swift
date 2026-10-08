@@ -63,7 +63,7 @@ struct WallpaperPickerView: View {
                 .opacity(0.35)
             VStack(spacing: 6) {
                 Image(systemName: "lock.fill").font(.app(.title2))
-                Text(Theme.wallpaperNames[index]).font(.app(.footnote).weight(.semibold))
+                Text(Theme.wallpaperNames[index]).font(.app(.footnote, weight: .semibold))
                 Text("За приглашённого друга").font(.app(.caption2))
             }
             .foregroundStyle(.white)
@@ -82,7 +82,7 @@ struct WallpaperPickerView: View {
                     .frame(maxWidth: .infinity)
                     .clipped()
                 Text(title)
-                    .font(.app(.footnote).weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .foregroundStyle(.white)
                     .shadow(radius: 4)
                     .padding(10)

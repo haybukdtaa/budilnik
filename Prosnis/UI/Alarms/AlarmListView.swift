@@ -118,7 +118,7 @@ struct AlarmListView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(Theme.accent)
             Text("Пока нет будильников")
-                .font(.app(.title3).bold())
+                .font(.app(.title3, weight: .bold))
             Text("Нажмите «+», чтобы добавить первый")
                 .foregroundStyle(.secondary)
         }

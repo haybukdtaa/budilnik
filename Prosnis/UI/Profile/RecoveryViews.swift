@@ -24,7 +24,7 @@ struct RecoveryCodeView: View {
                         ForEach(Array(words.enumerated()), id: \.offset) { index, word in
                             HStack(spacing: 4) {
                                 Text("\(index + 1).").font(.app(.caption)).foregroundStyle(.secondary).monospacedDigit()
-                                Text(word).font(.app(.body).weight(.medium))
+                                Text(word).font(.app(.body, weight: .medium))
                                 Spacer(minLength: 0)
                             }
                         }

@@ -273,7 +273,7 @@ struct AlarmEditView: View {
                     if isOn { draft.weekdays.remove(day) } else { draft.weekdays.insert(day) }
                 } label: {
                     Text(Weekdays.short[day - 1])
-                        .font(.app(.footnote).weight(.semibold))
+                        .font(.app(.footnote, weight: .semibold))
                         .frame(maxWidth: .infinity, minHeight: 38)
                         .background(isOn ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.card), in: Circle())
                         .foregroundStyle(isOn ? Color.white : Color.secondary)

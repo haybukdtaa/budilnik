@@ -29,9 +29,9 @@ final class MedStore: ObservableObject {
     private var loadFailed = false
     private var chain: Task<Void, Never>?
 
-    static let category = "MED"
-    static let takenAction = "MED_TAKEN"
-    static let snoozeAction = "MED_SNOOZE"
+    nonisolated static let category = "MED"
+    nonisolated static let takenAction = "MED_TAKEN"
+    nonisolated static let snoozeAction = "MED_SNOOZE"
     private static let prefix = "med-"
     /// Сколько тихих напоминаний держать в очереди iOS (всего в ней не больше 64 на приложение).
     static let maxQuiet = 25

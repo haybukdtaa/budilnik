@@ -22,7 +22,7 @@ struct MorningView: View {
                 VStack(spacing: 16) {
                     VStack(spacing: 4) {
                         Text("Доброе утро!")
-                            .font(.app(.largeTitle).bold())
+                            .font(.app(.largeTitle, weight: .bold))
                         Text(Format.dateTime(state.startedAt))
                             .foregroundStyle(.secondary)
                         if let reason = settings.wakeReason {
@@ -123,7 +123,7 @@ struct MorningView: View {
                     .frame(width: 110, height: 130)
                 VStack(alignment: .leading, spacing: 6) {
                     if gained > 0 {
-                        Text("+\(gained) опыта").font(.app(.title2).bold()).foregroundStyle(Theme.accentGradient)
+                        Text("+\(gained) опыта").font(.app(.title2, weight: .bold)).foregroundStyle(Theme.accentGradient)
                     }
                     if Titles.changed(fromLevel: state.levelBefore, toLevel: snapshot.level) {
                         Label("Новое звание: \(snapshot.title)", systemImage: "arrow.up.circle.fill")
@@ -135,7 +135,7 @@ struct MorningView: View {
                         .foregroundStyle(.secondary)
                     if movedToGarden {
                         Text("Дерево выросло и переехало в ваш сад! Сажаем новое.")
-                            .font(.app(.subheadline).weight(.semibold))
+                            .font(.app(.subheadline, weight: .semibold))
                             .foregroundStyle(.green)
                     } else if tree.stage > state.treeStageBefore {
                         Text("Дерево выросло: \(tree.title)")
@@ -153,7 +153,7 @@ struct MorningView: View {
                     }
                     ForEach(newBadges) { item in
                         Label("Значок: \(item.badge.title)", systemImage: item.badge.icon)
-                            .font(.app(.subheadline).weight(.semibold))
+                            .font(.app(.subheadline, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                     }
                 }

@@ -81,7 +81,7 @@ struct MathTaskView: View {
                         press(key)
                     } label: {
                         Text(key)
-                            .font(.app(.title2).weight(.semibold))
+                            .font(.app(.title2, weight: .semibold))
                             .frame(maxWidth: .infinity, minHeight: 54)
                             .background(key == "✓" ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.15)),
                                         in: RoundedRectangle(cornerRadius: 14))

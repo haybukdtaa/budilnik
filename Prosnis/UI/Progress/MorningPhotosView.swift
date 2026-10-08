@@ -104,7 +104,7 @@ struct MorningPhotosView: View {
                                     .clipped()
                                     .overlay(alignment: .bottomLeading) {
                                         Text(Format.dayKey(day))
-                                            .font(.app(.caption2).bold())
+                                            .font(.app(.caption2, weight: .bold))
                                             .padding(4)
                                             .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
                                             .padding(4)

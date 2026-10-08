@@ -4,7 +4,7 @@ import UIKit
 
 extension Font {
     /// Шрифт приложения для стиля текста: Lora для заголовков, Manrope для остального.
-    static func app(_ style: Font.TextStyle) -> Font {
+    static func app(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> Font {
         let ui: UIFont.TextStyle
         switch style {
         case .largeTitle: ui = .largeTitle
@@ -19,7 +19,7 @@ extension Font {
         case .caption2: ui = .caption2
         default: ui = .body
         }
-        return Font(Theme.uiFont(for: ui))
+        return Font(Theme.uiFont(for: ui, weight: weight.map(Theme.wght)))
     }
 }
 
@@ -54,7 +54,23 @@ enum Theme {
     }
 
     /// Заголовки — Lora (с засечками, как в книге), остальное — Manrope.
-    static func uiFont(for style: UIFont.TextStyle) -> UIFont {
+    /// Значение оси «wght» для толщины SwiftUI.
+    static func wght(_ weight: Font.Weight) -> CGFloat {
+        switch weight {
+        case .ultraLight: return 200
+        case .thin: return 250
+        case .light: return 300
+        case .regular: return 400
+        case .medium: return 500
+        case .semibold: return 600
+        case .bold: return 700
+        case .heavy, .black: return 800
+        default: return 400
+        }
+    }
+
+    /// `weight` — своя толщина вместо обычной для стиля (через ось шрифта, а не подделкой жирности).
+    static func uiFont(for style: UIFont.TextStyle, weight: CGFloat? = nil) -> UIFont {
         let font: UIFont
         switch style {
         case .largeTitle: font = uiFont("Lora", size: 34, weight: 500)
@@ -69,8 +85,9 @@ enum Theme {
         case .caption2: font = uiFont("Manrope", size: 11, weight: 500)
         default: font = uiFont("Manrope", size: 17, weight: 450)
         }
+        let weighted = weight.map { uiFont(font.familyName, size: font.pointSize, weight: $0) } ?? font
         // Крупный шрифт из настроек iPhone тоже работает.
-        return UIFontMetrics(forTextStyle: style).scaledFont(for: font)
+        return UIFontMetrics(forTextStyle: style).scaledFont(for: weighted)
     }
 
     /// Внешний вид навигации и вкладок в новом стиле.

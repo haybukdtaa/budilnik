@@ -26,7 +26,7 @@ struct ChronicleView: View {
                             .foregroundStyle(unlockedIDs.contains(badge.id) ? Theme.accent : Color.secondary)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 4) {
-                                Text(badge.title).font(.app(.subheadline).weight(.semibold))
+                                Text(badge.title).font(.app(.subheadline, weight: .semibold))
                                 if badge.isPrivate {
                                     Image(systemName: "lock.fill").font(.app(.caption2)).foregroundStyle(.secondary)
                                 }
@@ -48,7 +48,7 @@ struct ChronicleView: View {
                 } else {
                     ForEach(challenges.finished) { challenge in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(challenge.title).font(.app(.subheadline).weight(.semibold))
+                            Text(challenge.title).font(.app(.subheadline, weight: .semibold))
                             Text("\(challenge.status.title) · с \(Format.dateTime(challenge.startDate))" +
                                  (challenge.endedAt.map { " по \(Format.dateTime($0))" } ?? ""))
                                 .font(.app(.caption))

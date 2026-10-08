@@ -58,12 +58,12 @@ private struct GardenCard: View {
                 TreeView(stage: garden.stage, wilt: 0, species: garden.species)
                     .frame(width: 100, height: 120)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(garden.name).font(.app(.title3).bold())
+                    Text(garden.name).font(.app(.title3, weight: .bold))
                     Text("\(garden.species.title) · \(TreeState.stageTitles[min(garden.stage, 7)])")
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                     Text("Сегодня полили: \(garden.wateredToday) из \(garden.members.count)")
-                        .font(.app(.subheadline).weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(garden.wateredToday == garden.members.count ? Color.green : Theme.accent)
                     if let left = garden.toNextStage {
                         Text("До следующей стадии: \(left) \(HoursWon.plural(left, "полив", "полива", "поливов"))")

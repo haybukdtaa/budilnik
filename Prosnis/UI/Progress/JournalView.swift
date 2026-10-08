@@ -54,7 +54,7 @@ struct SavedCard: View {
                 .font(.app(.footnote))
                 .foregroundStyle(.secondary)
             Text("Сохранено \(stats.saved) ₽")
-                .font(.app(.title2).bold())
+                .font(.app(.title2, weight: .bold))
                 .foregroundStyle(Theme.accentGradient)
             Text("Встали вовремя \(stats.successes) из \(stats.total)" + (stats.streak > 1 ? " · серия \(stats.streak)" : ""))
                 .font(.app(.subheadline))
@@ -83,7 +83,7 @@ struct JournalListView: View {
                     Image(systemName: "list.bullet.rectangle")
                         .font(.system(size: 52))
                         .foregroundStyle(Theme.accent)
-                    Text("Дневник пока пуст").font(.app(.title3).bold())
+                    Text("Дневник пока пуст").font(.app(.title3, weight: .bold))
                     Text("Здесь появится каждое утро: что произошло и почему списали или нет.")
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
@@ -148,7 +148,7 @@ private struct JournalRow: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text(title).font(.app(.subheadline).weight(.semibold)).foregroundStyle(color)
+                Text(title).font(.app(.subheadline, weight: .semibold)).foregroundStyle(color)
                 if entry.outcome == .failed && entry.stake > 0 {
                     Text(entry.dispute == .refunded ? "0 ₽" : "−\(entry.stake) ₽")
                         .font(.app(.subheadline))

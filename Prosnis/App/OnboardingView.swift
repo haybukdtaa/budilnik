@@ -55,7 +55,7 @@ struct OnboardingView: View {
                 .font(.system(size: 72))
                 .foregroundStyle(Theme.accent)
             Text(title)
-                .font(.app(.title).bold())
+                .font(.app(.title, weight: .bold))
                 .multilineTextAlignment(.center)
             Text(text)
                 .multilineTextAlignment(.center)
@@ -68,7 +68,7 @@ struct OnboardingView: View {
     private var modulesPage: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Для чего вам будильник?")
-                .font(.app(.title2).bold())
+                .font(.app(.title2, weight: .bold))
                 .padding(.top, 32)
             Text("Можно выбрать несколько. Изменить можно в Профиле.")
                 .foregroundStyle(.secondary)
@@ -104,7 +104,7 @@ struct OnboardingView: View {
     private var profilePage: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Пара деталей")
-                .font(.app(.title2).bold())
+                .font(.app(.title2, weight: .bold))
                 .padding(.top, 32)
             TextField("Ваше имя для друзей", text: $name)
                 .padding(12)
