@@ -40,6 +40,8 @@ struct SettingsData: Codable, Equatable {
     var pendingGardenWaterDay: String?
     /// Последний день, которым поливали общие сады.
     var lastGardenWaterDay: String?
+    /// Человек состоит хотя бы в одном общем саду: иначе полив на сервер не отправляется.
+    var inGardens = false
 
     init() {}
 
@@ -71,6 +73,7 @@ struct SettingsData: Codable, Equatable {
         weeklySummaryOn = try c.decodeIfPresent(Bool.self, forKey: .weeklySummaryOn) ?? base.weeklySummaryOn
         pendingGardenWaterDay = try c.decodeIfPresent(String.self, forKey: .pendingGardenWaterDay)
         lastGardenWaterDay = try c.decodeIfPresent(String.self, forKey: .lastGardenWaterDay)
+        inGardens = try c.decodeIfPresent(Bool.self, forKey: .inGardens) ?? base.inGardens
     }
 }
 

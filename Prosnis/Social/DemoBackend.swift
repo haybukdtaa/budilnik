@@ -380,6 +380,12 @@ final class DemoBackend: SocialBackend, SyncBackend {
     func waterGardens(day: String) async throws -> [SharedGarden] {
         var all = demoGardens()
         guard state.wateredDay != day else { return all }
+        // Новый день: отметки «полил сегодня» сбрасываются.
+        for gardenIndex in all.indices {
+            for memberIndex in all[gardenIndex].members.indices {
+                all[gardenIndex].members[memberIndex].wateredToday = false
+            }
+        }
         for gardenIndex in all.indices {
             guard let memberIndex = all[gardenIndex].members.firstIndex(where: { $0.profile.id == me.id }),
                   !all[gardenIndex].members[memberIndex].wateredToday else { continue }

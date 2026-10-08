@@ -11,7 +11,7 @@ struct SharedGardenSection: View {
             VStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Растите дерево вместе").font(.headline)
-                    Text("Каждое ваше успешное утро поливает общее дерево. Если кто-то проспал, дерево не вянет — просто в этот день растёт меньше. А если полили все, оно растёт вдвое быстрее. Друзья видят только, полили ли вы сегодня: без времени и без денег.")
+                    Text("Каждое ваше успешное утро поливает общее дерево. Если кто-то проспал, дерево не вянет — просто в этот день растёт меньше. А если полили все, оно растёт вдвое быстрее. Друзья видят, полили ли вы сегодня и сколько раз всего. Время будильника и деньги им не видны.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -129,6 +129,11 @@ private struct CreateGardenView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .alert("Сад", isPresented: Binding(get: { social.errorText != nil }, set: { if !$0 { social.errorText = nil } })) {
+                Button("Понятно", role: .cancel) {}
+            } message: {
+                Text(social.errorText ?? "")
+            }
             .navigationTitle("Новый сад")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -159,6 +164,11 @@ private struct JoinGardenView: View {
                 TextField("Код из 6 символов", text: $code)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
+            }
+            .alert("Сад", isPresented: Binding(get: { social.errorText != nil }, set: { if !$0 { social.errorText = nil } })) {
+                Button("Понятно", role: .cancel) {}
+            } message: {
+                Text(social.errorText ?? "")
             }
             .navigationTitle("Войти в сад")
             .navigationBarTitleDisplayMode(.inline)

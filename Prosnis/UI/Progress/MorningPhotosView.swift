@@ -149,6 +149,8 @@ struct MorningPhotosView: View {
         }
         .background(Theme.background)
         .navigationTitle("Мои утра")
+        // Фото удалили или пересняли: старый ролик уже не тот.
+        .onChange(of: photos.days) { _, _ in exported = nil }
         .fullScreenCover(isPresented: $showSlideshow) {
             SlideshowView(days: currentMonth.map { photos.days(inMonth: $0) } ?? [])
         }

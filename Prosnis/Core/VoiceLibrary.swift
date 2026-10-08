@@ -21,14 +21,22 @@ final class VoiceLibrary: ObservableObject {
 
     @Published private(set) var recordings: [VoiceRecording] = []
     private let file = FileStore<[VoiceRecording]>("voices")
+    /// Файл списка был закрыт (телефон ещё не разблокировали): сохранять нельзя, иначе потеряем записи.
+    private var loadFailed = false
 
     private init() {
         reload()
     }
 
     func reload() {
+        let result = file.loadWithState()
+        loadFailed = result.state == .unreadable
         // Запись без файла (например, файл удалён системой) не показываем.
-        recordings = (file.load() ?? []).filter { FileManager.default.fileExists(atPath: VoiceLibrary.fileURL(soundID: $0.soundID).path) }
+        recordings = (result.value ?? []).filter { FileManager.default.fileExists(atPath: VoiceLibrary.fileURL(soundID: $0.soundID).path) }
+    }
+
+    func reloadIfNeeded() {
+        if loadFailed { reload() }
     }
 
     nonisolated static var soundsFolder: URL {
@@ -54,6 +62,8 @@ final class VoiceLibrary: ObservableObject {
 
     /// Сохраняет черновик записи под названием. Возвращает id звука или nil при ошибке.
     func saveDraft(title: String) -> String? {
+        reloadIfNeeded()
+        guard !loadFailed else { return nil }
         let manager = FileManager.default
         let recording = VoiceRecording(
             id: UUID(),
@@ -82,7 +92,8 @@ final class VoiceLibrary: ObservableObject {
     /// Удаляет запись. Нельзя удалить запись, которая стоит на будильнике: он остался бы без своего звука.
     @discardableResult
     func delete(_ recording: VoiceRecording) -> Bool {
-        guard alarmsUsing(recording.soundID).isEmpty else { return false }
+        reloadIfNeeded()
+        guard !loadFailed, alarmsUsing(recording.soundID).isEmpty else { return false }
         try? FileManager.default.removeItem(at: VoiceLibrary.fileURL(soundID: recording.soundID))
         recordings.removeAll { $0.id == recording.id }
         file.save(recordings)

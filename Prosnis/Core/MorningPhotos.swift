@@ -111,7 +111,7 @@ enum SlideshowExporter {
         for url in photos {
             guard let image = UIImage(contentsOfFile: url.path)?.cgImage,
                   let buffer = pixelBuffer(for: image) else { continue }
-            while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.01) }
+            try waitUntilReady(input, writer)
             let time = CMTime(seconds: Double(written) * secondsPerPhoto, preferredTimescale: 600)
             guard adaptor.append(buffer, withPresentationTime: time) else { throw writer.error ?? ExportError.failed }
             last = buffer
@@ -122,7 +122,7 @@ enum SlideshowExporter {
             throw ExportError.failed
         }
         // Последний кадр ещё раз в конце, чтобы последнее фото тоже держалось полторы секунды.
-        while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.01) }
+        try waitUntilReady(input, writer)
         let end = CMTime(seconds: Double(written) * secondsPerPhoto, preferredTimescale: 600)
         adaptor.append(last, withPresentationTime: end)
         input.markAsFinished()
@@ -132,6 +132,14 @@ enum SlideshowExporter {
         writer.finishWriting { done.signal() }
         done.wait()
         guard writer.status == .completed else { throw writer.error ?? ExportError.failed }
+    }
+
+    /// Ждёт готовности записи. Если запись сломалась (например, нет места), не ждём вечно.
+    private nonisolated static func waitUntilReady(_ input: AVAssetWriterInput, _ writer: AVAssetWriter) throws {
+        while !input.isReadyForMoreMediaData {
+            if writer.status != .writing { throw writer.error ?? ExportError.failed }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
     }
 
     /// Кадр с фото, заполняющим экран (лишнее по краям обрезается).

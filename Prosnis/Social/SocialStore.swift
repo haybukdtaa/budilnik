@@ -15,7 +15,12 @@ final class SocialStore: ObservableObject {
     @Published private(set) var messages: [ConversationID: [ChatMessage]] = [:]
     @Published private(set) var invite: Invite?
     @Published private(set) var witnessNotices: [WitnessNotice] = []
-    @Published private(set) var gardens: [SharedGarden] = []
+    @Published private(set) var gardens: [SharedGarden] = [] {
+        didSet {
+            let inGardens = !gardens.isEmpty
+            if AppSettings.shared.data.inGardens != inGardens { AppSettings.shared.data.inGardens = inGardens }
+        }
+    }
     @Published private(set) var isLoading = false
     @Published var errorText: String?
 
@@ -253,6 +258,8 @@ final class SocialStore: ObservableObject {
     /// Успешное утро поливает общие сады. Без сети полив ждёт следующего открытия (не дольше суток).
     func waterGardens(after entry: JournalEntry) {
         let settings = AppSettings.shared.data
+        // Нет ни одного сада — серверу незачем знать, что человек встал.
+        guard settings.inGardens else { return }
         guard GardenPolicy.shouldWater(entry: entry, privacy: settings.privacy, now: Date(),
                                        lastWateredDay: settings.lastGardenWaterDay) else { return }
         let day = WitnessPolicy.dayKey(entry.date)

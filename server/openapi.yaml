@@ -65,6 +65,8 @@ info:
     - У будильника со ставкой повторная проверка обязательна. Без ставки — по выбору человека
       (поле alarm.recheckEnabled), по умолчанию выключена.
     - В записи журнала поле rechecked: true — утро с повторной проверкой, false — без неё, нет поля — старые записи.
+    - Утро без повторной проверки (только без ставки) заканчивается событием «doneNoRecheck» вместо «recheckDone».
+      Для будильника со ставкой «doneNoRecheck» ничего не значит: там нужен «recheckDone» вовремя.
     - Парный челлендж засчитывает только утра с rechecked != false: соревнование должно быть честным.
       Дерево, опыт и личный прогресс растут от любого успешного утра.
 
@@ -320,7 +322,7 @@ components:
         morningID: { type: string, description: "«alarmID|секунды времени звонка»" }
         alarmID: { type: string, format: uuid }
         ring: { type: string, format: date-time }
-        kind: { type: string, enum: [started, taskDone, recheckDone, failed, technical] }
+        kind: { type: string, enum: [started, taskDone, recheckDone, failed, technical, doneNoRecheck] }
         at: { type: string, format: date-time, description: "По защищённым часам телефона. Только для справки: решающее время — момент получения сервером" }
         signature: { type: string, description: "base64 HMAC-SHA256 строки «morningID|kind|секунды at»" }
     StakeConsent:

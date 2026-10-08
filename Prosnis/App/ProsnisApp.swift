@@ -51,6 +51,7 @@ struct ProsnisApp: App {
         settings.reloadIfNeeded()
         AlarmService.shared.reloadIfNeeded()
         store.reloadIfNeeded()
+        VoiceLibrary.shared.reloadIfNeeded()
         challenges.reloadIfNeeded()
         payments.reloadIfNeeded()
         wake.reconcile()
@@ -114,8 +115,18 @@ struct RootView: View {
                 ProgressTabView()
                     .tabItem { Label("Прогресс", systemImage: "chart.line.uptrend.xyaxis") }
                     .tag(1)
-                    .sheet(isPresented: $router.showWeekly) {
-                        NavigationStack { WeeklySummaryView() }
+                    .sheet(isPresented: Binding(
+                        get: { router.showWeekly && wake.morning == nil && wake.session == nil },
+                        set: { router.showWeekly = $0 }
+                    )) {
+                        NavigationStack {
+                            WeeklySummaryView()
+                                .toolbar {
+                                    ToolbarItem(placement: .confirmationAction) {
+                                        Button("Закрыть") { router.showWeekly = false }
+                                    }
+                                }
+                        }
                     }
                 CommunityView()
                     .tabItem { Label("Сообщество", systemImage: "person.3") }

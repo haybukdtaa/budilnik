@@ -36,7 +36,7 @@ struct MorningView: View {
 
                     rewards(snapshot)
 
-                    if let index = StoryLibrary.chapterOpened(module: state.module, entries: journal.realEntries) {
+                    if let index = state.storyChapter, StoryLibrary.series(for: state.module).chapters.indices.contains(index) {
                         let series = StoryLibrary.series(for: state.module)
                         NavigationLink {
                             StoryChapterView(series: series, index: index)

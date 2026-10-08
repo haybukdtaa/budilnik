@@ -69,6 +69,11 @@ enum AppFiles {
         }
         // Записи своего голоса лежат вне Documents (в Library/Sounds).
         VoiceLibrary.wipeFiles()
+        // Временные файлы: собранный ролик, черновик записи голоса.
+        let temporary = manager.temporaryDirectory
+        if let items = try? manager.contentsOfDirectory(at: temporary, includingPropertiesForKeys: nil) {
+            for item in items { try? manager.removeItem(at: item) }
+        }
         if let domain = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: domain)
         }

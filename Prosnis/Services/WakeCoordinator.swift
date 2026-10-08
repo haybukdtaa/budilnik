@@ -14,6 +14,8 @@ struct MorningState: Identifiable, Equatable {
     let flowersBefore: Bool
     let fruitsBefore: Bool
     let startedAt: Date
+    /// Глава истории, которую открыло это утро.
+    var storyChapter: Int?
 }
 
 /// Ведёт утро от звонка до итога: задание, повторная проверка, деньги, запись в журнал.
@@ -176,7 +178,7 @@ final class WakeCoordinator: ObservableObject {
         let stake = AlarmStore.shared.isStakeActive(alarm) ? alarm.stakeAmount : 0
         let reference: UUID? = stake > 0 ? UUID() : nil
         // Со ставкой повторная проверка обязательна; без ставки — если человек её включил.
-        let withRecheck = stake > 0 || alarm.recheckEnabled == true
+        let withRecheck = stake > 0 || alarm.wantsRecheck
 
         setSession(WakeSession(
             alarmID: alarm.id,
@@ -353,7 +355,6 @@ final class WakeCoordinator: ObservableObject {
         if !current.needsRecheck {
             // Будильник без ставки и без повторной проверки: утро засчитано сразу.
             current.events.append(JournalEvent(date: now, text: "Задание выполнено"))
-            emit(.taskDone, session: current, at: now)
             finish(current, outcome: .success)
             return
         }
@@ -423,7 +424,7 @@ final class WakeCoordinator: ObservableObject {
         }
         let eventKind: WakeEventKind
         switch outcome {
-        case .success: eventKind = .recheckDone
+        case .success: eventKind = finished.needsRecheck ? .recheckDone : .doneNoRecheck
         case .failed: eventKind = .failed
         case .technical: eventKind = .technical
         }
@@ -469,7 +470,9 @@ final class WakeCoordinator: ObservableObject {
                 treeIndexBefore: before.tree.index,
                 flowersBefore: before.tree.flowers,
                 fruitsBefore: before.tree.fruits,
-                startedAt: Date()
+                startedAt: Date(),
+                storyChapter: finished.isDemo ? nil
+                    : StoryLibrary.chapterOpened(module: finished.module, entries: JournalStore.shared.realEntries)
             ))
         }
 
