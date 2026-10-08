@@ -91,6 +91,18 @@ struct RootView: View {
     /// Человек закрыл условия, не согласившись: до следующего запуска не спрашиваем.
     @State private var consentPostponed = false
 
+    /// Запуск с «-screenshotTab N» (для скриншотов в автотестах): сразу вкладка N с тестовыми данными.
+    /// Работает только в отладочной сборке.
+    static var screenshotTab: Int? {
+        #if DEBUG
+        let args = CommandLine.arguments
+        guard let index = args.firstIndex(of: "-screenshotTab"), index + 1 < args.count else { return nil }
+        return Int(args[index + 1])
+        #else
+        return nil
+        #endif
+    }
+
     /// Запуск с «-gardenPreview» (для снимка 3D-сада) работает только в отладочной сборке.
     static var gardenPreviewRequested: Bool {
         #if DEBUG
@@ -110,7 +122,7 @@ struct RootView: View {
         if RootView.gardenPreviewRequested {
             // Для снимка 3D-сада в автотестах: сразу сад, без приветствия.
             NavigationStack { GardenView(forcePreview: true) }
-        } else if !settings.data.onboardingDone {
+        } else if !settings.data.onboardingDone && RootView.screenshotTab == nil {
             OnboardingView()
         } else {
             TabView(selection: $tab) {
@@ -169,6 +181,13 @@ struct RootView: View {
             .sheet(item: $wake.morning) { state in
                 MorningView(state: state)
                     .preferredColorScheme(.dark)
+            }
+            .onAppear {
+                guard let screenshot = RootView.screenshotTab else { return }
+                tab = screenshot
+                // Тестовые данные, чтобы на скриншоте было что показать (только в отладочной сборке).
+                if JournalStore.shared.entries.isEmpty { JournalStore.shared.addDemoEntries() }
+                if !settings.data.useDemoSocial { settings.data.useDemoSocial = true }
             }
             .onChange(of: router.showWeekly) { _, show in
                 if show { tab = 1 }

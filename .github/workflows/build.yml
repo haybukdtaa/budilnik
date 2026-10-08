@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-26
@@ -31,6 +34,7 @@ jobs:
           print(ids[-1] if ids else '')
           ")
           echo "Симулятор: $DEVICE_ID"
+          echo "DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
           set -o pipefail
           xcodebuild test \
             -project Prosnis.xcodeproj \
@@ -63,6 +67,36 @@ jobs:
         with:
           name: Prosnis-ipa
           path: Prosnis.ipa
+
+      - name: Скриншоты экранов в симуляторе
+        if: success() && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          APP=$(find build-tests/Build/Products -path "*iphonesimulator*" -name "Prosnis.app" | head -1)
+          xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl status_bar "$DEVICE_ID" override --time "6:30" --batteryLevel 100 --cellularBars 4 || true
+          xcrun simctl install "$DEVICE_ID" "$APP"
+          mkdir -p shots
+          shoot() {
+            xcrun simctl terminate "$DEVICE_ID" app.prosnis.alarm 2>/dev/null || true
+            xcrun simctl launch "$DEVICE_ID" app.prosnis.alarm "$@"
+            sleep 15
+            xcrun simctl io "$DEVICE_ID" screenshot "shots/$NAME.png"
+          }
+          NAME=garden; shoot -gardenPreview
+          NAME=alarms; shoot -screenshotTab 0
+          NAME=progress; shoot -screenshotTab 1
+          NAME=community; shoot -screenshotTab 2
+          NAME=profile; shoot -screenshotTab 3
+          cd shots
+          git init -q
+          git checkout -q -b ci-screens
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git add *.png
+          git commit -qm "Скриншоты для ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-screens
 
       - name: Итоги тестов и предупреждений
         if: always()
