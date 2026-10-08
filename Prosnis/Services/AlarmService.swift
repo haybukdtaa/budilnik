@@ -396,6 +396,38 @@ final class AlarmService {
         }
     }
 
+    /// Громкое напоминание о лекарстве. Возвращает id системного будильника или nil.
+    func scheduleMedAlarm(at date: Date, title: String, medicationID: UUID, scheduled: Date) async -> UUID? {
+        guard date > Date(), await ensureAuthorization() else { return nil }
+        let systemID = UUID()
+        let taken = AlarmButton(text: "Принял(а)", textColor: .white, systemImageName: "checkmark.circle")
+        let later = AlarmButton(text: "Через \(MedStore.snoozeMinutes) минут", textColor: .white, systemImageName: "clock")
+        let alert = AlarmPresentation.Alert(
+            title: LocalizedStringResource(stringLiteral: title),
+            stopButton: taken,
+            secondaryButton: later,
+            secondaryButtonBehavior: .custom
+        )
+        let attributes = AlarmAttributes<ProsnisAlarmData>(
+            presentation: AlarmPresentation(alert: alert),
+            metadata: ProsnisAlarmData(),
+            tintColor: Theme.mint
+        )
+        let configuration = AlarmManager.AlarmConfiguration.alarm(
+            schedule: .fixed(date),
+            attributes: attributes,
+            stopIntent: MedTakenIntent(medicationID: medicationID, scheduled: scheduled, systemID: systemID),
+            secondaryIntent: MedSnoozeIntent(medicationID: medicationID, scheduled: scheduled, systemID: systemID),
+            sound: .default
+        )
+        do {
+            _ = try await manager.schedule(id: systemID, configuration: configuration)
+            return systemID
+        } catch {
+            return nil
+        }
+    }
+
     /// Тестовый будильник через `seconds` секунд, чтобы проверить звонок.
     func scheduleTest(after seconds: TimeInterval) async -> String {
         guard await ensureAuthorization() else {

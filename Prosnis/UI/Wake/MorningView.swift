@@ -58,6 +58,10 @@ struct MorningView: View {
                         .buttonStyle(.plain)
                     }
 
+                    if settings.data.medsEnabled {
+                        MorningMedsLine()
+                    }
+
                     MorningPhotoCard(date: state.startedAt)
 
                     if !checklist.isEmpty {

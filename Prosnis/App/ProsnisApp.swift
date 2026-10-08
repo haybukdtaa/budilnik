@@ -15,6 +15,7 @@ struct ProsnisApp: App {
 
     init() {
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
+        MedStore.registerCategory()
         Theme.applyAppearance()
     }
 
@@ -68,6 +69,8 @@ struct ProsnisApp: App {
         await payments.checkIfNeeded()
         social.sendPendingWitnessNotice()
         social.sendPendingGardenWater()
+        MedStore.shared.reloadIfNeeded()
+        MedStore.shared.refresh()
         await WeeklyNotification.update(enabled: settings.data.weeklySummaryOn)
         AccountStore.shared.ensureIdentity()
         await AccountStore.shared.ensureSignedIn()
@@ -160,6 +163,11 @@ struct RootView: View {
                 CommunityView()
                     .tabItem { Label("Сообщество", systemImage: "person.3") }
                     .tag(2)
+                if settings.data.medsEnabled {
+                    MedsView()
+                        .tabItem { Label("Лекарства", systemImage: "pills") }
+                        .tag(4)
+                }
                 ProfileView()
                     .tabItem { Label("Профиль", systemImage: "person.crop.circle") }
                     .tag(3)
@@ -192,9 +200,26 @@ struct RootView: View {
                 // Тестовые данные, чтобы на скриншоте было что показать (только в отладочной сборке).
                 if JournalStore.shared.entries.isEmpty { JournalStore.shared.addDemoEntries() }
                 if !settings.data.useDemoSocial { settings.data.useDemoSocial = true }
+                if !settings.data.medsEnabled { settings.data.medsEnabled = true }
+                if MedStore.shared.meds.isEmpty {
+                    var vitamin = Medication(name: "Витамин D", dose: "1 капсула", form: .capsule, times: [8 * 60 + 30], meal: .after)
+                    vitamin.startDate = Calendar.current.startOfDay(for: Date())
+                    MedStore.shared.save(vitamin)
+                    var antibiotic = Medication(name: "Амоксициллин", dose: "500 мг", form: .tablet, times: [9 * 60, 21 * 60], meal: .during)
+                    antibiotic.startDate = Calendar.current.startOfDay(for: Date())
+                    antibiotic.endDate = Date().addingTimeInterval(6 * 86400)
+                    antibiotic.stock = 8
+                    MedStore.shared.save(antibiotic)
+                }
             }
             .onChange(of: router.showWeekly) { _, show in
                 if show { tab = 1 }
+            }
+            .onChange(of: router.showMeds) { _, show in
+                if show {
+                    tab = 4
+                    router.showMeds = false
+                }
             }
             .task {
                 // Пока приложение открыто, сверка идёт каждые 30 секунд: звонок мог прийти, пока экран был включён.

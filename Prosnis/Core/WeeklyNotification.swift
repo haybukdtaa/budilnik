@@ -28,14 +28,33 @@ final class NotificationRouter: NSObject, ObservableObject, UNUserNotificationCe
     static let shared = NotificationRouter()
 
     @Published var showWeekly = false
+    @Published var showMeds = false
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        if response.notification.request.identifier == WeeklyNotification.identifier {
+        let request = response.notification.request
+        if request.identifier == WeeklyNotification.identifier {
             DispatchQueue.main.async { self.showWeekly = true }
+            completionHandler()
+            return
+        }
+        if request.content.categoryIdentifier == MedStore.category {
+            let action = response.actionIdentifier
+            let info = request.content.userInfo
+            if action == UNNotificationDefaultActionIdentifier {
+                DispatchQueue.main.async { self.showMeds = true }
+                completionHandler()
+                return
+            }
+            // «Принял(а)» или «Через 10 минут» прямо из уведомления, без открытия приложения.
+            Task { @MainActor in
+                await MedStore.shared.handleNotificationAction(action, userInfo: info)
+                completionHandler()
+            }
+            return
         }
         completionHandler()
     }

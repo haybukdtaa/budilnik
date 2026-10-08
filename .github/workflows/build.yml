@@ -89,6 +89,7 @@ jobs:
           NAME=progress; shoot -screenshotTab 1
           NAME=community; shoot -screenshotTab 2
           NAME=profile; shoot -screenshotTab 3
+          NAME=meds; shoot -screenshotTab 4
           cd shots
           git init -q
           git checkout -q -b ci-screens

@@ -226,6 +226,16 @@ struct PrivacyView: View {
                 Text("В таблицах видны имя, аватар и результат. Без участия вы видите таблицы, но вас в них нет.")
             }
 
+            if settings.data.medsEnabled {
+                Section {
+                    Toggle("Название лекарства на экране блокировки", isOn: $settings.data.medsShowNames)
+                } header: {
+                    Text("Лекарства")
+                } footer: {
+                    Text("Выключено: в напоминании написано только «Время принять лекарство». Сведения о лекарствах никогда не уходят на сервер и друзьям.")
+                }
+            }
+
             if settings.isEnabled(.prayer) {
                 Section {
                     Toggle("Показывать подъём на Фаджр", isOn: $settings.data.privacy.sharePrayer)

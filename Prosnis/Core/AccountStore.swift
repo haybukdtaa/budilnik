@@ -270,6 +270,8 @@ final class AccountStore: ObservableObject {
         DemoBackend.shared.reload()
         VoiceLibrary.shared.reload()
         MorningPhotoStore.shared.reload()
+        MedStore.shared.reload()
+        MedStore.shared.refresh()
         await WeeklyNotification.update(enabled: false)
         // Последним: перезагрузки выше могли поставить изменения в очередь.
         SyncEngine.shared.clear()

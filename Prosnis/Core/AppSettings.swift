@@ -51,6 +51,10 @@ struct SettingsData: Codable, Equatable {
     var identityCreated = false
     /// Аккаунт восстановлен, но данные с сервера ещё не загрузились: повторить при открытии.
     var pendingRestoreMerge = false
+    /// Модуль «Лекарства» (пятая вкладка).
+    var medsEnabled = false
+    /// Показывать название лекарства на экране блокировки. По умолчанию — нет.
+    var medsShowNames = false
 
     init() {}
 
@@ -87,6 +91,8 @@ struct SettingsData: Codable, Equatable {
         recoverySaved = try c.decodeIfPresent(Bool.self, forKey: .recoverySaved) ?? base.recoverySaved
         identityCreated = try c.decodeIfPresent(Bool.self, forKey: .identityCreated) ?? base.identityCreated
         pendingRestoreMerge = try c.decodeIfPresent(Bool.self, forKey: .pendingRestoreMerge) ?? base.pendingRestoreMerge
+        medsEnabled = try c.decodeIfPresent(Bool.self, forKey: .medsEnabled) ?? base.medsEnabled
+        medsShowNames = try c.decodeIfPresent(Bool.self, forKey: .medsShowNames) ?? base.medsShowNames
     }
 }
 
@@ -106,6 +112,9 @@ final class AppSettings: ObservableObject {
             guard !suppressSideEffects else { return }
             if oldValue.privacy.syncPrayerData && !data.privacy.syncPrayerData {
                 SyncEngine.shared.purgeSensitive()
+            }
+            if data.medsEnabled != oldValue.medsEnabled || data.medsShowNames != oldValue.medsShowNames {
+                MedStore.shared.refresh()
             }
             if data.prayer != oldValue.prayer {
                 AlarmStore.shared.refreshDatedAlarms(force: true)

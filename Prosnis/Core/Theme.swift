@@ -40,6 +40,8 @@ enum Theme {
         endPoint: .trailing
     )
     static let leaf = Color(red: 0.365, green: 0.643, blue: 0.541)
+    /// Цвет лекарств: мягкий мятный, чтобы с первого взгляда отличаться от будильников подъёма.
+    static let mint = Color(red: 0.30, green: 0.64, blue: 0.62)
 
     /// Шрифт с нужной толщиной. Lora и Manrope — переменные шрифты: толщина задаётся осью «wght».
     static func uiFont(_ family: String, size: CGFloat, weight: CGFloat) -> UIFont {

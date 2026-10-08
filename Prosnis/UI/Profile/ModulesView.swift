@@ -26,6 +26,21 @@ struct ModulesView: View {
                 Text("Модули определяют шаблоны будильников, утренний чек-лист и программу после подъёма. Модуль «Утренний намаз» и всё, что с ним связано, хранится только на телефоне, пока вы сами не разрешите иное в Приватности.")
             }
 
+            Section {
+                Toggle(isOn: $settings.data.medsEnabled) {
+                    Label {
+                        VStack(alignment: .leading) {
+                            Text("Лекарства")
+                            Text("Напоминания о таблетках, курс и запас").font(.app(.caption)).foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "pills")
+                    }
+                }
+            } footer: {
+                Text("Отдельная вкладка. Без ставок и заданий: лекарства — это забота, а не испытание. Сведения о лекарствах хранятся только на телефоне.")
+            }
+
             Section("Настройки модулей") {
                 ForEach(settings.data.modules) { module in
                     NavigationLink {

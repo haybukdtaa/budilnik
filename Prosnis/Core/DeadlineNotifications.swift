@@ -6,7 +6,7 @@ import UserNotifications
 @MainActor
 enum DeadlineNotifications {
     /// iOS хранит не больше 64 запланированных уведомлений; оставляем запас.
-    static let maxPending = 50
+    static let maxPending = 30
     private static let prefix = "deadline-"
     private static let recheckPrefix = "deadline-recheck-"
     private static let refreshReminderID = "refresh-reminder"

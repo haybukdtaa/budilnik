@@ -231,6 +231,7 @@ final class AlarmStore: ObservableObject {
     func cleanupOrphans() {
         var known = Set(alarms.map(\.id))
         if let recheck = WakeCoordinator.shared.session?.recheckAlarmID { known.insert(recheck) }
+        known.formUnion(MedStore.shared.scheduledAlarmIDs)
         service.pruneOrphans(known: known)
         let used = Set(alarms.compactMap { alarm -> String? in
             if case .photo(let name) = alarm.wallpaper { return name }
