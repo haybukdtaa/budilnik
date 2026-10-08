@@ -250,6 +250,11 @@ final class SocialStore: ObservableObject {
     }
 
     func answer(_ request: FriendRequest, accept: Bool) async {
+        // От заблокированного человека заявку принять нельзя.
+        if accept && AppSettings.shared.isBlocked(request.from.id) {
+            friendRequests.removeAll { $0.id == request.id }
+            return
+        }
         await run {
             let friend = try await backend.answerFriendRequest(request.id, accept: accept)
             friendRequests.removeAll { $0.id == request.id }

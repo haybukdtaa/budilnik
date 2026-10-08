@@ -9,7 +9,7 @@ final class AccountStore: ObservableObject {
 
     private static let tokenKey = "auth.token"
     private static let secretKey = "auth.secret"
-    private static let phraseKey = "auth.phrase"
+    private static let phraseKey = "auth.phrase.v2"
 
     @Published private(set) var token: String?
     /// Почему не удалось войти на сервер (показывается в Профиле).
@@ -32,7 +32,7 @@ final class AccountStore: ObservableObject {
         token = nil
     }
 
-    /// Код восстановления из 12 слов. Создаётся один раз; из него выводятся номер аккаунта и секрет устройства.
+    /// Код восстановления из 16 слов. Создаётся один раз; из него выводятся номер аккаунта и секрет устройства.
     var recoveryWords: [String] {
         ensureIdentity()
         return (Keychain.get(AccountStore.phraseKey) ?? "").split(separator: " ").map(String.init)
@@ -60,8 +60,8 @@ final class AccountStore: ObservableObject {
     private func adopt(phrase: [String]) {
         let identity = RecoveryPhrase.identity(for: phrase)
         // Переносится на новый телефон с зашифрованной резервной копией; без неё — по коду.
-        Keychain.set(phrase.joined(separator: " "), for: AccountStore.phraseKey, migratable: true)
         Keychain.set(identity.secret, for: AccountStore.secretKey, migratable: true)
+        Keychain.set(phrase.joined(separator: " "), for: AccountStore.phraseKey, migratable: true)
         if AppSettings.shared.data.profile.id != identity.userID {
             AppSettings.shared.data.profile.id = identity.userID
             AppSettings.shared.data.friendNumber = nil
@@ -69,23 +69,31 @@ final class AccountStore: ObservableObject {
         }
     }
 
-    /// Секрет устройства, выведенный из кода восстановления.
-    private var deviceSecret: String {
+    /// Секрет устройства, выведенный из кода восстановления. nil — связка ключей закрыта (до первой разблокировки).
+    private var deviceSecret: String? {
         ensureIdentity()
-        return Keychain.get(AccountStore.secretKey) ?? ""
+        return Keychain.get(AccountStore.secretKey)
     }
+
+    /// Идёт восстановление: обычный вход на сервер в это время не выполняется.
+    private var isRestoring = false
 
     /// Подпись секретом устройства (для событий утра).
     func sign(_ message: String) -> String {
-        WakeEvent.sign(message, secret: deviceSecret)
+        // Без секрета подписи нет: сервер такое событие не примет, но и подделать его пустым ключом нельзя.
+        guard let secret = deviceSecret, !secret.isEmpty else { return "" }
+        return WakeEvent.sign(message, secret: secret)
     }
 
     /// Если сервер подключён, а токена нет, регистрирует устройство. Без сервера ничего не делает.
     func ensureSignedIn() async {
-        guard token == nil, let url = AppConfig.serverURL else { return }
+        guard token == nil, !isRestoring, let url = AppConfig.serverURL, let secret = deviceSecret else { return }
         let backend = BackendRegistry.httpBackend(url)
+        let profile = AppSettings.shared.data.profile
         do {
-            let result = try await backend.register(profile: AppSettings.shared.data.profile, secret: deviceSecret)
+            let result = try await backend.register(profile: profile, secret: secret)
+            // Пока ждали ответ, аккаунт сменился (восстановление): чужой токен не сохраняем.
+            guard !isRestoring, AppSettings.shared.data.profile.id == profile.id else { return }
             signIn(token: result.token)
             if let number = result.number { AppSettings.shared.data.friendNumber = number }
             signInProblem = nil
@@ -96,15 +104,20 @@ final class AccountStore: ObservableObject {
         }
     }
 
-    /// Восстанавливает аккаунт по коду из 12 слов на этом телефоне. Возвращает текст ошибки или nil.
+    /// Восстанавливает аккаунт по коду восстановления на этом телефоне. Возвращает текст ошибки или nil.
     /// Данные с сервера добавляются к тем, что уже есть на телефоне; ничего не удаляется.
     func restore(phraseText: String) async -> String? {
         guard let phrase = RecoveryPhrase.parse(phraseText) else {
-            return "Нужно 12 слов из кода восстановления. Проверьте, что все слова написаны без ошибок."
+            return "Нужно \(RecoveryPhrase.wordCount) слов из кода восстановления. Проверьте, что все слова написаны без ошибок."
         }
         if phrase == recoveryWords { return "Это код этого же аккаунта: восстанавливать нечего." }
+        guard !isRestoring else { return "Восстановление уже идёт." }
         if WakeCoordinator.shared.session != nil {
             return "Сейчас идёт утренняя проверка. Восстановить аккаунт можно после неё."
+        }
+        // Данные этого телефона принадлежат другому аккаунту: смешивать их с восстановленным нельзя.
+        if !JournalStore.shared.realEntries.isEmpty || !AlarmStore.shared.alarms.isEmpty || !ChallengeStore.shared.challenges.isEmpty {
+            return "На этом телефоне уже есть свои будильники или дневник. Восстановить аккаунт можно только на чистом телефоне: сначала удалите данные в Профиле."
         }
         guard let url = AppConfig.serverURL else {
             return "Сервер ещё не подключён: восстанавливать пока неоткуда. Код начнёт работать вместе с сервером."
@@ -113,8 +126,12 @@ final class AccountStore: ObservableObject {
         let backend = BackendRegistry.httpBackend(url)
         var profile = AppSettings.shared.data.profile
         profile.id = identity.userID
+        isRestoring = true
+        defer { isRestoring = false }
         do {
             let result = try await backend.register(profile: profile, secret: identity.secret, restore: true)
+            // Неотправленные изменения прежнего аккаунта не должны уйти в восстановленный.
+            SyncEngine.shared.clear()
             adopt(phrase: phrase)
             signIn(token: result.token)
             if let number = result.number { AppSettings.shared.data.friendNumber = number }

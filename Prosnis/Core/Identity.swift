@@ -1,14 +1,17 @@
+import CommonCrypto
 import CryptoKit
 import Foundation
 import Security
 
-/// Код восстановления: 12 простых слов. Из них выводятся номер аккаунта и секрет устройства,
-/// поэтому на новом телефоне эти 12 слов возвращают тот же аккаунт. Без регистрации, телефона и почты.
+/// Код восстановления: 16 простых слов. Из них выводятся номер аккаунта и секрет устройства,
+/// поэтому на новом телефоне эти слова возвращают тот же аккаунт. Без регистрации, телефона и почты.
 enum RecoveryPhrase {
-    static let wordCount = 12
+    static let wordCount = 16
+    /// Повторов медленного вывода ключа: каждая попытка перебора стоит в сто тысяч раз дороже.
+    static let kdfRounds: UInt32 = 100_000
 
-    /// 256 слов: каждое слово — 8 бит, 12 слов — 96 бит. Подобрать такой код перебором невозможно,
-    /// тем более что сервер ограничивает число попыток.
+    /// 256 слов: каждое слово — 8 бит, 16 слов — 128 бит. Подобрать такой код перебором невозможно
+    /// ни через сервер, ни без него (даже зная номер аккаунта).
     static let words: [String] = [
         "дом", "лес", "сад", "мост", "кот", "сон", "мир", "луг", "дуб", "рак", "лук", "сыр", "чай", "суп", "хлеб", "соль",
         "река", "гора", "поле", "море", "небо", "звезда", "луна", "солнце", "ветер", "дождь", "снег", "туман", "облако", "радуга", "заря", "закат",
@@ -45,15 +48,34 @@ enum RecoveryPhrase {
         return parts
     }
 
-    /// Номер аккаунта и секрет устройства, однозначно выведенные из кода.
+    /// Номер аккаунта и секрет устройства, однозначно выведенные из кода через PBKDF2.
+    /// Номер и секрет получаются из общего ключа разными путями: по номеру секрет не узнать.
     static func identity(for phrase: [String]) -> (userID: UUID, secret: String) {
-        let seed = Data(SHA256.hash(data: Data(("prosnis-recovery-v1|" + phrase.joined(separator: " ")).utf8)))
-        var b = Array(seed.prefix(16))
+        let seed = derive(phrase.joined(separator: " "))
+        let idHash = Data(SHA256.hash(data: Data("id|".utf8) + seed))
+        var b = Array(idHash.prefix(16))
         b[6] = (b[6] & 0x0F) | 0x40 // UUID версии 4
         b[8] = (b[8] & 0x3F) | 0x80
         let userID = UUID(uuid: (b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]))
         let secret = Data(SHA256.hash(data: Data("secret|".utf8) + seed)).base64EncodedString()
         return (userID, secret)
+    }
+
+    private static func derive(_ password: String) -> Data {
+        let passwordBytes = Array(password.utf8)
+        let salt = Array("prosnis-recovery-v2".utf8)
+        var derived = [UInt8](repeating: 0, count: 32)
+        let status = passwordBytes.withUnsafeBufferPointer { passwordPointer in
+            passwordPointer.withMemoryRebound(to: Int8.self) { password in
+                CCKeyDerivationPBKDF(
+                    CCPBKDFAlgorithm(kCCPBKDF2), password.baseAddress, password.count,
+                    salt, salt.count, CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256), kdfRounds,
+                    &derived, derived.count
+                )
+            }
+        }
+        precondition(status == kCCSuccess, "PBKDF2 не сработал")
+        return Data(derived)
     }
 }
 

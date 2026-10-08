@@ -50,7 +50,7 @@ struct ProfileView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Label("Код восстановления", systemImage: "key")
                             if !settings.data.recoverySaved {
-                                Text("Запишите 12 слов: без них аккаунт не вернуть на новом телефоне")
+                                Text("Запишите \(RecoveryPhrase.wordCount) слов: без них аккаунт не вернуть на новом телефоне")
                                     .font(.caption)
                                     .foregroundStyle(.orange)
                             }

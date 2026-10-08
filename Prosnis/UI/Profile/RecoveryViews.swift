@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Код восстановления: 12 слов, которые возвращают аккаунт на новом телефоне.
+/// Код восстановления: 16 слов, которые возвращают аккаунт на новом телефоне.
 struct RecoveryCodeView: View {
     @EnvironmentObject private var settings: AppSettings
     @State private var revealed = false
@@ -9,7 +9,7 @@ struct RecoveryCodeView: View {
         let words = AccountStore.shared.recoveryWords
         List {
             Section {
-                Text("Регистрации нет: ни телефона, ни почты. Ваш аккаунт — это эти 12 слов. Запишите их на бумаге и храните дома. На новом телефоне они вернут дерево, друзей и дневник подъёмов.")
+                Text("Регистрации нет: ни телефона, ни почты. Ваш аккаунт — это эти 16 слов. Запишите их на бумаге и храните дома. На новом телефоне они вернут дерево, друзей и дневник подъёмов.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -53,12 +53,12 @@ struct RestoreAccountView: View {
     var body: some View {
         List {
             Section {
-                TextField("12 слов через пробел", text: $text, axis: .vertical)
+                TextField("\(RecoveryPhrase.wordCount) слов через пробел", text: $text, axis: .vertical)
                     .lineLimit(3...6)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             } footer: {
-                Text("Введите слова в том же порядке. Данные с сервера добавятся к тем, что уже есть на этом телефоне.")
+                Text("Введите слова в том же порядке. Восстановить можно только на телефоне без своих будильников и дневника.")
             }
             Section {
                 Button(working ? "Восстанавливаем…" : "Восстановить") {

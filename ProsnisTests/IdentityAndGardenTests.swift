@@ -14,7 +14,8 @@ final class IdentityAndGardenTests: XCTestCase {
 
     func testGeneratedPhraseParsesBackAndGivesSameIdentity() {
         let phrase = RecoveryPhrase.generate()
-        XCTAssertEqual(phrase.count, 12)
+        XCTAssertEqual(phrase.count, RecoveryPhrase.wordCount)
+        XCTAssertEqual(RecoveryPhrase.wordCount, 16, "128 бит: 16 слов по 8 бит")
         let typed = phrase.joined(separator: ",  ").uppercased()
         XCTAssertEqual(RecoveryPhrase.parse(typed), phrase, "Регистр, запятые и пробелы не важны")
         let first = RecoveryPhrase.identity(for: phrase)
@@ -26,9 +27,10 @@ final class IdentityAndGardenTests: XCTestCase {
 
     func testParseRejectsWrongCodes() {
         XCTAssertNil(RecoveryPhrase.parse("дом лес сад"))
-        let eleven = Array(RecoveryPhrase.words.prefix(11)).joined(separator: " ")
-        XCTAssertNil(RecoveryPhrase.parse(eleven + " абракадабра"))
-        XCTAssertNotNil(RecoveryPhrase.parse(Array(RecoveryPhrase.words.prefix(12)).joined(separator: " ")))
+        let almost = Array(RecoveryPhrase.words.prefix(RecoveryPhrase.wordCount - 1)).joined(separator: " ")
+        XCTAssertNil(RecoveryPhrase.parse(almost + " абракадабра"))
+        XCTAssertNil(RecoveryPhrase.parse(almost), "Не хватает слова")
+        XCTAssertNotNil(RecoveryPhrase.parse(Array(RecoveryPhrase.words.prefix(RecoveryPhrase.wordCount)).joined(separator: " ")))
     }
 
     // MARK: Номер для друзей
