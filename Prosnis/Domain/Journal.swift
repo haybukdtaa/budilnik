@@ -49,6 +49,8 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var paymentRef: UUID?
     /// Была ли повторная проверка. false — утро без неё (будильник без ставки). nil — старые записи и пропуски.
     var rechecked: Bool?
+    /// Списание ещё не показано карточкой в приложении (false). nil — показывать нечего или уже показано.
+    var chargeSeen: Bool?
 
     /// Сколько реально списано по этой записи.
     var charged: Int {
@@ -184,6 +186,20 @@ final class JournalStore: ObservableObject {
         entries[index].routineTotal = total
         save()
         AppEvents.journalChanged(entries[index])
+    }
+
+    /// Самое раннее списание, которое ещё не показано карточкой.
+    nonisolated static func firstUnseenCharge(in entries: [JournalEntry]) -> JournalEntry? {
+        entries
+            .filter { $0.chargeSeen == false && $0.isDemo != true && $0.outcome == .failed && $0.stake > 0 }
+            .min { $0.date < $1.date }
+    }
+
+    /// Карточку списания посмотрели.
+    func markChargeSeen(_ id: UUID) {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        entries[index].chargeSeen = nil
+        save()
     }
 
     /// Есть ли запись об этом будильнике около указанного звонка.

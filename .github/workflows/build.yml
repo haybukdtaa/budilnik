@@ -90,6 +90,8 @@ jobs:
           NAME=community; shoot -screenshotTab 2
           NAME=profile; shoot -screenshotTab 3
           NAME=meds; shoot -screenshotTab 4
+          NAME=prayer; shoot -screenshotScreen prayer
+          NAME=charge; shoot -screenshotScreen charge
           cd shots
           git init -q
           git checkout -q -b ci-screens

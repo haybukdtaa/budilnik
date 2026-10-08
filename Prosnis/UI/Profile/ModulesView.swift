@@ -118,10 +118,14 @@ struct ModuleSettingsView: View {
     }
 }
 
-/// Настройки расчёта Фаджра.
+/// Настройки Фаджра: город и одно действие — подогнать время под свой источник.
 struct PrayerSettingsView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var store: AlarmStore
+    @State private var entered = Date()
+    @State private var message: String?
+    @State private var messageIsError = false
+    @State private var didSetInitial = false
 
     /// Будильник на Фаджр со ставкой закрыт: менять расчёт нельзя, иначе звонок можно сдвинуть или убрать.
     private var lockedByStake: Bool {
@@ -138,52 +142,125 @@ struct PrayerSettingsView: View {
                 }
             }
             Group {
-            Section("Город") {
-                Picker("Город", selection: $settings.data.prayer.cityID) {
-                    ForEach(City.all) { Text($0.name).tag($0.id) }
-                }
-            }
-            Section {
-                Picker("Способ", selection: $settings.data.prayer.method) {
-                    ForEach(PrayerMethod.allCases) { Text($0.title).tag($0) }
-                }
-                if prayer.method == .custom {
-                    Stepper(String(format: "Угол: %.1f°", prayer.customAngle),
-                            value: $settings.data.prayer.customAngle, in: 10...20, step: 0.5)
-                }
-                Picker("Высокие широты", selection: $settings.data.prayer.highLatitude) {
-                    ForEach(HighLatitudeRule.allCases) { Text($0.title).tag($0) }
-                }
-                Stepper("Поправка: \(prayer.adjustmentMinutes) мин", value: $settings.data.prayer.adjustmentMinutes, in: -30...30)
-            } header: {
-                Text("Расчёт Фаджра")
-            } footer: {
-                Text("ДУМ РФ считает Фаджр по углу 16°, ДУМ Татарстана — по 18°. Летом в средней полосе солнце не опускается на нужный угол, тогда время считается по правилу высоких широт. Если ваша мечеть публикует другое время, задайте поправку.")
-            }
-            Section("Ближайшие 7 дней") {
-                ForEach(0..<7, id: \.self) { offset in
-                    let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) ?? Date()
-                    let day = PrayerTimes.day(for: date, settings: prayer)
-                    HStack {
-                        Text(Format.weekday(date))
-                        Spacer()
-                        Text(day.fajr.map(Format.time) ?? "—").monospacedDigit()
-                        if day.fajrAdjusted {
-                            Image(systemName: "moon.haze").foregroundStyle(.secondary)
-                        }
-                        Text("восход \(day.sunrise.map(Format.time) ?? "—")")
-                            .font(.app(.caption))
-                            .foregroundStyle(.secondary)
+                Section("Город") {
+                    Picker("Город", selection: $settings.data.prayer.cityID) {
+                        ForEach(City.all) { Text($0.name).tag($0.id) }
                     }
                 }
-                Text("Значок луны: время по правилу высоких широт.")
-                    .font(.app(.caption))
-                    .foregroundStyle(.secondary)
-            }
+
+                Section {
+                    Text("Время Фаджра зависит от того, как его считает ваша мечеть или муфтият: у одних солнце должно опуститься на 16° под горизонт, у других — на 18° и больше. Поэтому в разных приложениях время отличается на несколько минут, а иногда и на полчаса.")
+                        .font(.app(.footnote))
+                        .foregroundStyle(.secondary)
+                    Text("Введите один раз время Фаджра на сегодня из источника, которому вы доверяете. Мы подберём угол и дальше будем считать по нему каждый день — и зимой, и летом.")
+                        .font(.app(.footnote))
+                        .foregroundStyle(.secondary)
+                    DatePicker("Фаджр сегодня у вас", selection: $entered, displayedComponents: .hourAndMinute)
+                    Button("Подобрать") { calibrate() }
+                    if let message {
+                        Label(message, systemImage: messageIsError ? "exclamationmark.circle" : "checkmark.circle")
+                            .font(.app(.footnote))
+                            .foregroundStyle(messageIsError ? Theme.accent : Theme.leaf)
+                    }
+                } header: {
+                    Text("Подогнать под ваш источник")
+                } footer: {
+                    if prayer.method == .custom, let minutes = prayer.calibratedMinutes, let on = prayer.calibratedOn {
+                        Text("Сейчас: угол \(PrayerCalibration.angleText(prayer.customAngle))°, подобран по вашему времени \(String(format: "%02d:%02d", minutes / 60, minutes % 60)) от \(Format.dayKey(AppSettings.dayKey(on))).")
+                    }
+                }
+
+                Section("Ближайшие 7 дней") {
+                    ForEach(0..<7, id: \.self) { offset in
+                        let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) ?? Date()
+                        let day = PrayerTimes.day(for: date, settings: prayer)
+                        HStack {
+                            Text(Format.weekday(date))
+                            Spacer()
+                            Text(day.fajr.map(Format.time) ?? "—").monospacedDigit()
+                            if day.fajrAdjusted {
+                                Image(systemName: "moon.haze").foregroundStyle(.secondary)
+                            }
+                            Text("восход \(day.sunrise.map(Format.time) ?? "—")")
+                                .font(.app(.caption))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    DisclosureGroup("Дополнительно") {
+                        Picker("Способ", selection: Binding(
+                            get: { settings.data.prayer.method },
+                            set: { value in
+                                settings.data.prayer.method = value
+                                clearCalibration()
+                            }
+                        )) {
+                            ForEach(PrayerMethod.allCases) { Text($0.title).tag($0) }
+                        }
+                        if prayer.method == .custom {
+                            Stepper(String(format: "Угол: %.1f°", prayer.customAngle), value: Binding(
+                                get: { settings.data.prayer.customAngle },
+                                set: { value in
+                                    settings.data.prayer.customAngle = value
+                                    clearCalibration()
+                                }
+                            ), in: 10...20, step: 0.5)
+                        }
+                        Picker("Высокие широты", selection: $settings.data.prayer.highLatitude) {
+                            ForEach(HighLatitudeRule.allCases) { Text($0.title).tag($0) }
+                        }
+                        Stepper("Поправка: \(prayer.adjustmentMinutes) мин", value: $settings.data.prayer.adjustmentMinutes, in: -30...30)
+                    }
+                } footer: {
+                    Text("Обычно здесь ничего менять не нужно: достаточно подогнать время выше.")
+                }
             }
             .disabled(lockedByStake)
         }
         .navigationTitle("Фаджр")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            guard !didSetInitial else { return }
+            didSetInitial = true
+            entered = wallClock(PrayerTimes.day(for: Date(), settings: prayer).fajr, zone: prayer.city.timeZone)
+        }
+    }
+
+    /// Показывает время города в выборе времени (выбор работает в поясе телефона).
+    private func wallClock(_ date: Date?, zone: TimeZone) -> Date {
+        guard let date else { return Calendar.current.date(bySettingHour: 5, minute: 0, second: 0, of: Date()) ?? Date() }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        return Calendar.current.date(bySettingHour: parts.hour ?? 5, minute: parts.minute ?? 0, second: 0, of: Date()) ?? Date()
+    }
+
+    private func calibrate() {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: entered)
+        let minutes = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+        let now = Date()
+        let prayer = settings.data.prayer
+        guard let target = PrayerCalibration.fajrDate(minutes: minutes, on: now, settings: prayer),
+              let angle = PrayerCalibration.angle(forFajr: target, on: now, settings: prayer) else {
+            messageIsError = true
+            message = "Такое время не похоже на Фаджр для города «\(prayer.city.name)» на сегодня. Проверьте город и время."
+            return
+        }
+        var updated = prayer
+        updated.method = .custom
+        updated.customAngle = angle
+        updated.adjustmentMinutes = 0
+        updated.calibratedMinutes = minutes
+        updated.calibratedOn = now
+        settings.data.prayer = updated
+        messageIsError = false
+        message = "Готово: угол \(PrayerCalibration.angleText(angle))°. Дальше Фаджр считается по нему."
+    }
+
+    private func clearCalibration() {
+        settings.data.prayer.calibratedMinutes = nil
+        settings.data.prayer.calibratedOn = nil
     }
 }

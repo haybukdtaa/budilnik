@@ -25,12 +25,17 @@ enum DeadlineNotifications {
         (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
+    /// Текст единственного уведомления — в момент списания. Предупреждений заранее нет.
+    nonisolated static func text(amount: Int, isRecheck: Bool) -> (title: String, body: String) {
+        (title: "Списано \(amount) ₽",
+         body: isRecheck ? "Вторая проверка не пройдена." : "Задание не выполнено за 10 минут.")
+    }
+
     private static func content(amount: Int, isRecheck: Bool) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.title = "Время вышло"
-        let what = isRecheck ? "Вторая проверка не пройдена" : "Задание не выполнено за 10 минут"
-        let training = PaymentsStore.shared.isTraining ? " (тренировка: деньги не двигаются)" : ""
-        content.body = "\(what). Ставка \(amount) ₽ будет списана\(training)."
+        let text = text(amount: amount, isRecheck: isRecheck)
+        content.title = text.title
+        content.body = text.body
         content.sound = .default
         return content
     }

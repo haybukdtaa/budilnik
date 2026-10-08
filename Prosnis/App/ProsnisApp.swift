@@ -92,6 +92,7 @@ struct RootView: View {
     @EnvironmentObject private var wake: WakeCoordinator
     @ObservedObject private var alarmStore = AlarmStore.shared
     @ObservedObject private var router = NotificationRouter.shared
+    @ObservedObject private var journal = JournalStore.shared
     @State private var tab = 0
     /// Человек закрыл условия, не согласившись: до следующего запуска не спрашиваем.
     @State private var consentPostponed = false
@@ -106,6 +107,33 @@ struct RootView: View {
         #else
         return nil
         #endif
+    }
+
+    /// Запуск с «-screenshotScreen имя» (для скриншотов в автотестах): сразу нужный экран. Только в отладочной сборке.
+    static var screenshotScreen: String? {
+        #if DEBUG
+        let args = CommandLine.arguments
+        guard let index = args.firstIndex(of: "-screenshotScreen"), index + 1 < args.count else { return nil }
+        return args[index + 1]
+        #else
+        return nil
+        #endif
+    }
+
+    /// Пример списания для скриншота карточки.
+    private static var sampleCharge: JournalEntry {
+        JournalEntry(
+            date: Calendar.current.date(bySettingHour: 6, minute: 30, second: 0, of: Date()) ?? Date(),
+            alarmTitle: "Работа", timeText: "06:30", stake: 500, outcome: .failed,
+            events: [JournalEvent(date: Date(), text: "Время на задание истекло")]
+        )
+    }
+
+    /// Списание, которое пора показать карточкой (не поверх задания, утра или согласия).
+    private var chargeToShow: JournalEntry? {
+        guard wake.session == nil, wake.morning == nil, reconsentAmount == nil,
+              RootView.screenshotTab == nil else { return nil }
+        return JournalStore.firstUnseenCharge(in: journal.entries)
     }
 
     /// Запуск с «-gardenPreview» (для снимка 3D-сада) работает только в отладочной сборке.
@@ -124,7 +152,17 @@ struct RootView: View {
     }
 
     var body: some View {
-        if RootView.gardenPreviewRequested {
+        if let screen = RootView.screenshotScreen {
+            if screen == "charge" {
+                ChargeCardView(entry: RootView.sampleCharge, onDismiss: {}, onDispute: {})
+            } else {
+                NavigationStack { PrayerSettingsView() }
+                    .onAppear {
+                        settings.setModule(.prayer, enabled: true)
+                        settings.data.prayer.cityID = "makhachkala"
+                    }
+            }
+        } else if RootView.gardenPreviewRequested {
             // Для снимка 3D-сада в автотестах: сразу сад, без приветствия.
             NavigationStack { GardenView(forcePreview: true) }
         } else if !settings.data.onboardingDone && RootView.screenshotTab == nil {
@@ -188,6 +226,17 @@ struct RootView: View {
                         .preferredColorScheme(.dark)
                         .foregroundStyle(.primary)
                 }
+            }
+            .sheet(item: Binding(get: { chargeToShow }, set: { _ in })) { entry in
+                ChargeCardView(
+                    entry: entry,
+                    onDismiss: { journal.markChargeSeen(entry.id) },
+                    onDispute: {
+                        journal.dispute(entry)
+                        journal.markChargeSeen(entry.id)
+                    }
+                )
+                .interactiveDismissDisabled()
             }
             .sheet(item: $wake.morning) { state in
                 MorningView(state: state)

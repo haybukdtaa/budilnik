@@ -445,7 +445,8 @@ final class WakeCoordinator: ObservableObject {
             isPrayer: finished.isPrayer ? true : nil,
             taskKind: finished.taskKind,
             paymentRef: finished.paymentRef,
-            rechecked: outcome == .success ? finished.needsRecheck : nil
+            rechecked: outcome == .success ? finished.needsRecheck : nil,
+            chargeSeen: outcome == .failed && finished.stake > 0 && !finished.isDemo ? false : nil
         )
         let wasOnTaskScreen = finished.phase == .task
         setSession(nil)
@@ -592,7 +593,8 @@ final class WakeCoordinator: ObservableObject {
             module: alarm.effectiveModule,
             isPrayer: alarm.isPrayerRelated ? true : nil,
             taskKind: alarm.effectiveTask,
-            paymentRef: reference
+            paymentRef: reference,
+            chargeSeen: outcome == .failed && stake > 0 ? false : nil
         ))
         if let reference {
             let amount = stake

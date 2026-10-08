@@ -52,6 +52,9 @@ struct PrayerSettings: Codable, Equatable {
     var highLatitude: HighLatitudeRule = .angleBased
     /// Поправка в минутах, если местная мечеть публикует время с поправкой.
     var adjustmentMinutes = 0
+    /// Угол подобран по времени, которое человек ввёл сам: минуты от полуночи и дата ввода.
+    var calibratedMinutes: Int?
+    var calibratedOn: Date?
 
     init() {}
 
@@ -62,6 +65,8 @@ struct PrayerSettings: Codable, Equatable {
         customAngle = try c.decodeIfPresent(Double.self, forKey: .customAngle) ?? 16
         highLatitude = try c.decodeIfPresent(HighLatitudeRule.self, forKey: .highLatitude) ?? .angleBased
         adjustmentMinutes = try c.decodeIfPresent(Int.self, forKey: .adjustmentMinutes) ?? 0
+        calibratedMinutes = try c.decodeIfPresent(Int.self, forKey: .calibratedMinutes)
+        calibratedOn = try c.decodeIfPresent(Date.self, forKey: .calibratedOn)
     }
 
     var fajrAngle: Double { method.fajrAngle ?? min(max(customAngle, 10), 20) }
