@@ -460,7 +460,7 @@ final class WakeCoordinator: ObservableObject {
         }
 
         if outcome == .success {
-            if !finished.isDemo { MedStore.shared.morningCompleted(at: TrustedClock.now) }
+            if !finished.isDemo { MedStore.shared.morningCompleted(ring: finished.originalRing ?? finished.startDate) }
             pendingMornings.append(MorningState(
                 entryID: entry.id,
                 module: finished.module,

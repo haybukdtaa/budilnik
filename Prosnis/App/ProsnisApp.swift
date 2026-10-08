@@ -216,7 +216,7 @@ struct RootView: View {
             }
             .onChange(of: router.showMeds) { _, show in
                 if show {
-                    tab = 4
+                    if settings.data.medsEnabled { tab = 4 }
                     router.showMeds = false
                 }
             }

@@ -9,6 +9,14 @@ struct MedsView: View {
         NavigationStack {
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 List {
+                    if store.loudWithoutPermission {
+                        Section {
+                            Label("Громкие напоминания не работают: нет разрешения на будильники. Пока приходят тихие уведомления. Разрешите будильники в Настройках iPhone → Prosnis.",
+                                  systemImage: "exclamationmark.circle")
+                                .font(.app(.footnote))
+                                .foregroundStyle(Theme.accent)
+                        }
+                    }
                     if store.meds.isEmpty {
                         emptyState
                     } else {
@@ -25,7 +33,7 @@ struct MedsView: View {
                     }
                     Section {
                     } footer: {
-                        Text("Приложение только напоминает. Схему приёма назначает врач. Сведения о лекарствах хранятся только на этом телефоне.")
+                        Text("Приложение только напоминает. Схему приёма назначает врач. Сведения о лекарствах не уходят на сервер и друзьям.")
                             .frame(maxWidth: .infinity, alignment: .center)
                             .multilineTextAlignment(.center)
                     }
@@ -207,6 +215,7 @@ struct MedDetailView: View {
 
     var body: some View {
         if let med = store.med(medicationID) {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
             List {
                 Section {
                     HStack(spacing: 14) {
@@ -231,7 +240,7 @@ struct MedDetailView: View {
                     }
                 }
 
-                let now = Date()
+                let now = context.date
                 if MedSchedule.courseCompleted(med, records: store.records, wakeTimes: store.wakeTimes, now: now) {
                     Section {
                         Label("Курс пройден полностью", systemImage: "checkmark.seal").foregroundStyle(Theme.mint)
@@ -247,6 +256,7 @@ struct MedDetailView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            }
             .background(Theme.background)
             .navigationTitle(med.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -303,7 +313,7 @@ private struct MedCalendar: View {
     }
 
     private func dayState(_ day: Date) -> (fill: Color, stroke: Color) {
-        let doses = MedSchedule.doses(for: med, from: day, to: day.addingTimeInterval(86400), wakeTimes: store.wakeTimes)
+        let doses = store.doses(of: med, from: day, to: day.addingTimeInterval(86400))
         guard !doses.isEmpty else { return (.clear, Color.secondary.opacity(0.15)) }
         let now = Date()
         let taken = doses.filter { if case .taken = MedSchedule.state(of: $0, records: store.records, now: now) { return true } else { return false } }.count
@@ -312,6 +322,8 @@ private struct MedCalendar: View {
             return state == .due || state == .upcoming
         }.count
         if taken == doses.count { return (Theme.mint, .clear) }
+        // Сегодня ещё ничего не отмечено, а время не вышло — день не «часть» и не «пропуск».
+        if taken == 0 && pending > 0 { return (.clear, Theme.mint.opacity(0.5)) }
         if taken > 0 || pending > 0 { return (Theme.mint.opacity(0.35), .clear) }
         return (Color.secondary.opacity(0.2), .clear)
     }
@@ -376,7 +388,10 @@ struct MedEditView: View {
                         .onDelete { offsets in
                             if med.times.count > 1 { med.times.remove(atOffsets: offsets) }
                         }
-                        if med.times.count < 6 {
+                        .deleteDisabled(med.times.count <= 1)
+                        if med.times.isEmpty {
+                            Button("Добавить время") { med.times = [9 * 60] }
+                        } else if med.times.count < 6 {
                             Button("Добавить время") {
                                 let last = med.times.max() ?? 9 * 60
                                 med.times.append(min(last + 4 * 60, 23 * 60))
@@ -456,8 +471,17 @@ struct MedEditView: View {
 
     private func save() {
         var item = med
-        if !hasCourse { item.endDate = nil }
-        if !countsStock { item.stock = nil }
+        if !hasCourse {
+            item.endDate = nil
+        } else if item.endDate == nil {
+            item.endDate = Date().addingTimeInterval(6 * 86400)
+        }
+        if !countsStock {
+            item.stock = nil
+        } else if item.stock == original.stock, let current = store.med(item.id) {
+            // Пока экран был открыт, приём могли отметить с экрана блокировки: не затираем запас.
+            item.stock = current.stock
+        }
         if item.isAfterWake { item.times = [] } else if item.times.isEmpty { item.times = [9 * 60] }
         store.save(item)
         // Разрешение — только то, которое нужно: будильники для громких, уведомления для тихих.
@@ -507,7 +531,7 @@ struct MorningMedsLine: View {
     var body: some View {
         let now = Date()
         let noon = Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: now) ?? now
-        let morning = store.doses(from: now.addingTimeInterval(-3600), to: max(noon, now.addingTimeInterval(3 * 3600)))
+        let morning = store.doses(from: now.addingTimeInterval(-3600), to: max(noon, now.addingTimeInterval(3600)))
             .filter { MedSchedule.record(for: $0, in: store.records) == nil }
         let names = morning.compactMap { dose -> String? in
             guard let med = store.med(dose.medicationID) else { return nil }

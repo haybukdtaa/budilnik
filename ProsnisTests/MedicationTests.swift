@@ -38,6 +38,28 @@ final class MedicationTests: XCTestCase {
         XCTAssertEqual(morning.dosesPerDay, 1)
     }
 
+    func testTakenAfterWakeDoseStaysWhereItWasMarked() {
+        var morning = med(times: [], start: T.date(2026, 10, 5))
+        morning.afterWakeMinutes = 30
+        morning.afterWakeFallback = 9 * 60
+        // В 9:00 (будильника ещё не было) приём отметили; будильник в 10:00 не должен создать второй приём.
+        let marked = DoseRecord(medicationID: morning.id, scheduled: T.date(2026, 10, 5, 9, 0), status: .taken, at: T.date(2026, 10, 5, 9, 0))
+        let woke = T.date(2026, 10, 5, 10, 0)
+        let doses = MedSchedule.doses(for: morning, from: T.date(2026, 10, 5), to: T.date(2026, 10, 6),
+                                      wakeTimes: [calendar.startOfDay(for: woke): woke], records: [marked], calendar: calendar)
+        XCTAssertEqual(doses.map(\.scheduled), [T.date(2026, 10, 5, 9, 0)])
+    }
+
+    func testScheduleChangeKeepsPastDays() {
+        var changed = med(times: [10 * 60], start: T.date(2026, 10, 1))
+        changed.history = [ScheduleVersion(times: [9 * 60], afterWakeMinutes: nil, afterWakeFallback: 540, until: T.date(2026, 10, 3, 15, 0))]
+        let doses = MedSchedule.doses(for: changed, from: T.date(2026, 10, 1), to: T.date(2026, 10, 5), calendar: calendar)
+        XCTAssertEqual(doses.map(\.scheduled), [
+            T.date(2026, 10, 1, 9, 0), T.date(2026, 10, 2, 9, 0),
+            T.date(2026, 10, 3, 10, 0), T.date(2026, 10, 4, 10, 0),
+        ], "До дня смены — прежнее время, с него — новое")
+    }
+
     func testStateTakenSkippedMissedDue() {
         let dose = Dose(medicationID: UUID(), scheduled: T.date(2026, 10, 5, 9, 0))
         XCTAssertEqual(MedSchedule.state(of: dose, records: [], now: T.date(2026, 10, 5, 7, 0)), .upcoming)

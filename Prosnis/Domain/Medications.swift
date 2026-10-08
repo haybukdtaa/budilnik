@@ -55,7 +55,16 @@ enum MealRelation: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// Лекарство и схема приёма. Хранится только на телефоне: это сведения о здоровье.
+/// Прежнее расписание лекарства: действовало до дня `until` (не включая его).
+/// Нужно, чтобы смена времени приёма не переписывала прошлое в календаре.
+struct ScheduleVersion: Codable, Equatable {
+    var times: [Int]
+    var afterWakeMinutes: Int?
+    var afterWakeFallback: Int
+    var until: Date
+}
+
+/// Лекарство и схема приёма. Не уходит на сервер и друзьям: это сведения о здоровье.
 struct Medication: Codable, Identifiable, Equatable {
     var id = UUID()
     var name = ""
@@ -79,6 +88,20 @@ struct Medication: Codable, Identifiable, Equatable {
     var unitsPerDose = 1
     /// Громко, как будильник (звонит и в беззвучном режиме), или тихое уведомление.
     var loud = false
+    /// Прежние расписания (по возрастанию `until`).
+    var history: [ScheduleVersion]?
+
+    var schedule: ScheduleVersion {
+        ScheduleVersion(times: times, afterWakeMinutes: afterWakeMinutes, afterWakeFallback: afterWakeFallback, until: .distantFuture)
+    }
+
+    /// Расписание, действовавшее в этот день.
+    func schedule(on day: Date, calendar: Calendar) -> ScheduleVersion {
+        for version in history ?? [] where day < calendar.startOfDay(for: version.until) {
+            return version
+        }
+        return schedule
+    }
 
     var isAfterWake: Bool { afterWakeMinutes != nil }
     var dosesPerDay: Int { isAfterWake ? 1 : max(times.count, 1) }
@@ -105,6 +128,8 @@ struct DoseRecord: Codable, Identifiable, Equatable {
     var scheduled: Date
     var status: DoseStatus
     var at: Date
+    /// Сколько единиц списано с запаса этим приёмом (чтобы при отмене вернуть ровно столько).
+    var deducted: Int?
 }
 
 /// Один назначенный приём.
@@ -128,13 +153,15 @@ enum MedSchedule {
     static let dueBefore: TimeInterval = 30 * 60
 
     /// Приёмы лекарства в промежутке [from, to). `wakeTimes` — время подъёма по дням (начало дня → момент подъёма).
-    static func doses(for med: Medication, from: Date, to: Date, wakeTimes: [Date: Date] = [:], calendar: Calendar = .current) -> [Dose] {
+    /// `records` — отметки: приём «после подъёма», уже отмеченный в этот день, не переезжает на новое время.
+    static func doses(for med: Medication, from: Date, to: Date, wakeTimes: [Date: Date] = [:],
+                      records: [DoseRecord] = [], calendar: Calendar = .current) -> [Dose] {
         let firstDay = calendar.startOfDay(for: med.startDate)
         var day = max(calendar.startOfDay(for: from), firstDay)
         var result: [Dose] = []
         while day < to {
             if let end = med.endDate, day > calendar.startOfDay(for: end) { break }
-            for moment in moments(for: med, on: day, wakeTimes: wakeTimes, calendar: calendar)
+            for moment in moments(for: med, on: day, wakeTimes: wakeTimes, records: records, calendar: calendar)
             where moment >= from && moment < to && moment >= med.startDate.addingTimeInterval(-60) {
                 result.append(Dose(medicationID: med.id, scheduled: moment))
             }
@@ -144,12 +171,17 @@ enum MedSchedule {
         return result.sorted { $0.scheduled < $1.scheduled }
     }
 
-    static func moments(for med: Medication, on day: Date, wakeTimes: [Date: Date], calendar: Calendar) -> [Date] {
-        if let minutes = med.afterWakeMinutes {
+    static func moments(for med: Medication, on day: Date, wakeTimes: [Date: Date], records: [DoseRecord] = [], calendar: Calendar) -> [Date] {
+        let schedule = med.schedule(on: day, calendar: calendar)
+        if let minutes = schedule.afterWakeMinutes {
+            // Уже отмечен в этот день — остаётся там, где его отметили (иначе можно принять дважды).
+            if let marked = records.first(where: { $0.medicationID == med.id && calendar.isDate($0.scheduled, inSameDayAs: day) }) {
+                return [marked.scheduled]
+            }
             if let woke = wakeTimes[day] { return [woke.addingTimeInterval(Double(minutes) * 60)] }
-            return [at(minutes: med.afterWakeFallback, on: day, calendar: calendar)].compactMap { $0 }
+            return [at(minutes: schedule.afterWakeFallback, on: day, calendar: calendar)].compactMap { $0 }
         }
-        return med.times.sorted().compactMap { at(minutes: $0, on: day, calendar: calendar) }
+        return schedule.times.sorted().compactMap { at(minutes: $0, on: day, calendar: calendar) }
     }
 
     private static func at(minutes: Int, on day: Date, calendar: Calendar) -> Date? {
@@ -175,7 +207,7 @@ enum MedSchedule {
         guard let end = med.endDate,
               let after = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: end)),
               now >= after else { return false }
-        let all = doses(for: med, from: med.startDate, to: after, wakeTimes: wakeTimes, calendar: calendar)
+        let all = doses(for: med, from: med.startDate, to: after, wakeTimes: wakeTimes, records: records, calendar: calendar)
         guard !all.isEmpty else { return false }
         return all.allSatisfy { record(for: $0, in: records)?.status == .taken }
     }
@@ -184,7 +216,7 @@ enum MedSchedule {
     static func cleanWeek(_ med: Medication, records: [DoseRecord], wakeTimes: [Date: Date] = [:], now: Date, calendar: Calendar = .current) -> Bool {
         let today = calendar.startOfDay(for: now)
         guard let from = calendar.date(byAdding: .day, value: -7, to: today), from >= calendar.startOfDay(for: med.startDate) else { return false }
-        let week = doses(for: med, from: from, to: today, wakeTimes: wakeTimes, calendar: calendar)
+        let week = doses(for: med, from: from, to: today, wakeTimes: wakeTimes, records: records, calendar: calendar)
         guard !week.isEmpty else { return false }
         return week.allSatisfy { record(for: $0, in: records)?.status == .taken }
     }
