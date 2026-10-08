@@ -324,7 +324,7 @@ enum GardenMeshes {
     static let cylinder = MeshResource.generateCylinder(height: 1, radius: 1)
     static let box = MeshResource.generateBox(size: 1, cornerRadius: 0.1)
 
-    static func make(_ mesh: MeshResource, _ material: any Material, _ scale: SIMD3<Float>) -> ModelEntity {
+    static func make(_ mesh: MeshResource, _ material: any RealityKit.Material, _ scale: SIMD3<Float>) -> ModelEntity {
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.scale = scale
         return entity
