@@ -146,7 +146,8 @@ final class SyncEngine: ObservableObject {
         isSyncing = false
         if accepted == nil {
             // Утром могла пропасть сеть на минуту: события утра пробуем отправить ещё несколько раз.
-            guard attempt < 3, batch.contains(where: { $0.kind == .wakeEvent }) else { return }
+            guard attempt < 3, needsAnotherPass || items.contains(where: { $0.kind == .wakeEvent }) else { return }
+            needsAnotherPass = false
             try? await Task.sleep(nanoseconds: 20_000_000_000)
             await sync(using: backend, attempt: attempt + 1)
         } else if needsAnotherPass {

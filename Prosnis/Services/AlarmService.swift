@@ -160,13 +160,13 @@ final class AlarmService {
             return
         }
         let version = AlarmStore.changedAt(item)
+        // Месяц вперёд: обычный будильник звонит и без открытия приложения, ожидания должны его покрывать.
         let fresh = MissedMornings.candidates(
             ScheduleCalculator.effectiveOccurrences(
-                for: item, from: now,
-                to: now.addingTimeInterval(Double(AlarmService.datedHorizonDays + 1) * 86400),
-                context: context
+                for: item, from: now, to: now.addingTimeInterval(31 * 86400), context: context
             ),
-            calendar: context.calendar
+            calendar: context.calendar,
+            recordedAt: now
         )
         var old: [RingCandidate] = []
         if let stored = all[key], abs(stored.version.timeIntervalSince(version)) < 1 {

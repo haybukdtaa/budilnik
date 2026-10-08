@@ -34,6 +34,26 @@ final class MissedMorningsTests: XCTestCase {
                                           until: ring.addingTimeInterval(600)) { _ in false }, [[ring]])
     }
 
+    func testLateTimeZoneChangeCannotPostponeMorning() {
+        // Время 07:00 известно с вечера; за час до звонка пояс сменили — новое время на 12 часов позже.
+        let known = RingCandidate(at: ring, day: "d", recordedAt: ring.addingTimeInterval(-10 * 3600))
+        let later = RingCandidate(at: ring.addingTimeInterval(12 * 3600), day: "d", recordedAt: ring.addingTimeInterval(-3600))
+        let candidates = [known, later]
+        // Позднее время не действует: утро решается по 07:00, ждать нечего.
+        XCTAssertEqual(MissedMornings.due(candidates: candidates, after: ring.addingTimeInterval(-60),
+                                          until: ring.addingTimeInterval(600)) { _ in false }, [[ring]])
+        // Встать по позднему времени не спасает.
+        XCTAssertEqual(MissedMornings.due(candidates: candidates, after: ring.addingTimeInterval(-60),
+                                          until: ring.addingTimeInterval(600)) { $0 == later.at }, [[ring]])
+        // Сменили пояс заранее (за сутки) — новое время честное, утро ждёт его.
+        let early = RingCandidate(at: later.at, day: "d", recordedAt: ring.addingTimeInterval(-86400))
+        XCTAssertTrue(MissedMornings.due(candidates: [known, early], after: ring.addingTimeInterval(-60),
+                                         until: ring.addingTimeInterval(600)) { _ in false }.isEmpty)
+        // Перевод на раньше в последние 2 часа допустим: встать раньше можно всегда.
+        let earlier = RingCandidate(at: ring.addingTimeInterval(-3600), day: "d", recordedAt: ring.addingTimeInterval(-5400))
+        XCTAssertEqual(MissedMornings.valid([known, earlier]).count, 2)
+    }
+
     func testMergeDropsDuplicatesWithinMinute() {
         let merged = MissedMornings.merged([RingCandidate(at: ring, day: "a")], [RingCandidate(at: ring.addingTimeInterval(30), day: "a")])
         XCTAssertEqual(merged.count, 1)

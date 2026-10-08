@@ -410,7 +410,13 @@ final class WakeCoordinator: ObservableObject {
         if let recheck = finished.recheckDate {
             DeadlineNotifications.cancelRecheck(alarmID: finished.alarmID, recheck: recheck)
         }
-        emit(outcome == .success ? .recheckDone : .failed, session: finished, at: TrustedClock.now)
+        let eventKind: WakeEventKind
+        switch outcome {
+        case .success: eventKind = .recheckDone
+        case .failed: eventKind = .failed
+        case .technical: eventKind = .technical
+        }
+        emit(eventKind, session: finished, at: TrustedClock.now)
         let before = ProgressEngine.compute(entries: JournalStore.shared.realEntries, challenges: ChallengeStore.shared.challenges)
 
         let entry = JournalEntry(
@@ -434,8 +440,10 @@ final class WakeCoordinator: ObservableObject {
 
         if let reference = finished.paymentRef {
             let amount = finished.stake
-            PaymentsStore.shared.markOutcome(reference: reference, success: outcome == .success, amount: amount)
-            Task { await PaymentsStore.shared.settle(reference: reference, success: outcome == .success, amount: amount) }
+            // Списывается только провал. Сбой системы снимает блокировку так же, как успех.
+            let release = outcome != .failed
+            PaymentsStore.shared.markOutcome(reference: reference, success: release, amount: amount)
+            Task { await PaymentsStore.shared.settle(reference: reference, success: release, amount: amount) }
         }
 
         if outcome == .success {
