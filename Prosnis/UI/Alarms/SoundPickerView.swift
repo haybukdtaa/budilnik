@@ -156,7 +156,7 @@ struct VoiceRecorderView: View {
 
     private var message: String {
         switch recorder.state {
-        case .denied: return "Нет доступа к микрофону. Разрешите его в Настройках iPhone → Проснись."
+        case .denied: return "Нет доступа к микрофону. Разрешите его в Настройках iPhone → Prosnis."
         case .failed: return "Запись не получилась. Попробуйте ещё раз и говорите хотя бы секунду."
         case .recording: return "Говорите. Запись остановится сама через 30 секунд."
         case .recorded: return "Прослушайте запись. Если нравится — сохраните."

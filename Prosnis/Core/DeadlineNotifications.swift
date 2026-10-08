@@ -88,7 +88,7 @@ enum DeadlineNotifications {
             let fire = end.addingTimeInterval(-Double(AlarmService.datedHorizonDays - refreshReminderDays) * 86400)
             if fire > now {
                 let reminder = UNMutableNotificationContent()
-                reminder.title = "Откройте «Проснись»"
+                reminder.title = "Откройте «Prosnis»"
                 reminder.body = "Через 3 дня будильники по Фаджру и по праздникам перестанут ставиться. Утро без звонка из-за этого — провал."
                 reminder.sound = .default
                 try? await center.add(UNNotificationRequest(identifier: refreshReminderID, content: reminder, trigger: trigger(at: fire)))

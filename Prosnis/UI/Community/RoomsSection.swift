@@ -145,7 +145,7 @@ struct RoomDetailView: View {
                     HStack {
                         Text("Код: \(room.inviteCode)").font(.system(.body, design: .monospaced))
                         Spacer()
-                        ShareLink(item: "Заходи в «\(room.name)» в «Проснись»: код \(room.inviteCode)") {
+                        ShareLink(item: "Заходи в «\(room.name)» в «Prosnis»: код \(room.inviteCode)") {
                             Image(systemName: "square.and.arrow.up")
                         }
                     }

@@ -12,7 +12,7 @@ enum WeeklyNotification {
         guard enabled else { return }
         let content = UNMutableNotificationContent()
         content.title = "Итоги недели готовы"
-        content.body = "Сколько утр, сколько выиграно времени и как выросло дерево — загляните."
+        content.body = "Сколько подъёмов, сколько выиграно времени и как выросло дерево — загляните."
         content.sound = .default
         var parts = DateComponents()
         parts.weekday = 1 // воскресенье

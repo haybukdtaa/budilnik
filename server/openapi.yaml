@@ -83,11 +83,14 @@ security:
 paths:
   /v1/auth/register:
     post:
-      summary: Регистрация устройства без пароля
+      summary: Регистрация устройства без пароля, телефона и почты
       description: |
-        Приложение один раз создаёт случайный секрет и хранит его в связке ключей.
-        Первый вызов создаёт пользователя с этим userID; повторный с тем же секретом возвращает новый
-        токен для того же пользователя; с другим секретом — 403 (чужой userID захватить нельзя).
+        Приложение создаёт код восстановления из 12 слов (RecoveryPhrase) и выводит из него userID и секрет.
+        Первый вызов создаёт пользователя с этим userID и выдаёт ему номер для друзей; повторный с тем же
+        секретом возвращает новый токен для того же пользователя; с другим секретом — 403.
+        restore=true — восстановление по коду на новом телефоне: если такого userID нет, 404 и новый аккаунт не создаётся.
+        Сервер хранит не сам секрет, а его хеш, и ограничивает число попыток с одного адреса.
+        Номер для друзей: 9 случайных цифр (PRO-XXX-XXX-XXX), уникальный, выдаётся не по порядку.
       security: []
       requestBody:
         content:
@@ -99,9 +102,31 @@ paths:
                 secret: { type: string }
                 displayName: { type: string }
                 avatar: { type: string }
+                restore: { type: boolean, nullable: true }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { token: { type: string } } } } } }
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { token: { type: string }, number: { type: string, description: "PRO-XXX-XXX-XXX" } } } } } }
         "403": { description: Секрет не совпал }
+        "404": { description: При restore=true такого аккаунта нет }
+  /v1/me/backup:
+    get:
+      summary: Данные аккаунта для восстановления на новом телефоне (будильники, дневник, челленджи)
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { alarms: { type: array, items: { type: object } }, journal: { type: array, items: { type: object } }, challenges: { type: array, items: { type: object } } } } } } } }
+  /v1/friend-requests:
+    get:
+      summary: Входящие заявки в друзья
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { type: object, properties: { id: { type: string, format: uuid }, from: { $ref: "#/components/schemas/UserProfile" }, sentAt: { type: string, format: date-time } } } } } } } }
+    post:
+      summary: Заявка по номеру. Дружба начинается только после принятия. Не больше 20 заявок в сутки; 404 — номера нет
+      requestBody: { content: { application/json: { schema: { type: object, properties: { number: { type: string } } } } } }
+      responses: { "200": { description: OK } }
+  /v1/friend-requests/{id}/accept:
+    post:
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "200": { description: Новый друг, content: { application/json: { schema: { $ref: "#/components/schemas/Friend" } } } } }
+  /v1/friend-requests/{id}/decline:
+    post:
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "200": { description: OK } }
   /v1/time:
     get:
       summary: Время сервера. Приложение сверяет по нему защищённое время для блокировки ставки за 2 часа

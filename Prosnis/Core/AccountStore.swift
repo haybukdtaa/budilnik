@@ -9,6 +9,7 @@ final class AccountStore: ObservableObject {
 
     private static let tokenKey = "auth.token"
     private static let secretKey = "auth.secret"
+    private static let phraseKey = "auth.phrase"
 
     @Published private(set) var token: String?
     /// Почему не удалось войти на сервер (показывается в Профиле).
@@ -31,15 +32,47 @@ final class AccountStore: ObservableObject {
         token = nil
     }
 
-    /// Секрет устройства: создаётся один раз и хранится в связке ключей.
+    /// Код восстановления из 12 слов. Создаётся один раз; из него выводятся номер аккаунта и секрет устройства.
+    var recoveryWords: [String] {
+        ensureIdentity()
+        return (Keychain.get(AccountStore.phraseKey) ?? "").split(separator: " ").map(String.init)
+    }
+
+    /// Номер для друзей: выданный сервером, а в демо-режиме — демонстрационный.
+    var friendNumber: String? {
+        if let number = AppSettings.shared.data.friendNumber { return number }
+        if AppConfig.serverURL == nil && AppSettings.shared.data.useDemoSocial {
+            return FriendNumber.demo(for: AppSettings.shared.data.profile.id)
+        }
+        return nil
+    }
+
+    /// Создаёт аккаунт из нового кода восстановления, если его ещё нет.
+    /// Старый случайный секрет (версии до кода восстановления) заменяется: на сервере его ещё не было.
+    func ensureIdentity() {
+        // Новый код — только если старого точно нет. Закрытая связка ключей (до первой разблокировки) — не повод.
+        guard Keychain.exists(AccountStore.phraseKey) == false else { return }
+        let phrase = RecoveryPhrase.generate()
+        adopt(phrase: phrase)
+    }
+
+    /// Делает этот код восстановления кодом текущего аккаунта.
+    private func adopt(phrase: [String]) {
+        let identity = RecoveryPhrase.identity(for: phrase)
+        // Переносится на новый телефон с зашифрованной резервной копией; без неё — по коду.
+        Keychain.set(phrase.joined(separator: " "), for: AccountStore.phraseKey, migratable: true)
+        Keychain.set(identity.secret, for: AccountStore.secretKey, migratable: true)
+        if AppSettings.shared.data.profile.id != identity.userID {
+            AppSettings.shared.data.profile.id = identity.userID
+            AppSettings.shared.data.friendNumber = nil
+            signOut()
+        }
+    }
+
+    /// Секрет устройства, выведенный из кода восстановления.
     private var deviceSecret: String {
-        if let existing = Keychain.get(AccountStore.secretKey) { return existing }
-        var bytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        let secret = Data(bytes).base64EncodedString()
-        // Секрет переносится на новый телефон вместе с зашифрованной резервной копией: аккаунт не теряется.
-        Keychain.set(secret, for: AccountStore.secretKey, migratable: true)
-        return secret
+        ensureIdentity()
+        return Keychain.get(AccountStore.secretKey) ?? ""
     }
 
     /// Подпись секретом устройства (для событий утра).
@@ -52,13 +85,51 @@ final class AccountStore: ObservableObject {
         guard token == nil, let url = AppConfig.serverURL else { return }
         let backend = BackendRegistry.httpBackend(url)
         do {
-            let newToken = try await backend.register(profile: AppSettings.shared.data.profile, secret: deviceSecret)
-            signIn(token: newToken)
+            let result = try await backend.register(profile: AppSettings.shared.data.profile, secret: deviceSecret)
+            signIn(token: result.token)
+            if let number = result.number { AppSettings.shared.data.friendNumber = number }
             signInProblem = nil
         } catch BackendError.forbidden {
             signInProblem = "Сервер не узнал это устройство. Если вы перенесли данные со старого телефона без резервной копии связки ключей, обратитесь в поддержку."
         } catch {
             signInProblem = nil // нет сети: попробуем при следующем открытии
+        }
+    }
+
+    /// Восстанавливает аккаунт по коду из 12 слов на этом телефоне. Возвращает текст ошибки или nil.
+    /// Данные с сервера добавляются к тем, что уже есть на телефоне; ничего не удаляется.
+    func restore(phraseText: String) async -> String? {
+        guard let phrase = RecoveryPhrase.parse(phraseText) else {
+            return "Нужно 12 слов из кода восстановления. Проверьте, что все слова написаны без ошибок."
+        }
+        if phrase == recoveryWords { return "Это код этого же аккаунта: восстанавливать нечего." }
+        if WakeCoordinator.shared.session != nil {
+            return "Сейчас идёт утренняя проверка. Восстановить аккаунт можно после неё."
+        }
+        guard let url = AppConfig.serverURL else {
+            return "Сервер ещё не подключён: восстанавливать пока неоткуда. Код начнёт работать вместе с сервером."
+        }
+        let identity = RecoveryPhrase.identity(for: phrase)
+        let backend = BackendRegistry.httpBackend(url)
+        var profile = AppSettings.shared.data.profile
+        profile.id = identity.userID
+        do {
+            let result = try await backend.register(profile: profile, secret: identity.secret, restore: true)
+            adopt(phrase: phrase)
+            signIn(token: result.token)
+            if let number = result.number { AppSettings.shared.data.friendNumber = number }
+            AppSettings.shared.data.recoverySaved = true
+            let snapshot = try await backend.restoreSnapshot()
+            AlarmStore.shared.mergeRestored(snapshot.alarms ?? [])
+            JournalStore.shared.mergeRestored(snapshot.journal ?? [])
+            ChallengeStore.shared.mergeRestored(snapshot.challenges ?? [])
+            return nil
+        } catch BackendError.notFound {
+            return "Аккаунт с таким кодом не найден. Проверьте слова и их порядок."
+        } catch BackendError.forbidden {
+            return "Код не подошёл. Проверьте слова и их порядок."
+        } catch {
+            return "Не получилось связаться с сервером. Попробуйте позже."
         }
     }
 

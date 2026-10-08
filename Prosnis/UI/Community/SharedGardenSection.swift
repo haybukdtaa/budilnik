@@ -92,7 +92,7 @@ private struct GardenCard: View {
 
             HStack {
                 if garden.members.count < SharedGarden.maxMembers {
-                    ShareLink(item: "Присоединяйся к нашему саду в «Проснись»: код \(garden.inviteCode)") {
+                    ShareLink(item: "Присоединяйся к нашему саду в «Prosnis»: код \(garden.inviteCode)") {
                         Label("Позвать друга · \(garden.inviteCode)", systemImage: "person.badge.plus")
                     }
                 } else {

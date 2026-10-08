@@ -66,6 +66,7 @@ struct ProsnisApp: App {
         social.sendPendingWitnessNotice()
         social.sendPendingGardenWater()
         await WeeklyNotification.update(enabled: settings.data.weeklySummaryOn)
+        AccountStore.shared.ensureIdentity()
         await AccountStore.shared.ensureSignedIn()
         let backend = BackendRegistry.current
         if backend.isOnline && !backend.isDemo {
@@ -96,7 +97,10 @@ struct RootView: View {
     }
 
     var body: some View {
-        if !settings.data.onboardingDone {
+        if CommandLine.arguments.contains("-gardenPreview") {
+            // Для снимка 3D-сада в автотестах: сразу сад, без приветствия.
+            NavigationStack { GardenView(forcePreview: true) }
+        } else if !settings.data.onboardingDone {
             OnboardingView()
         } else {
             TabView(selection: $tab) {

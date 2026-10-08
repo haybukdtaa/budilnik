@@ -71,7 +71,7 @@ struct SavedCard: View {
     }
 }
 
-/// Журнал утр (открывается из вкладки «Прогресс»).
+/// Дневник подъёмов (открывается из вкладки «Прогресс»).
 struct JournalListView: View {
     @EnvironmentObject private var journal: JournalStore
 
@@ -83,7 +83,7 @@ struct JournalListView: View {
                     Image(systemName: "list.bullet.rectangle")
                         .font(.system(size: 52))
                         .foregroundStyle(Theme.accent)
-                    Text("Журнал пока пуст").font(.title3.bold())
+                    Text("Дневник пока пуст").font(.title3.bold())
                     Text("Здесь появится каждое утро: что произошло и почему списали или нет.")
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
@@ -106,7 +106,7 @@ struct JournalListView: View {
                 .scrollContentBackground(.hidden)
             }
         }
-        .navigationTitle("Журнал")
+        .navigationTitle("Дневник подъёмов")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -234,7 +234,7 @@ struct JournalDetailView: View {
                                 .foregroundStyle(.orange)
                         }
                     } footer: {
-                        Text("Спор рассматривается по записям журнала и событиям утра. Если подтвердится сбой приложения, деньги вернутся. Автоматического возврата нет.")
+                        Text("Спор рассматривается по дневнику подъёмов и событиям утра. Если подтвердится сбой приложения, деньги вернутся. Автоматического возврата нет.")
                     }
                 }
             }

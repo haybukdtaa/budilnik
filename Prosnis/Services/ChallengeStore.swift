@@ -45,6 +45,15 @@ final class ChallengeStore: ObservableObject {
         evaluateAll()
     }
 
+    /// Добавляет челленджи, восстановленные с сервера (которых ещё нет на телефоне).
+    func mergeRestored(_ restored: [Challenge]) {
+        let known = Set(challenges.map(\.id))
+        let added = restored.filter { !known.contains($0.id) }
+        guard !added.isEmpty else { return }
+        challenges += added
+        save()
+    }
+
     func abandon(_ id: UUID) {
         guard let index = challenges.firstIndex(where: { $0.id == id }), challenges[index].status == .active else { return }
         challenges[index].status = .abandoned

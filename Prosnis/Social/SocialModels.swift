@@ -134,13 +134,13 @@ enum LeaderboardKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .weekRegularity: return "Неделя"
         case .allTimeStreak: return "Рекорд серии"
-        case .allTimeWakes: return "Всего утр"
+        case .allTimeWakes: return "Всего подъёмов"
         }
     }
 
     var detail: String {
         switch self {
-        case .weekRegularity: return "Доля утр этой недели, когда человек встал по плану"
+        case .weekRegularity: return "Сколько будильников этой недели закончились подъёмом"
         case .allTimeStreak: return "Самая длинная серия подъёмов за всё время. Рекорд держится, пока его не побьют"
         case .allTimeWakes: return "Сколько раз человек встал с заданием за всё время"
         }
@@ -174,7 +174,7 @@ struct GlobalStats: Codable, Equatable {
     var activeChallenges: Int
 }
 
-/// Награда за приглашённого друга. Открывается, когда друг проведёт 7 утр.
+/// Награда за приглашённого друга. Открывается, когда друг встанет 7 раз.
 struct InviteReward: Codable, Identifiable, Equatable {
     var id: String
     var title: String

@@ -138,7 +138,7 @@ struct WeeklySummaryView: View {
         let snapshot = ProgressEngine.compute(entries: journal.realEntries, challenges: challenges.challenges)
         List {
             Section {
-                row("Утр с заданием", "\(summary.mornings)")
+                row("Будильников с заданием", "\(summary.mornings)")
                 row("Встали", "\(summary.successes)")
                 if summary.failures > 0 { row("Проспали", "\(summary.failures)") }
                 if summary.successes > 0 {
@@ -178,7 +178,7 @@ struct WeeklySummaryView: View {
                 ))
             } footer: {
                 Text(permissionDenied
-                     ? "Нет разрешения на уведомления. Включите его в Настройках iPhone → Проснись."
+                     ? "Нет разрешения на уведомления. Включите его в Настройках iPhone → Prosnis."
                      : "В воскресенье в 20:00 придёт напоминание посмотреть итоги недели.")
             }
         }

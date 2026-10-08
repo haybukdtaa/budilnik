@@ -175,6 +175,17 @@ final class AlarmStore: ObservableObject {
         upsert(copy)
     }
 
+    /// Добавляет будильники, восстановленные с сервера (которых ещё нет на телефоне), и ставит их.
+    func mergeRestored(_ items: [AlarmItem]) {
+        let known = Set(alarms.map(\.id))
+        let added = items.filter { !known.contains($0.id) }
+        guard !added.isEmpty else { return }
+        alarms += added
+        sort()
+        save()
+        for item in added where item.isEnabled { sync(item) }
+    }
+
     /// Выключает одноразовый будильник после срабатывания, без обращения к системе.
     func disableSilently(_ id: UUID) {
         guard let index = alarms.firstIndex(where: { $0.id == id }), alarms[index].isEnabled else { return }

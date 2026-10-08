@@ -3,6 +3,8 @@ import SwiftUI
 struct FriendsSection: View {
     @EnvironmentObject private var social: SocialStore
     @State private var showInvite = false
+    @State private var number = ""
+    @State private var requestSent = false
 
     var body: some View {
         List {
@@ -13,10 +15,44 @@ struct FriendsSection: View {
             }
 
             Section {
+                FriendNumberRow()
+            } header: {
+                Text("Мой номер")
+            } footer: {
+                Text("Регистрации нет. Друзья находят вас по этому номеру, а вы решаете, принять ли заявку.")
+            }
+
+            Section("Добавить по номеру") {
+                TextField("PRO-000-000-000", text: $number)
+                    .keyboardType(.numbersAndPunctuation)
+                    .autocorrectionDisabled()
+                Button(requestSent ? "Заявка отправлена" : "Отправить заявку") {
+                    Task {
+                        requestSent = await social.sendFriendRequest(number: number)
+                        if requestSent { number = "" }
+                    }
+                }
+                .disabled(FriendNumber.normalize(number) == nil)
                 Button {
                     showInvite = true
                 } label: {
-                    Label("Пригласить или добавить друга", systemImage: "person.badge.plus")
+                    Label("Пригласить по одноразовому коду", systemImage: "person.badge.plus")
+                }
+            }
+
+            if !social.friendRequests.isEmpty {
+                Section("Заявки в друзья") {
+                    ForEach(social.friendRequests) { request in
+                        HStack(spacing: 12) {
+                            AvatarView(profile: request.from, size: 34)
+                            Text(request.from.displayName).font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Button("Принять") { Task { await social.answer(request, accept: true) } }
+                                .buttonStyle(.borderedProminent)
+                            Button("Нет") { Task { await social.answer(request, accept: false) } }
+                                .buttonStyle(.bordered)
+                        }
+                    }
                 }
             }
 
@@ -40,7 +76,7 @@ struct FriendsSection: View {
 
             Section("Друзья") {
                 if social.friends.isEmpty {
-                    Text("Пока никого. Пригласите друга по коду.").foregroundStyle(.secondary)
+                    Text("Пока никого. Отправьте другу свой номер.").foregroundStyle(.secondary)
                 }
                 ForEach(social.friends) { friend in
                     NavigationLink {
@@ -111,7 +147,7 @@ struct InviteSheet: View {
                         Text(invite.code)
                             .font(.system(size: 40, weight: .bold, design: .monospaced))
                             .frame(maxWidth: .infinity)
-                        ShareLink(item: "Добавь меня в «Проснись»: мой код \(invite.code)") {
+                        ShareLink(item: "Добавь меня в «Prosnis»: мой код \(invite.code)") {
                             Label("Отправить код", systemImage: "square.and.arrow.up")
                         }
                     } else {
@@ -120,7 +156,7 @@ struct InviteSheet: View {
                 } header: {
                     Text("Мой код")
                 } footer: {
-                    Text("Код действует 7 дней. Когда приглашённый друг проведёт 7 утр, вы оба получите награду.")
+                    Text("Код действует 7 дней. Когда приглашённый друг встанет 7 раз, вы оба получите награду.")
                 }
 
                 Section("Код друга") {
@@ -203,7 +239,7 @@ struct FriendDetailView: View {
                 }
 
                 Section {
-                    Toggle("Свидетель моих утр", isOn: Binding(
+                    Toggle("Свидетель моих подъёмов", isOn: Binding(
                         get: { settings.isWitness(friend.id) },
                         set: { settings.setWitness(friend.id, $0) }
                     ))

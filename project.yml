@@ -13,7 +13,7 @@ targets:
     info:
       path: Prosnis/Info.plist
       properties:
-        CFBundleDisplayName: Проснись
+        CFBundleDisplayName: Prosnis
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

@@ -15,6 +15,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var messages: [ConversationID: [ChatMessage]] = [:]
     @Published private(set) var invite: Invite?
     @Published private(set) var witnessNotices: [WitnessNotice] = []
+    @Published private(set) var friendRequests: [FriendRequest] = []
     @Published private(set) var gardens: [SharedGarden] = [] {
         didSet {
             let inGardens = !gardens.isEmpty
@@ -56,6 +57,7 @@ final class SocialStore: ObservableObject {
         let blocked = Set(AppSettings.shared.data.blockedUsers)
         witnessNotices = ((try? await backend.witnessNotices()) ?? []).filter { !blocked.contains($0.friend.id) }
         if let loaded = try? await backend.gardens() { gardens = loaded }
+        if let loaded = try? await backend.friendRequests() { friendRequests = loaded.filter { !blocked.contains($0.from.id) } }
         let unlocked = rewards.filter(\.unlocked).map(\.id)
         if Set(unlocked) != Set(AppSettings.shared.data.unlockedRewards) {
             AppSettings.shared.data.unlockedRewards = unlocked
@@ -73,6 +75,7 @@ final class SocialStore: ObservableObject {
         invite = nil
         witnessNotices = []
         gardens = []
+        friendRequests = []
     }
 
     // MARK: - Друзья
@@ -223,6 +226,34 @@ final class SocialStore: ObservableObject {
         await run {
             let pair = try await backend.createPairChallenge(with: friend.id, title: title, days: days)
             pairs.append(pair)
+        }
+    }
+
+    // MARK: - Заявки в друзья
+
+    /// Отправляет заявку по номеру. Возвращает true, если заявка ушла.
+    func sendFriendRequest(number: String) async -> Bool {
+        guard let normalized = FriendNumber.normalize(number) else {
+            errorText = "Номер — это 9 цифр, например PRO-482-913-075."
+            return false
+        }
+        if normalized == AccountStore.shared.friendNumber {
+            errorText = "Это ваш собственный номер."
+            return false
+        }
+        var ok = false
+        await run {
+            try await backend.sendFriendRequest(number: normalized)
+            ok = true
+        }
+        return ok
+    }
+
+    func answer(_ request: FriendRequest, accept: Bool) async {
+        await run {
+            let friend = try await backend.answerFriendRequest(request.id, accept: accept)
+            friendRequests.removeAll { $0.id == request.id }
+            if let friend, !friends.contains(where: { $0.id == friend.id }) { friends.append(friend) }
         }
     }
 

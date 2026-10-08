@@ -60,6 +60,12 @@ protocol SocialBackend: AnyObject {
     /// Друзья, у которых я свидетель и которые проспали за последние дни.
     func witnessNotices() async throws -> [WitnessNotice]
 
+    /// Заявка в друзья по номеру вида PRO-XXX-XXX-XXX.
+    func sendFriendRequest(number: String) async throws
+    func friendRequests() async throws -> [FriendRequest]
+    /// Принять (вернёт нового друга) или отклонить заявку.
+    func answerFriendRequest(_ id: UUID, accept: Bool) async throws -> Friend?
+
     func gardens() async throws -> [SharedGarden]
     func createGarden(_ draft: GardenDraft) async throws -> SharedGarden
     func joinGarden(code: String) async throws -> SharedGarden
@@ -107,6 +113,9 @@ final class OfflineBackend: SocialBackend, SyncBackend {
     func deleteAccount() async throws {}
     func notifyWitnesses(_ notice: MissedMorningNotice) async throws { throw BackendError.serverUnavailable }
     func witnessNotices() async throws -> [WitnessNotice] { try unavailable() }
+    func sendFriendRequest(number: String) async throws { throw BackendError.serverUnavailable }
+    func friendRequests() async throws -> [FriendRequest] { try unavailable() }
+    func answerFriendRequest(_ id: UUID, accept: Bool) async throws -> Friend? { try unavailable() }
     func gardens() async throws -> [SharedGarden] { try unavailable() }
     func createGarden(_ draft: GardenDraft) async throws -> SharedGarden { try unavailable() }
     func joinGarden(code: String) async throws -> SharedGarden { try unavailable() }

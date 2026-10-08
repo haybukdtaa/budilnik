@@ -36,6 +36,21 @@ enum Keychain {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Есть ли запись: true/false, или nil, если связка ключей сейчас закрыта (телефон не разблокировали после включения).
+    static func exists(_ key: String) -> Bool? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        switch SecItemCopyMatching(query as CFDictionary, nil) {
+        case errSecSuccess: return true
+        case errSecItemNotFound: return false
+        default: return nil
+        }
+    }
+
     static func removeAll() {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

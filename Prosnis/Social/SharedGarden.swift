@@ -67,6 +67,20 @@ struct SharedGarden: Codable, Identifiable, Equatable {
     }
 }
 
+/// Заявка в друзья по номеру. Дружба начинается, только когда её примут.
+struct FriendRequest: Codable, Identifiable, Equatable {
+    var id: UUID
+    var from: UserProfile
+    var sentAt: Date
+}
+
+/// Данные аккаунта с сервера для восстановления на новом телефоне.
+struct RestoreSnapshot: Codable {
+    var alarms: [AlarmItem]?
+    var journal: [JournalEntry]?
+    var challenges: [Challenge]?
+}
+
 struct GardenDraft: Codable, Equatable {
     var name: String
     var species: TreeSpecies

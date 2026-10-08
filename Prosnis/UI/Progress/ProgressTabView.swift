@@ -42,7 +42,7 @@ struct ProgressTabView: View {
                     NavigationLink {
                         JournalListView()
                     } label: {
-                        row(icon: "list.bullet.rectangle", title: "Журнал утр", detail: "Каждое утро по минутам")
+                        row(icon: "list.bullet.rectangle", title: "Дневник подъёмов", detail: "Каждое утро по минутам")
                     }
                     .buttonStyle(.plain)
                 }
@@ -101,17 +101,17 @@ struct ProgressTabView: View {
                             .foregroundStyle(.secondary)
                         Text(tree.title).font(.title3.bold())
                         Text(tree.isLastStage
-                             ? "До переезда в сад: \(tree.wakesToNext) утр"
-                             : "До следующей стадии: \(tree.wakesToNext) утр")
+                             ? "До переезда в сад: \(Words.wakes(tree.wakesToNext))"
+                             : "До следующей стадии: \(Words.wakes(tree.wakesToNext))")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         if tree.fruits {
                             Label("Плоды: месяц без провалов", systemImage: "sparkles").font(.caption).foregroundStyle(.green)
                         } else if tree.flowers {
-                            Label("Цветёт: неделя без провалов. Плоды через \(max(0, TreeState.fruitsStreak - snapshot.currentStreak)) утр",
+                            Label("Цветёт: неделя без провалов. Плоды через \(Words.days(max(0, TreeState.fruitsStreak - snapshot.currentStreak)))",
                                   systemImage: "camera.macro").font(.caption).foregroundStyle(.pink)
                         } else if tree.wilt == 0 && tree.stage > 0 {
-                            Text("Цветы появятся через \(max(0, TreeState.flowersStreak - snapshot.currentStreak)) утр подряд")
+                            Text("Ещё \(Words.days(max(0, TreeState.flowersStreak - snapshot.currentStreak))) без провалов — и дерево зацветёт")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -163,7 +163,7 @@ struct ProgressTabView: View {
                     Text("\(snapshot.xp) опыта · до следующего уровня \(snapshot.xpForNextLevel)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Text("Серия \(snapshot.currentStreak) · рекорд \(snapshot.longestStreak) · всего утр \(snapshot.totalWakes)")
+                    Text("Серия \(snapshot.currentStreak) · рекорд \(snapshot.longestStreak) · всего подъёмов \(snapshot.totalWakes)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -179,7 +179,7 @@ struct ProgressTabView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Итоги недели").font(.headline)
                 if week.mornings == 0 {
-                    Text("На этой неделе утр с заданием ещё не было.")
+                    Text("На этой неделе будильников с заданием ещё не было.")
                         .foregroundStyle(.secondary)
                 } else {
                     Text("Встали \(week.successes) из \(week.mornings) · \(Int((week.regularity * 100).rounded()))%")
@@ -241,11 +241,11 @@ struct ChallengeRow: View {
             }
             if let days = challenge.durationDays {
                 ProgressView(value: min(1, Double(progress.daysPassed) / Double(days))).tint(Theme.accent)
-                Text("День \(min(progress.daysPassed, days)) из \(days) · успешных утр \(progress.successDays)")
+                Text("День \(min(progress.daysPassed, days)) из \(days) · подъёмов \(progress.successDays)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Text("Бессрочный · идёт \(progress.daysPassed) дн. · успешных утр \(progress.successDays)")
+                Text("Бессрочный · идёт \(Words.days(progress.daysPassed)) · подъёмов \(progress.successDays)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -348,7 +348,7 @@ struct SpeciesPickerView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Дерево растёт \(TreeState.cycle) удачных утр, потом переезжает в ваш сад навсегда. Вид выбирается один раз на всё дерево.")
+                    Text("Дерево растёт \(TreeState.cycle) подъёмов, потом переезжает в ваш сад навсегда. Вид выбирается один раз на всё дерево.")
                         .foregroundStyle(.secondary)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
                         ForEach(TreeSpecies.allCases) { species in
@@ -393,43 +393,122 @@ struct GardenView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var journal: JournalStore
     @EnvironmentObject private var challenges: ChallengeStore
+    /// Показать, как сад будет выглядеть через годы (и для снимка в автотестах).
+    var forcePreview = false
+    @State private var preview = false
+    @State private var selected: GardenTreeSpec?
+    @State private var showList = false
+
+    private func realTrees(_ snapshot: ProgressSnapshot) -> [GardenTreeSpec] {
+        var trees = snapshot.garden.map { tree in
+            GardenTreeSpec(index: tree.index, species: settings.species(forTree: tree.index) ?? .oak, stage: 7,
+                           flowers: true, fruits: true, grownAt: tree.date)
+        }
+        let current = snapshot.tree
+        trees.append(GardenTreeSpec(index: current.index, species: settings.species(forTree: current.index) ?? .oak,
+                                    stage: current.stage, wilt: current.wilt, flowers: current.flowers, fruits: current.fruits,
+                                    isCurrent: true))
+        return trees
+    }
 
     var body: some View {
         let snapshot = ProgressEngine.compute(entries: journal.realEntries, challenges: challenges.challenges)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if snapshot.garden.isEmpty {
-                    Text("Сад пока пуст. Первое дерево переедет сюда после \(TreeState.cycle) удачных утр. Сейчас у него \(snapshot.tree.progress).")
-                        .foregroundStyle(.secondary)
-                }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
-                    ForEach(snapshot.garden) { tree in
-                        let species = settings.species(forTree: tree.index) ?? .oak
-                        VStack(spacing: 4) {
-                            TreeView(stage: 7, wilt: 0, species: species, flowers: true, fruits: true).frame(height: 110)
-                            Text("\(species.title) №\(tree.index + 1)").font(.caption.weight(.semibold))
-                            Text("вырос \(Format.fullDate(tree.date))").font(.caption2).foregroundStyle(.secondary)
+        let showingPreview = preview || forcePreview
+        let trees = showingPreview ? GardenLayout.preview : realTrees(snapshot)
+        ZStack(alignment: .bottom) {
+            Garden3DView(trees: trees) { selected = $0 }
+                .ignoresSafeArea()
+            VStack(spacing: 8) {
+                if let selected {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(selected.species.title) №\(selected.index + 1)").font(.headline)
+                        if selected.isCurrent && !showingPreview {
+                            Text("Растёт сейчас: \(TreeState.stageTitles[min(selected.stage, 7)]), \(snapshot.tree.progress) из \(TreeState.cycle) подъёмов")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        } else if let date = selected.grownAt {
+                            Text("Выросло \(Format.fullDate(date))").font(.subheadline).foregroundStyle(.secondary)
+                        } else {
+                            Text(TreeState.stageTitles[min(selected.stage, 7)]).font(.subheadline).foregroundStyle(.secondary)
                         }
-                        .padding(8)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
                     }
-                    VStack(spacing: 4) {
-                        TreeView(stage: snapshot.tree.stage, wilt: snapshot.tree.wilt,
-                                 species: settings.species(forTree: snapshot.tree.index) ?? .oak,
-                                 flowers: snapshot.tree.flowers, fruits: snapshot.tree.fruits)
-                            .frame(height: 110)
-                        Text("Растёт сейчас").font(.caption.weight(.semibold))
-                        Text("\(snapshot.tree.progress) из \(TreeState.cycle)").font(.caption2).foregroundStyle(.secondary)
-                    }
-                    .padding(8)
-                    .background(Theme.card.opacity(0.6), in: RoundedRectangle(cornerRadius: 14))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                } else {
+                    Text(showingPreview
+                         ? "Так сад будет выглядеть через годы подъёмов"
+                         : (snapshot.garden.isEmpty
+                            ? "Первое дерево переедет в сад после \(TreeState.cycle) подъёмов. Сейчас у него \(snapshot.tree.progress)."
+                            : "В саду \(snapshot.garden.count) \(HoursWon.plural(snapshot.garden.count, "дерево", "дерева", "деревьев")). Коснитесь дерева, чтобы узнать о нём."))
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
                 }
             }
             .padding(16)
         }
-        .background(Theme.background)
         .navigationTitle("Мой сад")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if !forcePreview {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button(preview ? "Мой сад" : "Как будет выглядеть сад", systemImage: "sparkles") {
+                            preview.toggle()
+                            selected = nil
+                        }
+                        Button("Список деревьев", systemImage: "list.bullet") { showList = true }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showList) { GardenListView() }
+    }
+}
+
+/// Сад списком: когда выросло каждое дерево.
+struct GardenListView: View {
+    @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var journal: JournalStore
+    @EnvironmentObject private var challenges: ChallengeStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let snapshot = ProgressEngine.compute(entries: journal.realEntries, challenges: challenges.challenges)
+        NavigationStack {
+            List {
+                if snapshot.garden.isEmpty {
+                    Text("Сад пока пуст.").foregroundStyle(.secondary)
+                }
+                ForEach(snapshot.garden) { tree in
+                    let species = settings.species(forTree: tree.index) ?? .oak
+                    HStack {
+                        TreeView(stage: 7, wilt: 0, species: species, flowers: true, fruits: true).frame(width: 44, height: 50)
+                        VStack(alignment: .leading) {
+                            Text("\(species.title) №\(tree.index + 1)").font(.subheadline.weight(.semibold))
+                            Text("выросло \(Format.fullDate(tree.date))").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                HStack {
+                    TreeView(stage: snapshot.tree.stage, wilt: snapshot.tree.wilt,
+                             species: settings.species(forTree: snapshot.tree.index) ?? .oak,
+                             flowers: snapshot.tree.flowers, fruits: snapshot.tree.fruits)
+                        .frame(width: 44, height: 50)
+                    VStack(alignment: .leading) {
+                        Text("Растёт сейчас").font(.subheadline.weight(.semibold))
+                        Text("\(snapshot.tree.progress) из \(TreeState.cycle) подъёмов").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Деревья сада")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Закрыть") { dismiss() } } }
+        }
     }
 }
 

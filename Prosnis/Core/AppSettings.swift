@@ -42,6 +42,10 @@ struct SettingsData: Codable, Equatable {
     var lastGardenWaterDay: String?
     /// Человек состоит хотя бы в одном общем саду: иначе полив на сервер не отправляется.
     var inGardens = false
+    /// Номер для друзей, выданный сервером.
+    var friendNumber: String?
+    /// Человек подтвердил, что записал код восстановления.
+    var recoverySaved = false
 
     init() {}
 
@@ -74,6 +78,8 @@ struct SettingsData: Codable, Equatable {
         pendingGardenWaterDay = try c.decodeIfPresent(String.self, forKey: .pendingGardenWaterDay)
         lastGardenWaterDay = try c.decodeIfPresent(String.self, forKey: .lastGardenWaterDay)
         inGardens = try c.decodeIfPresent(Bool.self, forKey: .inGardens) ?? base.inGardens
+        friendNumber = try c.decodeIfPresent(String.self, forKey: .friendNumber)
+        recoverySaved = try c.decodeIfPresent(Bool.self, forKey: .recoverySaved) ?? base.recoverySaved
     }
 }
 

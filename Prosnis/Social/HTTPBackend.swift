@@ -44,8 +44,16 @@ final class HTTPBackend: SocialBackend, SyncBackend {
     private struct ReasonBody: Codable { var reason: String }
     private struct PairBody: Codable { var friendID: UUID; var title: String; var days: Int }
     private struct SyncResponse: Codable { var accepted: [UUID] }
-    private struct RegisterBody: Codable { var userID: UUID; var secret: String; var displayName: String; var avatar: String }
-    private struct TokenResponse: Codable { var token: String }
+    private struct RegisterBody: Codable {
+        var userID: UUID
+        var secret: String
+        var displayName: String
+        var avatar: String
+        /// Восстановление по коду: если такого аккаунта нет, сервер отвечает 404 и не создаёт новый.
+        var restore: Bool?
+    }
+    private struct TokenResponse: Codable { var token: String; var number: String? }
+    private struct NumberBody: Codable { var number: String }
     private struct TimeResponse: Codable { var now: Date }
 
     private func send<Body: Encodable, Response: Decodable>(
@@ -165,11 +173,30 @@ final class HTTPBackend: SocialBackend, SyncBackend {
         try await send("POST", "v1/me/water", body: DayBody(day: day), as: [SharedGarden].self)
     }
 
-    /// Регистрация устройства без пароля: id пользователя + секрет из связки ключей → токен.
+    /// Регистрация устройства без пароля: id пользователя + секрет из кода восстановления → токен и номер для друзей.
     /// Повторный вызов с тем же секретом возвращает тот же аккаунт.
-    func register(profile: UserProfile, secret: String) async throws -> String {
-        let body = RegisterBody(userID: profile.id, secret: secret, displayName: profile.displayName, avatar: profile.avatar)
-        return try await send("POST", "v1/auth/register", body: body, as: TokenResponse.self).token
+    func register(profile: UserProfile, secret: String, restore: Bool = false) async throws -> (token: String, number: String?) {
+        let body = RegisterBody(userID: profile.id, secret: secret, displayName: profile.displayName, avatar: profile.avatar,
+                                restore: restore ? true : nil)
+        let response = try await send("POST", "v1/auth/register", body: body, as: TokenResponse.self)
+        return (response.token, response.number)
+    }
+
+    /// Всё, что сервер хранит об аккаунте: для восстановления на новом телефоне.
+    func restoreSnapshot() async throws -> RestoreSnapshot {
+        try await get("v1/me/backup", as: RestoreSnapshot.self)
+    }
+
+    func sendFriendRequest(number: String) async throws {
+        try await call("POST", "v1/friend-requests", body: NumberBody(number: number))
+    }
+    func friendRequests() async throws -> [FriendRequest] { try await get("v1/friend-requests", as: [FriendRequest].self) }
+    func answerFriendRequest(_ id: UUID, accept: Bool) async throws -> Friend? {
+        if accept {
+            return try await send("POST", "v1/friend-requests/\(id.uuidString)/accept", body: Empty(), as: Friend.self)
+        }
+        try await call("POST", "v1/friend-requests/\(id.uuidString)/decline", body: Empty())
+        return nil
     }
 
     func push(_ items: [OutboxItem]) async throws -> [UUID] {

@@ -43,6 +43,26 @@ struct ProfileView: View {
                     }
                 }
 
+                Section {
+                    NavigationLink {
+                        RecoveryCodeView()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Код восстановления", systemImage: "key")
+                            if !settings.data.recoverySaved {
+                                Text("Запишите 12 слов: без них аккаунт не вернуть на новом телефоне")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                    NavigationLink { RestoreAccountView() } label: {
+                        Label("Восстановить аккаунт по коду", systemImage: "arrow.counterclockwise")
+                    }
+                } header: {
+                    Text("Аккаунт без регистрации")
+                }
+
                 Section("Настройки") {
                     NavigationLink { ModulesView() } label: { Label("Модули и чек-листы", systemImage: "square.grid.2x2") }
                     NavigationLink { PrivacyView() } label: { Label("Приватность", systemImage: "hand.raised") }
@@ -81,7 +101,7 @@ struct ProfileView: View {
                 } header: {
                     Text("Данные")
                 } footer: {
-                    Text("Удаляются будильники, журнал, челленджи, настройки и фоны на телефоне, а при подключённом сервере и аккаунт на нём.")
+                    Text("Удаляются будильники, дневник подъёмов, челленджи, настройки и фоны на телефоне, а при подключённом сервере и аккаунт на нём.")
                 }
 
                 Section("О приложении") {
@@ -197,7 +217,7 @@ struct PrivacyView: View {
             } header: {
                 Text("Что могут видеть друзья")
             } footer: {
-                Text("Всё выключено по умолчанию. Для каждого друга можно сузить список в его карточке. Ставки, деньги и журнал не видит никто.")
+                Text("Всё выключено по умолчанию. Для каждого друга можно сузить список в его карточке. Ставки, деньги и дневник подъёмов не видит никто.")
             }
 
             Section {

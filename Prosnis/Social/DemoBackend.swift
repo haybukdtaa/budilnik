@@ -19,6 +19,8 @@ final class DemoBackend: SocialBackend, SyncBackend {
         var gardens: [SharedGarden]?
         /// День, которым я уже поливал сады.
         var wateredDay: String?
+        /// Входящие заявки в друзья (nil — ещё не созданы).
+        var requests: [FriendRequest]?
     }
 
     private var state: State
@@ -264,7 +266,7 @@ final class DemoBackend: SocialBackend, SyncBackend {
         func text(_ value: Int) -> String {
             switch kind {
             case .weekRegularity: return "\(value)%"
-            case .allTimeStreak: return "\(value) дн."
+            case .allTimeStreak: return Words.days(value)
             case .allTimeWakes: return "\(value)"
             }
         }
@@ -298,8 +300,8 @@ final class DemoBackend: SocialBackend, SyncBackend {
 
     func inviteRewards() async throws -> [InviteReward] {
         [
-            InviteReward(id: "aurora", title: "Фон «Аврора»", detail: "Открыт: приглашённый друг провёл 7 утр", unlocked: true),
-            InviteReward(id: "mentor", title: "Значок «Наставник»", detail: "Пригласите трёх друзей, которые проведут по 7 утр", unlocked: false),
+            InviteReward(id: "aurora", title: "Фон «Аврора»", detail: "Открыт: приглашённый друг встал 7 раз", unlocked: true),
+            InviteReward(id: "mentor", title: "Значок «Наставник»", detail: "Пригласите трёх друзей, которые встанут по 7 раз", unlocked: false),
         ]
     }
 
@@ -321,6 +323,35 @@ final class DemoBackend: SocialBackend, SyncBackend {
 
     func notifyWitnesses(_ notice: MissedMorningNotice) async throws {
         // Вымышленные друзья: сообщение никуда не уходит.
+    }
+
+    // MARK: - Заявки в друзья
+
+    func sendFriendRequest(number: String) async throws {
+        guard FriendNumber.normalize(number) != nil else { throw BackendError.invalidCode }
+        // Вымышленный человек: заявка никуда не уходит.
+    }
+
+    func friendRequests() async throws -> [FriendRequest] {
+        if let requests = state.requests { return requests }
+        let seeded = [FriendRequest(id: UUID(), from: DemoBackend.person("Камила", "🌷"), sentAt: Date().addingTimeInterval(-3600))]
+        state.requests = seeded
+        save()
+        return seeded
+    }
+
+    func answerFriendRequest(_ id: UUID, accept: Bool) async throws -> Friend? {
+        let requests = try await friendRequests()
+        guard let request = requests.first(where: { $0.id == id }) else { throw BackendError.notFound }
+        state.requests = requests.filter { $0.id != id }
+        var friend: Friend?
+        if accept {
+            let added = Friend(profile: request.from, since: Date(), status: nil, myVisibility: Visibility())
+            state.friends.append(added)
+            friend = added
+        }
+        save()
+        return friend
     }
 
     // MARK: - Общие сады

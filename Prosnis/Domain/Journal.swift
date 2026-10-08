@@ -104,7 +104,7 @@ enum StakeAdvisor {
     }
 }
 
-/// Журнал утр: хранение на диске, статистика, споры.
+/// Дневник подъёмов: хранение на диске, статистика, споры.
 @MainActor
 final class JournalStore: ObservableObject {
     static let shared = JournalStore()
@@ -165,6 +165,17 @@ final class JournalStore: ObservableObject {
         entries.sort { $0.date > $1.date }
         save()
         AppEvents.journalChanged(entry, isNew: true)
+    }
+
+    /// Добавляет записи, восстановленные с сервера (которых ещё нет на телефоне).
+    func mergeRestored(_ restored: [JournalEntry]) {
+        let known = Set(entries.map(\.id))
+        let added = restored.filter { !known.contains($0.id) }
+        guard !added.isEmpty else { return }
+        entries += added
+        entries.sort { $0.date > $1.date }
+        save()
+        ChallengeStore.shared.evaluateAll()
     }
 
     func setRoutine(entryID: UUID, done: [String], total: Int) {
