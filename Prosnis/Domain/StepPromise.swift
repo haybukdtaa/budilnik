@@ -22,6 +22,8 @@ enum StepRead: Equatable {
     case steps(Int)
     /// Нет доступа к данным о движении: человек выключил его сам.
     case denied
+    /// Доступ ещё не спрашивали (например, сбросили все разрешения в настройках iPhone). Это не отказ.
+    case needsAccess
     /// Не удалось прочитать (сбой телефона или счётчика).
     case unavailable
 }
@@ -73,7 +75,7 @@ enum PromiseRules {
             return now >= promise.end.addingTimeInterval(grace) ? .broken(.notEnough, steps: count) : nil
         case .denied:
             return now >= promise.end.addingTimeInterval(grace) ? .broken(.denied, steps: nil) : nil
-        case .unavailable, nil:
+        case .unavailable, .needsAccess, nil:
             return nil
         }
     }

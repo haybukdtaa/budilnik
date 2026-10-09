@@ -47,9 +47,10 @@ enum StepCounting {
     /// Шаги за промежуток [from, to].
     static func read(from: Date, to: Date) async -> StepRead {
         guard isAvailable else { return .unavailable }
-        // Системный запрос доступа при чтении не показываем: доступ спрашивается при создании обещания.
+        // Системный запрос доступа при чтении не показываем: отказ — только явный «Не разрешать».
         switch CMPedometer.authorizationStatus() {
-        case .denied, .restricted, .notDetermined: return .denied
+        case .denied, .restricted: return .denied
+        case .notDetermined: return .needsAccess
         default: break
         }
         let pedometer = CMPedometer()
@@ -84,6 +85,8 @@ final class PromiseStore: ObservableObject {
     private let file = FileStore<[StepPromise]>("promises")
     private var loadFailed = false
     private var isReconciling = false
+    /// Во время проверки пришла принудительная: после текущей прохода — ещё один.
+    private var rerunForced = false
     private var lastCheck: [UUID: Date] = [:]
 
     private init() {
@@ -147,10 +150,22 @@ final class PromiseStore: ObservableObject {
     /// Читает шаги и решает обещания, у которых окно началось. Идущее окно проверяется раз в минуту.
     func reconcile(now: Date = TrustedClock.now, force: Bool = false) async {
         reloadIfNeeded()
-        guard !isReconciling, !promises.isEmpty else { return }
+        guard !isReconciling else {
+            if force { rerunForced = true }
+            return
+        }
+        guard !promises.isEmpty else { return }
         isReconciling = true
         defer { isReconciling = false }
+        await reconcileOnce(now: now, force: force)
+        // Принудительная проверка при открытии не теряется, если в этот момент шла обычная.
+        while rerunForced {
+            rerunForced = false
+            await reconcileOnce(now: TrustedClock.now, force: true)
+        }
+    }
 
+    private func reconcileOnce(now: Date, force: Bool) async {
         for promise in promises where now >= promise.start {
             guard promises.contains(where: { $0.id == promise.id }) else { continue }
             var read: StepRead?
@@ -160,6 +175,11 @@ final class PromiseStore: ObservableObject {
                 if !force, let last = lastCheck[promise.id], now.timeIntervalSince(last) < gap { continue }
                 lastCheck[promise.id] = now
                 read = await StepCounting.read(from: promise.start, to: min(now, promise.end))
+                // Доступ сбросили (не отказ): спрашиваем заново, пока приложение открыто. Отказ — выбор человека.
+                if read == .needsAccess {
+                    _ = await StepCounting.requestAccess()
+                    read = await StepCounting.read(from: promise.start, to: min(now, promise.end))
+                }
                 switch read {
                 case .steps(let count)?:
                     liveSteps[promise.id] = count
@@ -168,7 +188,7 @@ final class PromiseStore: ObservableObject {
                     mark(promise.id, readFailed: false)
                 case .unavailable?:
                     mark(promise.id, readFailed: true)
-                case nil:
+                case .needsAccess?, nil:
                     break
                 }
             }
@@ -241,7 +261,8 @@ final class PromiseStore: ObservableObject {
     private func scheduleNotifications(_ promise: StepPromise) async {
         let center = UNUserNotificationCenter.current()
         func add(_ id: String, _ title: String, _ body: String, at date: Date) async {
-            guard date > Date() else { return }
+            // Обещание уже решили, пока ставились предыдущие: его напоминания не нужны.
+            guard date > Date(), promises.contains(where: { $0.id == promise.id }) else { return }
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body
@@ -256,13 +277,21 @@ final class PromiseStore: ObservableObject {
                   "«\(promise.title)»: нужно \(promise.minSteps) шагов до \(Format.time(promise.end)).", at: promise.start)
         await add(names[1], "Окно закончилось",
                   "Откройте приложение — посчитаем шаги.", at: promise.end)
+        // Напоминания — в 9:00 утра, а не ночью; все до крайнего срока проверки.
+        let deadline = PromiseRules.verifyDeadline(promise)
+        let calendar = Calendar.current
         for (index, days) in PromiseStore.reminderDays.enumerated() {
+            guard let day = calendar.date(byAdding: .day, value: days, to: promise.end),
+                  let fire = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day),
+                  fire < deadline else { continue }
             let last = days == PromiseStore.reminderDays.last
             await add(names[2 + index], "Шаги ещё не посчитаны",
-                      last ? "Завтра шаги за «\(promise.title)» уже нельзя будет проверить: откройте приложение сегодня."
+                      last ? "Шаги за «\(promise.title)» можно проверить до \(Format.dayMonth(deadline)), \(Format.time(deadline)). Откройте приложение."
                            : "Откройте приложение — посчитаем шаги за «\(promise.title)».",
-                      at: promise.end.addingTimeInterval(Double(days) * 86400 + 9 * 3600))
+                      at: fire)
         }
+        // Если обещание решили, пока ставились напоминания, — снимаем всё, что успело встать.
+        if !promises.contains(where: { $0.id == promise.id }) { cancelNotifications(promise.id) }
     }
 
     private func cancelNotifications(_ id: UUID) {

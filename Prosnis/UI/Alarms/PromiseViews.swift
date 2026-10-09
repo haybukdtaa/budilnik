@@ -139,7 +139,7 @@ struct PromiseEditView: View {
                 } footer: {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Нужно набрать шаги с \(Format.time(start)) до \(Format.time(end)). Не набрали — ставка спишется.")
-                        if PromiseRules.isLocked(StepPromise(start: start, end: end), now: Date()) {
+                        if PromiseRules.isLocked(StepPromise(start: start, end: end), now: TrustedClock.now) {
                             Text("До начала меньше 2 часов: после создания обещание уже нельзя будет изменить или удалить.")
                                 .foregroundStyle(Theme.accent)
                         }

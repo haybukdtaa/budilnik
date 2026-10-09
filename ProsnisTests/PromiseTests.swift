@@ -29,6 +29,16 @@ final class PromiseTests: XCTestCase {
                        .broken(.notEnough, steps: 4900))
     }
 
+    func testResetPermissionsIsNotARefusal() {
+        // Сбросили разрешения в настройках iPhone: это не отказ, ждём — приложение спросит доступ снова.
+        XCTAssertNil(PromiseRules.resolve(promise(), read: .needsAccess, now: T.date(2026, 10, 9, 8, 0)))
+    }
+
+    func testGraceBoundaryIsInclusive() {
+        XCTAssertEqual(PromiseRules.resolve(promise(), read: .steps(10), now: T.date(2026, 10, 8, 23, 32)),
+                       .broken(.notEnough, steps: 10))
+    }
+
     func testDeniedAccessIsTheUsersChoice() {
         XCTAssertNil(PromiseRules.resolve(promise(), read: .denied, now: T.date(2026, 10, 8, 22, 40)), "Пока окно идёт — ждём")
         XCTAssertEqual(PromiseRules.resolve(promise(), read: .denied, now: T.date(2026, 10, 9, 8, 0)), .broken(.denied, steps: nil))
