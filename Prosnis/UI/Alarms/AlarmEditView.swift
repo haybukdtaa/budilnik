@@ -215,6 +215,20 @@ struct AlarmEditView: View {
                             .font(.app(.subheadline))
                             .foregroundStyle(.orange)
                     }
+                    let prayer = settings.data.prayer
+                    let fajrToday = PrayerTimes.day(for: Date(), settings: prayer).fajr
+                    let calibrated = prayer.method == .custom && prayer.calibratedMinutes != nil
+                    NavigationLink {
+                        PrayerSettingsView()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(calibrated ? "Время подогнано под ваш источник" : "Подогнать под мою мечеть")
+                                .foregroundStyle(calibrated ? Color.primary : Theme.accent)
+                            Text("Фаджр сегодня: \(fajrToday.map(Format.time) ?? "—") · \(prayer.city.name)")
+                                .font(.app(.caption))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             } footer: {
                 if draft.isFajr {

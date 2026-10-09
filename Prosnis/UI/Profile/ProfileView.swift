@@ -2,6 +2,13 @@ import SwiftUI
 
 /// Вкладка «Профиль»: имя, модули, приватность, деньги, данные.
 struct ProfileView: View {
+    /// «0.2 · сборка 57»: по номеру сборки видно, что на телефоне стоит свежая версия.
+    private var appVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return "\(version) · сборка \(build)"
+    }
+
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var journal: JournalStore
     @EnvironmentObject private var challenges: ChallengeStore
@@ -108,7 +115,7 @@ struct ProfileView: View {
                     HStack {
                         Text("Версия")
                         Spacer()
-                        Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+                        Text(appVersion)
                             .foregroundStyle(.secondary)
                     }
                     Text("Производственный календарь РФ заложен на 2026 и 2027 годы (постановление № 1187 от 17.09.2026). Для других лет учитываются праздники и обычные переносы.")
