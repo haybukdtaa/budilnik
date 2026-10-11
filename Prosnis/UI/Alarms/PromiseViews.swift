@@ -14,12 +14,13 @@ struct PromiseRow: View {
                 .foregroundStyle(Theme.accent)
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(Format.time(promise.start)) · \(promise.title)")
+                Text(title)
                     .font(.app(.body))
-                Text("до \(Format.time(promise.end)) · \(progressText)")
+                Text(progressText)
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             Spacer()
             if PromiseRules.isLocked(promise, now: now) {
@@ -31,13 +32,18 @@ struct PromiseRow: View {
         .onTapGesture(perform: onTap)
     }
 
+    /// «22:00 · Пробежка», а если не сегодня — с датой.
+    private var title: String {
+        let base = "\(Format.time(promise.start)) · \(promise.title)"
+        return Calendar.current.isDateInToday(promise.start) ? base : "\(Format.dayMonth(promise.start)), \(base)"
+    }
+
     private var progressText: String {
-        let goal = "\(promise.minSteps) шагов · \(promise.stake) ₽"
         if now < promise.start {
-            return "\(Format.dayMonth(promise.start)) · \(goal)"
+            return "до \(Format.time(promise.end)) · \(promise.minSteps) шагов · \(promise.stake) ₽"
         }
         let done = store.liveSteps[promise.id] ?? 0
-        return "шаги \(done) из \(promise.minSteps)"
+        return "до \(Format.time(promise.end)) · шаги \(done) из \(promise.minSteps)"
     }
 }
 

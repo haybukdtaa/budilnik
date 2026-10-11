@@ -66,7 +66,11 @@ struct SleepRow: View {
             DialView(time: next)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Ложусь спать").font(.app(.body))
-                Text(subtitle).font(.app(.subheadline)).foregroundStyle(.secondary)
+                Text(subtitle)
+                    .font(.app(.subheadline))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 8)
             Button("Начать", action: onStart)

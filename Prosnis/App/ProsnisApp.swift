@@ -32,6 +32,8 @@ struct ProsnisApp: App {
                 .environmentObject(sync)
                 .preferredColorScheme(.dark)
                 .tint(Theme.accent)
+                // Переключатели — бордовые, как кнопки логотипа.
+                .toggleStyle(SwitchToggleStyle(tint: Theme.toggle))
                 .task { await becameActive() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { Task { await becameActive() } }
