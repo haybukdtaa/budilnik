@@ -167,7 +167,7 @@ struct PrayerSettingsView: View {
                     if let message {
                         Label(message, systemImage: messageIsError ? "exclamationmark.circle" : "checkmark.circle")
                             .font(.app(.footnote))
-                            .foregroundStyle(messageIsError ? Theme.accent : Theme.leaf)
+                            .foregroundStyle(messageIsError ? Theme.accent : Theme.mint)
                     }
                 } header: {
                     Text("Подогнать под ваш источник")
