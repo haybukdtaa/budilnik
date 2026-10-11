@@ -69,8 +69,7 @@ struct SleepRow: View {
                 Text(subtitle)
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .lineLimit(2)
             }
             Spacer(minLength: 8)
             Button("Начать", action: onStart)
