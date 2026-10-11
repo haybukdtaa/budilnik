@@ -121,8 +121,7 @@ struct HoursWonCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, 8)
     }
 }
 

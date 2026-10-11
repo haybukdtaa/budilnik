@@ -151,7 +151,7 @@ struct RootView: View {
 
     /// Условия ставки изменились: ставки не действуют, пока человек не согласится заново.
     private var reconsentAmount: Int? {
-        guard !consentPostponed, wake.session == nil, wake.morning == nil else { return nil }
+        guard !consentPostponed, wake.session == nil, wake.morning == nil, RootView.screenshotTab == nil else { return nil }
         return alarmStore.alarmsNeedingConsent.map(\.stakeAmount).max()
     }
 
