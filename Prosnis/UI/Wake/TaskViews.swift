@@ -73,7 +73,7 @@ struct MathTaskView: View {
                 .foregroundStyle(wrong ? Color.red : Color.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                 ForEach(keys, id: \.self) { key in
@@ -84,7 +84,7 @@ struct MathTaskView: View {
                             .font(.app(.title2, weight: .semibold))
                             .frame(maxWidth: .infinity, minHeight: 54)
                             .background(key == "✓" ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.15)),
-                                        in: RoundedRectangle(cornerRadius: 14))
+                                        in: RoundedRectangle(cornerRadius: 12))
                             .foregroundStyle(key == "✓" ? Color.black : Color.white)
                     }
                     .buttonStyle(.plain)
@@ -211,7 +211,7 @@ struct QRTaskView: View {
                 onUnavailable("Камера недоступна, задание заменено на печать")
             }
             .frame(height: 360)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Text(status)
                 .font(.app(.subheadline))

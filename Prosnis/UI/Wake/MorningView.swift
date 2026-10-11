@@ -99,7 +99,7 @@ struct MorningView: View {
                             .font(.app(.headline))
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 16))
+                            .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 12))
                             .foregroundStyle(.white)
                     }
                 }
@@ -123,7 +123,7 @@ struct MorningView: View {
                     .frame(width: 110, height: 130)
                 VStack(alignment: .leading, spacing: 6) {
                     if gained > 0 {
-                        Text("+\(gained) опыта").font(.app(.title2, weight: .bold)).foregroundStyle(Theme.accentGradient)
+                        Text("+\(gained) опыта").font(.app(.title2, weight: .bold)).foregroundStyle(Theme.accent)
                     }
                     if Titles.changed(fromLevel: state.levelBefore, toLevel: snapshot.level) {
                         Label("Новое звание: \(snapshot.title)", systemImage: "arrow.up.circle.fill")
@@ -166,7 +166,7 @@ struct MorningView: View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -204,7 +204,7 @@ private struct ProgramCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -242,7 +242,7 @@ struct FocusTimerView: View {
                 Text("\(minutes) минут без отвлечений: самое продуктивное время дня.")
                     .foregroundStyle(.secondary)
                 Button("Начать") { endDate = Date().addingTimeInterval(Double(minutes) * 60) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.burgundy)
             }
         }
     }

@@ -129,6 +129,7 @@ struct AlarmEditView: View {
                     }
                 }
             }
+            .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Theme.background)
             .disabled(isLocked)
@@ -457,7 +458,7 @@ struct AlarmEditView: View {
                     scanError = "Нет доступа к камере. Разрешите его в Настройках iPhone."
                 }
                 .frame(height: 380)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 Text(scanError ?? "Наведите камеру на QR-код или штрихкод")
                     .foregroundStyle(scanError == nil ? Color.secondary : Color.orange)
                 Spacer()
@@ -484,7 +485,7 @@ struct AlarmEditView: View {
             .shadow(radius: 6)
         }
         .frame(height: 160)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
     }
 }

@@ -51,6 +51,14 @@ final class AlarmStore: ObservableObject {
 
     func reload() { load() }
 
+    /// Для скриншотов в автотестах: показать будильники без постановки в систему.
+    func seedDemo(_ items: [AlarmItem]) {
+        guard alarms.isEmpty else { return }
+        alarms = items
+        sort()
+        save()
+    }
+
     private func save() { file.save(alarms) }
 
     private func sort() {

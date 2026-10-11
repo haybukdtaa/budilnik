@@ -63,7 +63,7 @@ struct SavedCard: View {
                 .foregroundStyle(.secondary)
             Text("Сохранено \(stats.saved) ₽")
                 .font(.app(.title2, weight: .bold))
-                .foregroundStyle(Theme.accentGradient)
+                .foregroundStyle(Theme.accent)
             Text("Встали вовремя \(stats.successes) из \(stats.total)" + (stats.streak > 1 ? " · серия \(stats.streak)" : ""))
                 .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
@@ -74,8 +74,7 @@ struct SavedCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+        .padding(.vertical, 4)
     }
 }
 

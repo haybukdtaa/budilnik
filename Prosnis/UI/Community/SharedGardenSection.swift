@@ -17,7 +17,7 @@ struct SharedGardenSection: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
 
                 ForEach(social.gardens) { garden in
                     GardenCard(garden: garden)
@@ -29,7 +29,7 @@ struct SharedGardenSection: View {
                     } label: {
                         Label("Посадить сад", systemImage: "leaf.fill").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.burgundy)
                     Button {
                         showJoin = true
                     } label: {
@@ -104,7 +104,7 @@ private struct GardenCard: View {
             }
         }
         .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
         .confirmationDialog("Выйти из сада «\(garden.name)»?", isPresented: $confirmLeave, titleVisibility: .visible) {
             Button("Выйти", role: .destructive) { Task { await social.leaveGarden(garden) } }
         }

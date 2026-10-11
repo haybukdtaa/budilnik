@@ -30,7 +30,7 @@ struct ProsnisApp: App {
                 .environmentObject(social)
                 .environmentObject(payments)
                 .environmentObject(sync)
-                .preferredColorScheme(.light)
+                .preferredColorScheme(.dark)
                 .tint(Theme.accent)
                 .task { await becameActive() }
                 .onChange(of: scenePhase) { _, phase in
@@ -246,7 +246,7 @@ struct RootView: View {
             }
             .sheet(item: $wake.morning) { state in
                 MorningView(state: state)
-                    .preferredColorScheme(.light)
+                    .preferredColorScheme(.dark)
             }
             .onAppear {
                 guard let screenshot = RootView.screenshotTab else { return }
@@ -255,6 +255,14 @@ struct RootView: View {
                 if JournalStore.shared.entries.isEmpty { JournalStore.shared.addDemoEntries() }
                 if !settings.data.useDemoSocial { settings.data.useDemoSocial = true }
                 if !settings.data.medsEnabled { settings.data.medsEnabled = true }
+                var work = AlarmItem()
+                work.hour = 6; work.minute = 30; work.weekdays = [1, 2, 3, 4, 5]; work.label = "Работа"
+                work.stakeEnabled = true; work.stakeAmount = 500; work.taskEnabled = true; work.taskKind = .steps
+                var fajr = AlarmItem()
+                fajr.fajrOffset = 0; fajr.module = .prayer
+                var weekend = AlarmItem()
+                weekend.hour = 8; weekend.minute = 30; weekend.weekdays = [6, 7]; weekend.label = "Выходные"; weekend.isEnabled = false
+                AlarmStore.shared.seedDemo([work, fajr, weekend])
                 if PromiseStore.shared.promises.isEmpty {
                     let begin = PromiseEditView.defaultStart()
                     _ = PromiseStore.shared.add(StepPromise(title: "Пробежка", start: begin, end: begin.addingTimeInterval(90 * 60),

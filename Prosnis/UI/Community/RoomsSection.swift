@@ -236,7 +236,7 @@ struct ChatView: View {
                     TextField("Сообщение", text: $text, axis: .vertical)
                         .lineLimit(1...4)
                         .padding(10)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
                     Button {
                         let value = text
                         text = ""
@@ -274,7 +274,7 @@ struct ChatView: View {
                 Text(message.text)
                     .padding(10)
                     .background(mine ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.card),
-                                in: RoundedRectangle(cornerRadius: 14))
+                                in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(mine ? Color.white : Color.primary)
                 Text(Format.time(message.sentAt)).font(.app(.caption2)).foregroundStyle(.secondary)
             }

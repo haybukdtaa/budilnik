@@ -23,7 +23,7 @@ struct WallpaperPickerView: View {
                         .foregroundStyle(Theme.accent)
                     }
                     .frame(height: 150)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
                 if case .photo = selection {
@@ -69,7 +69,7 @@ struct WallpaperPickerView: View {
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func tile(for wallpaper: Wallpaper, title: String) -> some View {
@@ -94,9 +94,9 @@ struct WallpaperPickerView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 12)
                     .stroke(selection == wallpaper ? Theme.accent : .clear, lineWidth: 3)
             )
         }

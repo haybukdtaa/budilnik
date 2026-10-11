@@ -91,7 +91,7 @@ struct HoursWonCard: View {
                                              from: monthStart, to: Date().addingTimeInterval(86400))
                 Text("+\(HoursWon.text(minutes: minutes)) утра в этом месяце")
                     .font(.app(.title2, weight: .bold))
-                    .foregroundStyle(Theme.accentGradient)
+                    .foregroundStyle(Theme.accent)
                 let equivalents = HoursWon.equivalents(minutes: minutes)
                 if equivalents.isEmpty {
                     Text("Считаем по сравнению с тем, когда вы вставали раньше (\(String(format: "%02d:%02d", baseline / 60, baseline % 60))). Каждое раннее утро добавляет время.")
@@ -117,12 +117,12 @@ struct HoursWonCard: View {
                     settings.data.usualWakeMinutes = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
                     editing = false
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.burgundy)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

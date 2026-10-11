@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Главный экран: список будильников.
+/// Главный экран, как «Часы» iPhone: «Сон», обещания и будильники плоским списком.
 struct AlarmListView: View {
     @EnvironmentObject private var store: AlarmStore
     @EnvironmentObject private var journal: JournalStore
@@ -12,65 +12,43 @@ struct AlarmListView: View {
     @State private var showBedtime = false
     @State private var showPromise = false
     @State private var openPromise: StepPromise?
+    @State private var editMode: EditMode = .inactive
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Theme.background.ignoresSafeArea()
-
-                if store.alarms.isEmpty && promises.promises.isEmpty {
-                    emptyState
-                } else {
-                    TimelineView(.everyMinute) { context in
-                        list(now: context.date)
-                    }
-                }
+            TimelineView(.everyMinute) { context in
+                list(now: context.date)
             }
+            .background(Theme.background)
             .navigationTitle("Будильники")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        Button("Проверить звонок через минуту", systemImage: "bell.badge") {
-                            store.runTest()
-                        }
-                        Section("Проверить задание и повторную проверку") {
-                            ForEach([TaskKind.typing, .math, .memory, .steps]) { kind in
-                                Button(kind.title, systemImage: kind.icon) {
-                                    WakeCoordinator.shared.startDemo(task: kind)
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                    Button(editMode.isEditing ? "Готово" : "Изменить") {
+                        withAnimation { editMode = editMode.isEditing ? .inactive : .active }
                     }
+                    .opacity(store.alarms.isEmpty ? 0 : 1)
+                    .disabled(store.alarms.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("Будильник", systemImage: "alarm") {
+                        Button {
                             var item = AlarmItem()
                             item.module = settings.data.modules.first ?? .basic
                             editing = item
+                        } label: {
+                            Label("Будильник", systemImage: "alarm")
                         }
-                        Button("Обещание по шагам", systemImage: "figure.run") { showPromise = true }
+                        Button {
+                            showPromise = true
+                        } label: {
+                            Label("Обещание по шагам", systemImage: "figure.run")
+                        }
                     } label: {
-                        Image(systemName: "plus.circle.fill").font(.app(.title2))
+                        Image(systemName: "plus").font(.app(.title3))
                     }
                 }
             }
-            .safeAreaInset(edge: .bottom) {
-                Button {
-                    showBedtime = true
-                } label: {
-                    Label("Ложусь спать", systemImage: "moon.stars.fill")
-                        .font(.app(.headline))
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 16))
-                        .foregroundStyle(.white)
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-            }
+            .environment(\.editMode, $editMode)
             .sheet(item: $editing) { alarm in
                 AlarmEditView(alarm: alarm, isNew: !store.alarms.contains { $0.id == alarm.id })
             }
@@ -93,49 +71,74 @@ struct AlarmListView: View {
         }
     }
 
+    private func header(_ title: String) -> some View {
+        Text(title)
+            .font(.app(.title3, weight: .bold))
+            .foregroundStyle(.white)
+            .textCase(nil)
+            .padding(.top, 6)
+    }
+
+    /// Ближайший звонок среди включённых будильников.
+    private func nextAlarm(now: Date) -> Date? {
+        store.alarms.filter(\.isEnabled).compactMap { store.nextOccurrence(of: $0, after: now) }.min()
+    }
+
     private func list(now: Date) -> some View {
         List {
-            if !journal.realEntries.isEmpty {
-                SavedCard()
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            Section {
+                SleepRow(next: nextAlarm(now: now), now: now) { showBedtime = true }
+            } header: {
+                header("Сон")
             }
-            ForEach(promises.promises) { promise in
-                PromiseRow(promise: promise, now: now) { openPromise = promise }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-            }
-            ForEach(store.alarms) { alarm in
-                let locked = store.isLocked(alarm)
-                AlarmRow(alarm: alarm, isLocked: locked, next: alarm.isEnabled ? store.nextOccurrence(of: alarm, after: now) : nil) {
-                    editing = alarm
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                .swipeActions {
-                    if !locked {
-                        Button("Удалить", role: .destructive) { store.delete(alarm) }
+
+            if !promises.promises.isEmpty {
+                Section {
+                    ForEach(promises.promises) { promise in
+                        PromiseRow(promise: promise, now: now) { openPromise = promise }
                     }
+                } header: {
+                    header("Обещания")
+                }
+            }
+
+            Section {
+                if store.alarms.isEmpty {
+                    Text("Пока нет будильников. Нажмите «+», чтобы добавить первый.")
+                        .font(.app(.subheadline))
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(store.alarms) { alarm in
+                    let locked = store.isLocked(alarm)
+                    AlarmRow(alarm: alarm, isLocked: locked, next: alarm.isEnabled ? store.nextOccurrence(of: alarm, after: now) : nil) {
+                        editing = alarm
+                    }
+                    .swipeActions {
+                        if !locked {
+                            Button("Удалить", role: .destructive) { store.delete(alarm) }
+                        }
+                    }
+                }
+                .onDelete { offsets in
+                    for index in offsets where store.alarms.indices.contains(index) {
+                        let alarm = store.alarms[index]
+                        if !store.isLocked(alarm) { store.delete(alarm) }
+                    }
+                }
+            } header: {
+                header("Другие")
+            }
+
+            if !journal.realEntries.isEmpty {
+                Section {
+                    SavedCard()
+                } header: {
+                    header("Месяц")
                 }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "alarm")
-                .font(.system(size: 56))
-                .foregroundStyle(Theme.accent)
-            Text("Пока нет будильников")
-                .font(.app(.title3, weight: .bold))
-            Text("Нажмите «+», чтобы добавить первый")
-                .foregroundStyle(.secondary)
-        }
     }
 }
 
@@ -147,25 +150,17 @@ private struct AlarmRow: View {
     let onTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            WallpaperView(wallpaper: alarm.wallpaper)
-                .frame(width: 8)
-                .clipShape(Capsule())
-
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(alarm.timeText)
-                    .font(.system(size: alarm.isFajr ? 34 : 46, weight: .light, design: .rounded))
+                    .font(.system(size: 56, weight: .thin))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 HStack(spacing: 6) {
-                    Image(systemName: alarm.effectiveModule.icon)
-                    Text(alarm.displayTitle)
-                    Text("·")
-                    Text(alarm.repeatText)
+                    Text("\(alarm.displayTitle) · \(alarm.repeatText)")
                     if alarm.hasTask {
                         Image(systemName: alarm.effectiveTask.icon)
-                    }
-                    if alarm.stakeEnabled {
-                        Image(systemName: "bolt.fill").foregroundStyle(Theme.accent)
                     }
                     if isLocked {
                         Image(systemName: "lock.fill")
@@ -174,6 +169,14 @@ private struct AlarmRow: View {
                 .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                if alarm.stakeEnabled {
+                    Text("Ставка \(alarm.stakeAmount) ₽")
+                        .font(.app(.caption))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 2)
+                        .background(Theme.burgundy.opacity(0.28), in: Capsule())
+                }
                 if store.isScheduleFailed(alarm) {
                     Label("Не поставлен в систему: проверьте разрешение на будильники", systemImage: "exclamationmark.triangle.fill")
                         .font(.app(.caption))
@@ -197,8 +200,7 @@ private struct AlarmRow: View {
             .labelsHidden()
             .disabled(isLocked)
         }
-        .padding(14)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+        .padding(.vertical, 4)
         .opacity(alarm.isEnabled ? 1 : 0.5)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)

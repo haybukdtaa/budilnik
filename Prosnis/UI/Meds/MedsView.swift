@@ -38,6 +38,7 @@ struct MedsView: View {
                             .multilineTextAlignment(.center)
                     }
                 }
+                .listStyle(.plain)
                 .scrollContentBackground(.hidden)
             }
             .background(Theme.background)
@@ -69,7 +70,7 @@ struct MedsView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                 Button("Добавить") { editing = Medication() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.burgundy)
                     .tint(Theme.mint)
             }
             .frame(maxWidth: .infinity)
@@ -546,7 +547,7 @@ struct MorningMedsLine: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
         }
     }
 }

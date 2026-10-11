@@ -13,40 +13,49 @@ struct ProgressTabView: View {
         let snapshot = ProgressEngine.compute(entries: journal.realEntries, challenges: challenges.challenges)
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    treeCard(snapshot)
-                    levelCard(snapshot)
-                    NavigationLink {
-                        WeeklySummaryView()
-                    } label: {
-                        weekCard(snapshot)
+                VStack(alignment: .leading, spacing: 0) {
+                    section("Дерево") { treeCard(snapshot) }
+                    section("Уровень") { levelCard(snapshot) }
+                    section("Неделя") {
+                        NavigationLink {
+                            WeeklySummaryView()
+                        } label: {
+                            weekCard(snapshot)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    HoursWonCard()
-                    NavigationLink {
-                        StoriesView()
-                    } label: {
-                        row(icon: "book.fill", title: "Утренние истории", detail: "Глава за каждое успешное утро")
-                    }
-                    .buttonStyle(.plain)
-                    NavigationLink {
-                        MorningPhotosView()
-                    } label: {
-                        row(icon: "photo.on.rectangle", title: "Мои утра", detail: "Фото дня и ролик за месяц")
-                    }
-                    .buttonStyle(.plain)
                     if journal.realEntries.contains(where: { $0.stake > 0 }) {
-                        SavedCard()
+                        section("Месяц") { SavedCard() }
                     }
-                    challengesCard
-                    NavigationLink {
-                        JournalListView()
-                    } label: {
-                        row(icon: "list.bullet.rectangle", title: "Дневник подъёмов", detail: "Каждое утро по минутам")
+                    section(nil) { HoursWonCard() }
+                    section("Челленджи") { challengesCard }
+                    section(nil) {
+                        VStack(spacing: 0) {
+                            NavigationLink {
+                                JournalListView()
+                            } label: {
+                                row(icon: "list.bullet.rectangle", title: "Дневник подъёмов", detail: "Каждое утро по минутам")
+                            }
+                            .buttonStyle(.plain)
+                            Divider().overlay(Theme.separator)
+                            NavigationLink {
+                                StoriesView()
+                            } label: {
+                                row(icon: "book.fill", title: "Утренние истории", detail: "Глава за каждое успешное утро")
+                            }
+                            .buttonStyle(.plain)
+                            Divider().overlay(Theme.separator)
+                            NavigationLink {
+                                MorningPhotosView()
+                            } label: {
+                                row(icon: "photo.on.rectangle", title: "Мои утра", detail: "Фото дня и ролик за месяц")
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
             }
             .background(Theme.background)
             .navigationTitle("Прогресс")
@@ -65,11 +74,25 @@ struct ProgressTabView: View {
         }
     }
 
+    /// Плоский блок: без карточки, только содержимое.
     private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+            .padding(.vertical, 8)
+    }
+
+    /// Раздел с заголовком и тонкими линиями, как в «Часах».
+    private func section<Content: View>(_ title: String?, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let title {
+                Text(title).font(.app(.title3, weight: .bold)).padding(.top, 18).padding(.bottom, 6)
+            } else {
+                Spacer().frame(height: 14)
+            }
+            Divider().overlay(Theme.separator)
+            content()
+            Divider().overlay(Theme.separator)
+        }
     }
 
     private func row(icon: String, title: String, detail: String) -> some View {
@@ -130,7 +153,7 @@ struct ProgressTabView: View {
                         } label: {
                             Label("Выбрать дерево", systemImage: "leaf")
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.burgundy)
                     }
                     Spacer()
                     NavigationLink {
@@ -362,8 +385,8 @@ struct SpeciesPickerView: View {
                                 }
                                 .padding(10)
                                 .frame(maxWidth: .infinity)
-                                .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected == species ? Theme.accent : .clear, lineWidth: 3))
+                                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected == species ? Theme.accent : .clear, lineWidth: 3))
                             }
                             .buttonStyle(.plain)
                         }
@@ -433,7 +456,7 @@ struct GardenView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 } else {
                     Text(showingPreview
                          ? "Так сад будет выглядеть через годы подъёмов"
@@ -444,7 +467,7 @@ struct GardenView: View {
                         .multilineTextAlignment(.center)
                         .padding(12)
                         .frame(maxWidth: .infinity)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
             .padding(16)
@@ -527,7 +550,7 @@ struct TreePreviewView: View {
                             Text(Words.wakes(TreeState.thresholds[stage])).font(.app(.caption)).foregroundStyle(.secondary)
                         }
                         .padding(10)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 .padding(16)

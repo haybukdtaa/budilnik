@@ -40,7 +40,7 @@ struct OnboardingView: View {
                     .font(.app(.headline))
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 16))
+                    .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(.white)
             }
             .padding(16)
@@ -87,7 +87,7 @@ struct OnboardingView: View {
                             .foregroundStyle(modules.contains(module) ? Theme.accent : Color.secondary)
                     }
                     .padding(12)
-                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
             }

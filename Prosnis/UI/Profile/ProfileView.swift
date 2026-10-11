@@ -111,6 +111,21 @@ struct ProfileView: View {
                     Text("Удаляются будильники, дневник подъёмов, челленджи, настройки и фоны на телефоне, а при подключённом сервере и аккаунт на нём.")
                 }
 
+                Section("Проверка") {
+                    Button {
+                        AlarmStore.shared.runTest()
+                    } label: {
+                        Label("Проверить звонок через минуту", systemImage: "bell.badge")
+                    }
+                    ForEach([TaskKind.typing, .math, .memory, .steps]) { kind in
+                        Button {
+                            WakeCoordinator.shared.startDemo(task: kind)
+                        } label: {
+                            Label("Проверить задание: \(kind.title)", systemImage: kind.icon)
+                        }
+                    }
+                }
+
                 Section("О приложении") {
                     HStack {
                         Text("Версия")

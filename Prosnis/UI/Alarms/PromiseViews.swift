@@ -8,44 +8,36 @@ struct PromiseRow: View {
     let onTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            Capsule().fill(Theme.leaf).frame(width: 8)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(Format.time(promise.start))
-                    .font(.system(size: 40, weight: .light, design: .rounded))
-                    .monospacedDigit()
-                HStack(spacing: 6) {
-                    Image(systemName: "figure.run")
-                    Text(promise.title)
-                    Text("·")
-                    Text("до \(Format.time(promise.end))")
-                    Image(systemName: "bolt.fill").foregroundStyle(Theme.accent)
-                    if PromiseRules.isLocked(promise, now: now) {
-                        Image(systemName: "lock.fill")
-                    }
-                }
-                .font(.app(.subheadline))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                Text(progressText)
-                    .font(.app(.caption))
+        HStack(spacing: 12) {
+            Image(systemName: "figure.run")
+                .font(.system(size: 22))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(Format.time(promise.start)) · \(promise.title)")
+                    .font(.app(.body))
+                Text("до \(Format.time(promise.end)) · \(progressText)")
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
             Spacer()
+            if PromiseRules.isLocked(promise, now: now) {
+                Image(systemName: "lock.fill").foregroundStyle(.secondary)
+            }
         }
-        .padding(14)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+        .padding(.vertical, 4)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
     }
 
     private var progressText: String {
-        let goal = "\(promise.minSteps) шагов"
+        let goal = "\(promise.minSteps) шагов · \(promise.stake) ₽"
         if now < promise.start {
-            return "\(Format.dayMonth(promise.start)) · нужно \(goal)"
+            return "\(Format.dayMonth(promise.start)) · \(goal)"
         }
         let done = store.liveSteps[promise.id] ?? 0
-        return "Шаги: \(done) из \(promise.minSteps)"
+        return "шаги \(done) из \(promise.minSteps)"
     }
 }
 

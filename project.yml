@@ -15,10 +15,6 @@ targets:
       properties:
         CFBundleDisplayName: Prosnis
         UILaunchScreen: {}
-        UIAppFonts:
-          - Lora.ttf
-          - Lora-Italic.ttf
-          - Manrope.ttf
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSAlarmKitUsageDescription: "Приложению нужно разрешение, чтобы будильник звонил вовремя, даже когда телефон заблокирован или в режиме «Не беспокоить»."

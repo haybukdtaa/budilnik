@@ -49,7 +49,7 @@ struct MorningPhotoCard: View {
                     .scaledToFill()
                     .frame(height: 180)
                     .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 Button("Переснять") { showCamera = true }.font(.app(.footnote))
             } else {
                 Text("Рассвет, кофе, вид из окна — одно фото в день. В конце месяца соберём из них ролик «Мой месяц утром». Фото хранятся только на телефоне.")
@@ -61,7 +61,7 @@ struct MorningPhotoCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 20))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
         .sheet(isPresented: $showCamera) {
             PhotoCaptureView { image in photos.save(image, for: date) }
                 .ignoresSafeArea()
@@ -122,7 +122,7 @@ struct MorningPhotosView: View {
                         Label("Смотреть «\(MorningPhotosView.monthTitle(current)) утром»", systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.burgundy)
 
                     if let exported {
                         ShareLink(item: exported) {

@@ -25,7 +25,7 @@ struct ChargeCardView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 22))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
             if let reason = entry.events.last?.text {
                 Text(reason)
                     .font(.app(.footnote))
@@ -39,7 +39,7 @@ struct ChargeCardView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.burgundy)
             if entry.dispute == .none {
                 Button("Оспорить списание", action: onDispute)
                     .font(.app(.footnote))

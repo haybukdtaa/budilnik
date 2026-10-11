@@ -49,7 +49,7 @@ struct FriendsSection: View {
                             Text(request.from.displayName).font(.app(.subheadline, weight: .semibold))
                             Spacer()
                             Button("Принять") { Task { await social.answer(request, accept: true) } }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.burgundy)
                             Button("Нет") { Task { await social.answer(request, accept: false) } }
                                 .buttonStyle(.bordered)
                         }

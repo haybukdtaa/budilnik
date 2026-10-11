@@ -85,7 +85,7 @@ struct OfflineBanner: View {
                 Button("Включить демо-режим") {
                     settings.data.useDemoSocial = true
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.burgundy)
             }
             .padding(24)
         }
@@ -105,7 +105,7 @@ struct StatsCard: View {
             Spacer()
         }
         .padding(14)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

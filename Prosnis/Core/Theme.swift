@@ -1,114 +1,66 @@
-import CoreText
 import SwiftUI
 import UIKit
 
 extension Font {
-    /// Шрифт приложения для стиля текста: Lora для заголовков, Manrope для остального.
+    /// Шрифт приложения: один, системный (как в «Часах» iPhone).
     static func app(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> Font {
-        let ui: UIFont.TextStyle
-        switch style {
-        case .largeTitle: ui = .largeTitle
-        case .title: ui = .title1
-        case .title2: ui = .title2
-        case .title3: ui = .title3
-        case .headline: ui = .headline
-        case .subheadline: ui = .subheadline
-        case .callout: ui = .callout
-        case .footnote: ui = .footnote
-        case .caption: ui = .caption1
-        case .caption2: ui = .caption2
-        default: ui = .body
-        }
-        return Font(Theme.uiFont(for: ui, weight: weight.map(Theme.wght)))
+        Font.system(style, design: .default, weight: weight)
     }
 }
 
+/// Кнопка с бордовой заливкой, как в логотипе.
+struct BurgundyButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.app(.headline))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 11)
+            .background(Theme.burgundy.opacity(configuration.isPressed ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+extension ButtonStyle where Self == BurgundyButtonStyle {
+    static var burgundy: BurgundyButtonStyle { BurgundyButtonStyle() }
+}
+
 enum Theme {
-    /// Фон «Небо на рассвете»: персиковый сверху, сиреневый в середине, голубой внизу.
-    static let skyTop = Color(red: 0.976, green: 0.788, blue: 0.714)
-    static let skyMiddle = Color(red: 0.910, green: 0.765, blue: 0.878)
-    static let skyBottom = Color(red: 0.725, green: 0.784, blue: 0.949)
-    static let background = LinearGradient(colors: [skyTop, skyMiddle, skyBottom], startPoint: .top, endPoint: .bottom)
-    /// Полупрозрачные белые карточки поверх неба.
-    static let card = Color.white.opacity(0.58)
-    /// Тёмный сливовый текст вместо чёрного.
-    static let ink = Color(red: 0.165, green: 0.141, blue: 0.251)
-    static let accent = Color(red: 0.482, green: 0.361, blue: 0.788)
+    /// Чёрный фон, строгие тёмно-серые блоки; цвета — из логотипа: роза и бордо.
+    static let background = Color.black
+    static let card = Color(white: 0.11)
+    static let ink = Color.white
+    /// Роза логотипа: ссылки, активная вкладка, выделения.
+    static let accent = Color(red: 0.847, green: 0.380, blue: 0.443)
+    /// Бордо логотипа: кнопки и заливки.
+    static let burgundy = Color(red: 0.557, green: 0.184, blue: 0.282)
+    /// Включённый переключатель.
+    static let toggle = Color(red: 0.690, green: 0.227, blue: 0.333)
     static let accentGradient = LinearGradient(
-        colors: [Color(red: 0.58, green: 0.45, blue: 0.88), Color(red: 0.482, green: 0.361, blue: 0.788)],
+        colors: [Color(red: 0.478, green: 0.149, blue: 0.251), Color(red: 0.651, green: 0.208, blue: 0.322)],
         startPoint: .leading,
         endPoint: .trailing
     )
+    /// Тонкие линии между строками.
+    static let separator = Color(white: 0.17)
+    /// Глубокий бордо цифр на циферблате.
+    static let numeral = Color(red: 0.369, green: 0.165, blue: 0.220)
     static let leaf = Color(red: 0.365, green: 0.643, blue: 0.541)
     /// Цвет лекарств: мягкий мятный, чтобы с первого взгляда отличаться от будильников подъёма.
     static let mint = Color(red: 0.30, green: 0.64, blue: 0.62)
 
-    /// Шрифт с нужной толщиной. Lora и Manrope — переменные шрифты: толщина задаётся осью «wght».
-    static func uiFont(_ family: String, size: CGFloat, weight: CGFloat) -> UIFont {
-        let wght = 0x7767_6874 // 'wght'
-        let descriptor = UIFontDescriptor(fontAttributes: [
-            .family: family,
-            UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): [wght: weight],
-        ])
-        return UIFont(descriptor: descriptor, size: size)
-    }
-
-    /// Заголовки — Lora (с засечками, как в книге), остальное — Manrope.
-    /// Значение оси «wght» для толщины SwiftUI.
-    static func wght(_ weight: Font.Weight) -> CGFloat {
-        switch weight {
-        case .ultraLight: return 200
-        case .thin: return 250
-        case .light: return 300
-        case .regular: return 400
-        case .medium: return 500
-        case .semibold: return 600
-        case .bold: return 700
-        case .heavy, .black: return 800
-        default: return 400
-        }
-    }
-
-    /// `weight` — своя толщина вместо обычной для стиля (через ось шрифта, а не подделкой жирности).
-    static func uiFont(for style: UIFont.TextStyle, weight: CGFloat? = nil) -> UIFont {
-        let font: UIFont
-        switch style {
-        case .largeTitle: font = uiFont("Lora", size: 34, weight: 500)
-        case .title1: font = uiFont("Lora", size: 28, weight: 500)
-        case .title2: font = uiFont("Lora", size: 22, weight: 500)
-        case .title3: font = uiFont("Lora", size: 20, weight: 500)
-        case .headline: font = uiFont("Manrope", size: 17, weight: 650)
-        case .subheadline: font = uiFont("Manrope", size: 15, weight: 450)
-        case .callout: font = uiFont("Manrope", size: 16, weight: 450)
-        case .footnote: font = uiFont("Manrope", size: 13, weight: 450)
-        case .caption1: font = uiFont("Manrope", size: 12, weight: 500)
-        case .caption2: font = uiFont("Manrope", size: 11, weight: 500)
-        default: font = uiFont("Manrope", size: 17, weight: 450)
-        }
-        let weighted = weight.map { uiFont(font.familyName, size: font.pointSize, weight: $0) } ?? font
-        // Крупный шрифт из настроек iPhone тоже работает.
-        return UIFontMetrics(forTextStyle: style).scaledFont(for: weighted)
-    }
-
-    /// Внешний вид навигации и вкладок в новом стиле.
+    /// Внешний вид навигации, вкладок и переключателей.
     @MainActor
     static func applyAppearance() {
         let bar = UINavigationBarAppearance()
         bar.configureWithTransparentBackground()
-        let ink = UIColor(ink)
-        bar.largeTitleTextAttributes = [.font: uiFont(for: .largeTitle), .foregroundColor: ink]
-        bar.titleTextAttributes = [.font: uiFont("Lora", size: 18, weight: 500), .foregroundColor: ink]
         UINavigationBar.appearance().standardAppearance = bar
         UINavigationBar.appearance().scrollEdgeAppearance = bar
         UINavigationBar.appearance().compactAppearance = bar
-        let tabItem = UITabBarItemAppearance()
-        tabItem.normal.titleTextAttributes = [.font: uiFont("Manrope", size: 11, weight: 600)]
-        tabItem.selected.titleTextAttributes = [.font: uiFont("Manrope", size: 11, weight: 700)]
         let tabs = UITabBarAppearance()
         tabs.configureWithDefaultBackground()
-        tabs.stackedLayoutAppearance = tabItem
         UITabBar.appearance().standardAppearance = tabs
         UITabBar.appearance().scrollEdgeAppearance = tabs
+        UISwitch.appearance().onTintColor = UIColor(toggle)
     }
 
     /// Готовые фоны будильника.
