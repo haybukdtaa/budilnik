@@ -71,7 +71,6 @@ struct MedsView: View {
                     .multilineTextAlignment(.center)
                 Button("Добавить") { editing = Medication() }
                     .buttonStyle(.burgundy)
-                    .tint(Theme.mint)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
@@ -358,7 +357,7 @@ struct MedEditView: View {
                                         .font(.app(.subheadline))
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 7)
-                                        .background(med.form == form ? Theme.mint.opacity(0.22) : Color.secondary.opacity(0.08), in: Capsule())
+                                        .background(med.form == form ? Theme.mint.opacity(0.22) : Theme.card, in: Capsule())
                                         .foregroundStyle(med.form == form ? Theme.ink : Color.secondary)
                                 }
                                 .buttonStyle(.plain)

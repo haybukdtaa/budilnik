@@ -95,7 +95,7 @@ struct RecheckBanner: View {
                 Text("Не засыпайте: будильник зазвонит снова")
                     .font(.app(.caption))
             }
-            .foregroundStyle(.black)
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(Theme.accentGradient)

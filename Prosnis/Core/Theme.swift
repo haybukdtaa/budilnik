@@ -10,18 +10,24 @@ extension Font {
 
 /// Кнопка с бордовой заливкой, как в логотипе.
 struct BurgundyButtonStyle: ButtonStyle {
+    var color: Color = Theme.burgundy
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.app(.headline))
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
             .padding(.vertical, 11)
-            .background(Theme.burgundy.opacity(configuration.isPressed ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 12))
+            .background(color.opacity(configuration.isPressed ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 12))
+            .opacity(isEnabled ? 1 : 0.4)
     }
 }
 
 extension ButtonStyle where Self == BurgundyButtonStyle {
     static var burgundy: BurgundyButtonStyle { BurgundyButtonStyle() }
+    /// Красная кнопка для остановки записи.
+    static var stop: BurgundyButtonStyle { BurgundyButtonStyle(color: .red) }
 }
 
 enum Theme {
@@ -44,7 +50,6 @@ enum Theme {
     static let separator = Color(white: 0.17)
     /// Глубокий бордо цифр на циферблате.
     static let numeral = Color(red: 0.369, green: 0.165, blue: 0.220)
-    static let leaf = Color(red: 0.365, green: 0.643, blue: 0.541)
     /// Цвет лекарств: мягкий мятный, чтобы с первого взгляда отличаться от будильников подъёма.
     static let mint = Color(red: 0.30, green: 0.64, blue: 0.62)
 
@@ -60,7 +65,6 @@ enum Theme {
         tabs.configureWithDefaultBackground()
         UITabBar.appearance().standardAppearance = tabs
         UITabBar.appearance().scrollEdgeAppearance = tabs
-        UISwitch.appearance().onTintColor = UIColor(toggle)
     }
 
     /// Готовые фоны будильника.

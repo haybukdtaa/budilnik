@@ -16,7 +16,7 @@ struct ProgressTabView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     section("Дерево") { treeCard(snapshot) }
                     section("Уровень") { levelCard(snapshot) }
-                    section("Неделя") {
+                    section(nil) {
                         NavigationLink {
                             WeeklySummaryView()
                         } label: {
@@ -28,7 +28,7 @@ struct ProgressTabView: View {
                         section("Месяц") { SavedCard() }
                     }
                     section(nil) { HoursWonCard() }
-                    section("Челленджи") { challengesCard }
+                    section(nil) { challengesCard }
                     section(nil) {
                         VStack(spacing: 0) {
                             NavigationLink {
@@ -79,6 +79,7 @@ struct ProgressTabView: View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)
+            .contentShape(Rectangle())
     }
 
     /// Раздел с заголовком и тонкими линиями, как в «Часах».
@@ -474,6 +475,9 @@ struct GardenView: View {
         }
         .navigationTitle("Мой сад")
         .navigationBarTitleDisplayMode(.inline)
+        // Небо в саду светлое днём: заголовок и меню должны читаться на нём, а ночью — на тёмном.
+        .toolbarColorScheme(GardenDaytime.at(hour: Calendar.current.component(.hour, from: Date())) == .night ? .dark : .light,
+                            for: .navigationBar)
         .toolbar {
             if !forcePreview {
                 ToolbarItem(placement: .topBarTrailing) {

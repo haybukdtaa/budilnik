@@ -28,6 +28,7 @@ struct AlarmListView: View {
                     }
                     .opacity(store.alarms.isEmpty ? 0 : 1)
                     .disabled(store.alarms.isEmpty)
+                    .accessibilityHidden(store.alarms.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -48,7 +49,6 @@ struct AlarmListView: View {
                     }
                 }
             }
-            .environment(\.editMode, $editMode)
             .sheet(item: $editing) { alarm in
                 AlarmEditView(alarm: alarm, isNew: !store.alarms.contains { $0.id == alarm.id })
             }
@@ -87,7 +87,7 @@ struct AlarmListView: View {
     private func list(now: Date) -> some View {
         List {
             Section {
-                SleepRow(next: nextAlarm(now: now), now: now) { showBedtime = true }
+                SleepRow(next: nextAlarm(now: now), hasEnabled: store.alarms.contains(where: \.isEnabled), now: now) { showBedtime = true }
             } header: {
                 header("Сон")
             }
@@ -118,12 +118,12 @@ struct AlarmListView: View {
                             Button("Удалить", role: .destructive) { store.delete(alarm) }
                         }
                     }
+                    .deleteDisabled(locked)
                 }
                 .onDelete { offsets in
-                    for index in offsets where store.alarms.indices.contains(index) {
-                        let alarm = store.alarms[index]
-                        if !store.isLocked(alarm) { store.delete(alarm) }
-                    }
+                    // Сначала выбираем будильники: после первого удаления номера сдвигаются.
+                    let doomed = offsets.compactMap { store.alarms.indices.contains($0) ? store.alarms[$0] : nil }
+                    for alarm in doomed where !store.isLocked(alarm) { store.delete(alarm) }
                 }
             } header: {
                 header("Другие")
@@ -139,6 +139,11 @@ struct AlarmListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        // Режим «Изменить» действует только на этот список, а не на окна поверх него.
+        .environment(\.editMode, $editMode)
+        .onChange(of: store.alarms.isEmpty) { _, isEmpty in
+            if isEmpty { editMode = .inactive }
+        }
     }
 }
 

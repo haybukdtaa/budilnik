@@ -139,8 +139,7 @@ struct VoiceRecorderView: View {
         switch recorder.state {
         case .recording:
             Button("Остановить") { recorder.stop() }
-                .buttonStyle(.burgundy)
-                .tint(.red)
+                .buttonStyle(.stop)
         case .recorded:
             HStack {
                 Button("Прослушать") { recorder.playDraft() }

@@ -19,8 +19,7 @@ struct PromiseRow: View {
                 Text(progressText)
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .lineLimit(2)
             }
             Spacer()
             if PromiseRules.isLocked(promise, now: now) {
@@ -43,7 +42,7 @@ struct PromiseRow: View {
             return "до \(Format.time(promise.end)) · \(promise.minSteps) шагов · \(promise.stake) ₽"
         }
         let done = store.liveSteps[promise.id] ?? 0
-        return "до \(Format.time(promise.end)) · шаги \(done) из \(promise.minSteps)"
+        return "до \(Format.time(promise.end)) · шаги \(done) из \(promise.minSteps) · \(promise.stake) ₽"
     }
 }
 

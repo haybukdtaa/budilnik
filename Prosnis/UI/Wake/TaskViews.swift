@@ -85,7 +85,7 @@ struct MathTaskView: View {
                             .frame(maxWidth: .infinity, minHeight: 54)
                             .background(key == "✓" ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.15)),
                                         in: RoundedRectangle(cornerRadius: 12))
-                            .foregroundStyle(key == "✓" ? Color.black : Color.white)
+                            .foregroundStyle(Color.white)
                     }
                     .buttonStyle(.plain)
                 }
@@ -144,7 +144,7 @@ struct MemoryTaskView: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                 ForEach(0..<MemorySequence.gridSize, id: \.self) { cell in
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(highlighted == cell ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.15)))
+                        .fill(highlighted == cell ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.white.opacity(0.15)))
                         .aspectRatio(1, contentMode: .fit)
                         .onTapGesture { tap(cell) }
                 }
@@ -280,7 +280,7 @@ struct StepsTaskView: View {
                     .stroke(Color.white.opacity(0.15), lineWidth: 16)
                 Circle()
                     .trim(from: 0, to: min(1, Double(counter.steps) / Double(goal)))
-                    .stroke(Theme.accentGradient, style: StrokeStyle(lineWidth: 16, lineCap: .round))
+                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: 16, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 VStack {
                     Text("\(min(counter.steps, goal))")

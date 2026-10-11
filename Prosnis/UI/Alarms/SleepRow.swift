@@ -58,12 +58,14 @@ struct DialView: View {
 /// Блок «Сон» наверху будильников: циферблат, через сколько зазвонит, кнопка «Начать».
 struct SleepRow: View {
     let next: Date?
+    let hasEnabled: Bool
     let now: Date
     let onStart: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
             DialView(time: next)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Ложусь спать").font(.app(.body))
                 Text(subtitle)
@@ -74,12 +76,13 @@ struct SleepRow: View {
             Spacer(minLength: 8)
             Button("Начать", action: onStart)
                 .buttonStyle(.burgundy)
+                .fixedSize()
         }
         .padding(.vertical, 4)
     }
 
     private var subtitle: String {
-        guard let next else { return "Нет включённых будильников" }
+        guard let next else { return hasEnabled ? "Ближайших звонков нет" : "Нет включённых будильников" }
         return "Зазвонит через \(DurationText.until(next.timeIntervalSince(now)))"
     }
 }
