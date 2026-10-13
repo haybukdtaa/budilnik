@@ -145,7 +145,7 @@ struct RootView: View {
 
     /// Списание, которое пора показать карточкой (не поверх задания, утра или согласия).
     private var chargeToShow: JournalEntry? {
-        guard wake.session == nil, wake.morning == nil, reconsentAmount == nil,
+        guard wake.session == nil, wake.morning == nil, wake.note == nil, !focus.showsCover, reconsentAmount == nil,
               RootView.screenshotTab == nil else { return nil }
         return JournalStore.firstUnseenCharge(in: journal.entries)
     }
@@ -161,7 +161,8 @@ struct RootView: View {
 
     /// Условия обязательства изменились: ставки не действуют, пока человек не согласится заново.
     private var reconsentAmount: Int? {
-        guard !consentPostponed, wake.session == nil, wake.morning == nil, RootView.screenshotTab == nil else { return nil }
+        guard !consentPostponed, wake.session == nil, wake.morning == nil, wake.note == nil, !focus.showsCover,
+              RootView.screenshotTab == nil else { return nil }
         return alarmStore.alarmsNeedingConsent.map(\.stakeAmount).max()
     }
 

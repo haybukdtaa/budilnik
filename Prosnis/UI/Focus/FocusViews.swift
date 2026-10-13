@@ -145,10 +145,11 @@ struct FocusSessionView: View {
     @ObservedObject private var store = FocusStore.shared
     let session: FocusSession
     @State private var confirmEnd = false
+    /// Решается в момент нажатия кнопки: это отмена без последствий или досрочное завершение.
+    @State private var endIsCancel = true
 
     var body: some View {
         let live = store.current ?? session
-        let cancelNow = FocusRules.canCancel(live, now: TrustedClock.now)
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let now = TrustedClock.now
             let total = Double(live.minutes) * 60
@@ -189,6 +190,7 @@ struct FocusSessionView: View {
                     .padding(.horizontal, 12)
                 Spacer(minLength: 0)
                 Button(role: canCancel ? .cancel : .destructive) {
+                    endIsCancel = FocusRules.canCancel(live, now: TrustedClock.now)
                     confirmEnd = true
                 } label: {
                     Text(canCancel ? "Отменить сессию" : "Завершить раньше времени")
@@ -207,13 +209,15 @@ struct FocusSessionView: View {
             .background { Theme.background.ignoresSafeArea() }
         }
         .confirmationDialog(
-            cancelNow ? "Отменить сессию?" : "Завершить раньше времени?",
+            endIsCancel ? "Отменить сессию?" : "Завершить раньше времени?",
             isPresented: $confirmEnd, titleVisibility: .visible
         ) {
-            Button(cancelNow ? "Отменить сессию" : "Завершить", role: .destructive) { store.endEarly() }
+            Button(endIsCancel ? "Отменить сессию" : "Завершить", role: .destructive) { store.endEarly() }
             Button("Продолжить", role: .cancel) {}
         } message: {
-            Text(cancelNow ? "Без последствий." : (live.stake > 0 ? "Сессия не засчитается, спишется \(live.stake) ₽." : "Сессия не засчитается."))
+            Text(endIsCancel
+                 ? (live.stake > 0 ? "Без последствий, если подтвердить сразу. Через несколько секунд после 5-й минуты спишется \(live.stake) ₽." : "Без последствий.")
+                 : (live.stake > 0 ? "Сессия не засчитается, спишется \(live.stake) ₽." : "Сессия не засчитается."))
         }
         .task {
             while !Task.isCancelled {

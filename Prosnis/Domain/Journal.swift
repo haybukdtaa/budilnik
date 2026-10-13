@@ -101,7 +101,7 @@ enum StakeAdvisor {
         if fails >= 3 {
             let raised = max(current + 100, Int((Double(current) * 1.5 / 50).rounded()) * 50)
             return StakeHint(
-                text: "Вы проспали \(fails) из последних \(recent.count) раз. Возможно, обязательство \(current) ₽ слишком мала. Попробуйте \(raised) ₽.",
+                text: "Вы проспали \(fails) из последних \(recent.count) раз. Возможно, обязательство \(current) ₽ слишком мало. Попробуйте \(raised) ₽.",
                 suggested: raised
             )
         }

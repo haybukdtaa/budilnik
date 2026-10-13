@@ -172,16 +172,29 @@ final class WakeCoordinator: ObservableObject {
     }
 
     /// Переводит сессию на вторую проверку.
-    private func startStageTwo(_ value: WakeSession, now: Date, note: String) {
+    private func startStageTwo(_ value: WakeSession, now: Date, note noteText: String) {
+        // Заметка, которую не закрыли за 10 минут, не должна мешать второй проверке: окно с ней убираем.
+        self.note = nil
+        pendingNote = nil
         var current = value
         current.stage = 2
         current.phase = .task
         current.ringDate = current.recheckDate ?? now
         current.sentence = SentenceBank.random(excluding: current.sentence)
         current.events.append(JournalEvent(date: current.ringDate, text: "Прозвенела повторная проверка"))
-        current.events.append(JournalEvent(date: now, text: note))
+        current.events.append(JournalEvent(date: now, text: noteText))
         setSession(current)
         evaluate(now)
+    }
+
+    /// Будильник выключили или удалили посреди утра: запасные звонки больше не нужны.
+    func alarmDisabled(_ alarmID: UUID) {
+        guard var current = session, current.alarmID == alarmID, current.stage == 1,
+              current.repeatAlarmIDs?.isEmpty == false else { return }
+        cancelRepeats(current)
+        current.repeatAlarmIDs = nil
+        current.events.append(JournalEvent(date: TrustedClock.now, text: "Будильник выключен, запасные звонки сняты"))
+        setSession(current)
     }
 
     private func begin(

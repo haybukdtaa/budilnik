@@ -57,7 +57,7 @@ final class ChallengeStore: ObservableObject {
     /// Челлендж с обязательством можно остановить только в течение 5 минут после начала.
     static let cancelWindow: TimeInterval = 5 * 60
 
-    func canStop(_ challenge: Challenge, now: Date = Date()) -> Bool {
+    func canStop(_ challenge: Challenge, now: Date = TrustedClock.now) -> Bool {
         !challenge.hasStake || now.timeIntervalSince(challenge.startDate) <= ChallengeStore.cancelWindow
     }
 
@@ -108,8 +108,11 @@ final class ChallengeStore: ObservableObject {
         var alreadyCharged = 0
         var events = [JournalEvent(date: Date(), text: "Челлендж «\(challenge.title)» сорван")]
         if let failedOn = result.failedOn,
-           let entry = journal.entries.first(where: { $0.isPromise != true && $0.isDemo != true && abs($0.date.timeIntervalSince(failedOn)) < 1 }) {
-            alreadyCharged = entry.charged
+           true {
+            // Всё, что уже списано в это утро: будильник и доплаты других челленджей. Платится большая из сумм, а не их сумма.
+            alreadyCharged = journal.entries
+                .filter { $0.isDemo != true && abs($0.date.timeIntervalSince(failedOn)) < 1 && ($0.isPromise != true || $0.kind == .challenge) }
+                .reduce(0) { $0 + $1.charged }
         }
         let extra = ChallengeEvaluator.extraCharge(amount: amount, alreadyCharged: alreadyCharged)
         if alreadyCharged > 0 {

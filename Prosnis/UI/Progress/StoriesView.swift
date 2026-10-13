@@ -146,7 +146,7 @@ struct WeeklySummaryView: View {
                 if settings.data.usualWakeMinutes != nil {
                     row("Выиграно утра", "+\(HoursWon.text(minutes: summary.minutesWon))")
                 }
-                if summary.saved > 0 { row("Сохранено ставок", "\(summary.saved) ₽") }
+                if summary.saved > 0 { row("Сохранено по обязательствам", "\(summary.saved) ₽") }
                 row("Дерево", "\(snapshot.tree.title), +\(summary.successes) к росту")
             } header: {
                 Text("Неделя с \(Format.dayKey(AppSettings.dayKey(summary.weekStart)))")

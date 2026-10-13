@@ -97,7 +97,7 @@ struct AlarmEditView: View {
 
                 Section {
                     TextField("Название", text: $draft.label)
-                    TextField("Заметка себе (покажется при выключении)", text: Binding(
+                    TextField("Заметка себе (после первого задания)", text: Binding(
                         get: { draft.note ?? "" },
                         set: { draft.note = $0 }
                     ), axis: .vertical)
@@ -341,7 +341,7 @@ struct AlarmEditView: View {
                     }
                 }
                 if draft.stakeEnabled {
-                    Label("Повторная проверка: обязательна с обязательством", systemImage: "checkmark.shield")
+                    Label("Повторная проверка обязательна для будильника с обязательством", systemImage: "checkmark.shield")
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 } else {

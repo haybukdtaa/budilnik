@@ -114,7 +114,7 @@ struct OnboardingView: View {
                 .padding(12)
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
             Toggle("Мне \(AppConfig.adultAge) лет или больше", isOn: $isAdult)
-            Text("Нужно для ставок и чатов. Без этого будильник, задания и прогресс работают полностью.")
+            Text("Нужно для обязательств и чатов. Без этого будильник, задания и прогресс работают полностью.")
                 .font(.app(.footnote))
                 .foregroundStyle(.secondary)
             Button("Разрешить будильники") {

@@ -413,7 +413,7 @@ struct ChallengeEditView: View {
             goal: goal,
             wakeBeforeMinutes: goal == .wakeBefore ? (parts.hour ?? 7) * 60 + (parts.minute ?? 0) : nil,
             durationDays: duration,
-            startDate: Date(),
+            startDate: TrustedClock.now,
             stake: amount
         ))
         dismiss()

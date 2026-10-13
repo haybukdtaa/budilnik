@@ -18,6 +18,8 @@ final class FocusStore: ObservableObject {
 
     @Published private(set) var current: FocusSession?
     @Published var result: FocusResult?
+    /// Полноэкранный показ включается чуть позже старта: окно запуска к этому времени уже закрыто.
+    @Published private(set) var coverEnabled = true
 
     private let file = FileStore<FocusSession>("focus_session")
     private var loadFailed = false
@@ -35,6 +37,7 @@ final class FocusStore: ObservableObject {
         current = loaded.value
         loadFailed = loaded.state == .unreadable
         result = nil
+        coverEnabled = true
     }
 
     func reloadIfNeeded() {
@@ -42,7 +45,7 @@ final class FocusStore: ObservableObject {
     }
 
     /// Нужен ли полноэкранный показ: сессия идёт или её итог ещё не закрыт.
-    var showsCover: Bool { current != nil || result != nil }
+    var showsCover: Bool { coverEnabled && (current != nil || result != nil) }
 
     private func save() {
         if let current { file.save(current) } else { file.delete() }
@@ -68,6 +71,11 @@ final class FocusStore: ObservableObject {
         result = nil
         current = session
         save()
+        coverEnabled = false
+        Task {
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            coverEnabled = true
+        }
         schedule(Self.endID, title: "Фокус-сессия закончилась",
                  body: "Откройте приложение, чтобы засчитать её.", at: session.endsAt)
         return nil
@@ -157,8 +165,8 @@ final class FocusStore: ObservableObject {
         let charged = !success && session.stake > 0
         let reference: UUID? = charged ? (session.paymentRef ?? UUID()) : nil
 
-        clear()
-        result = FocusResult(minutes: session.minutes, outcome: outcome, stake: session.stake, away: away)
+        // Запись в дневник — первой: если приложение закроют посреди итога, он не потеряется и не задвоится.
+        if !JournalStore.shared.entries.contains(where: { $0.id == session.id }) {
         JournalStore.shared.add(JournalEntry(
             id: session.id,
             date: session.startedAt,
@@ -179,6 +187,9 @@ final class FocusStore: ObservableObject {
             PaymentsStore.shared.markOutcome(reference: reference, success: false, amount: amount)
             Task { await PaymentsStore.shared.hold(amount: amount, reference: reference) }
         }
+        }
+        clear()
+        result = FocusResult(minutes: session.minutes, outcome: outcome, stake: session.stake, away: away)
     }
 
     // MARK: - Уведомления
@@ -194,7 +205,7 @@ final class FocusStore: ObservableObject {
             identifier: id, content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
         )
-        Task { try? await UNUserNotificationCenter.current().add(request) }
+        UNUserNotificationCenter.current().add(request) { _ in }
     }
 
     /// Пока человек вне приложения: предупреждение за 30 секунд до лимита и сообщение о провале.
@@ -209,7 +220,7 @@ final class FocusStore: ObservableObject {
                  body: "Осталось меньше 30 секунд: иначе фокус-сессия не засчитается\(sum).",
                  at: now.addingTimeInterval(max(5, remaining - 30)))
         schedule(Self.lostID, title: "Фокус-сессия не засчитана",
-                 body: "Вы были вне приложения больше 5 минут\(session.stake > 0 ? ". Спишется \(session.stake) ₽." : ".")",
+                 body: "Вы были вне приложения больше 5 минут. Откройте приложение\(session.stake > 0 ? ": спишется \(session.stake) ₽." : ".")",
                  at: lostAt)
     }
 

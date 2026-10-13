@@ -8,7 +8,7 @@ enum WakeRules {
     /// За сколько до звонка будильник с обязательством закрыт для изменений.
     static let lockSeconds: TimeInterval = 2 * 3600
     /// Будильник из очереди старше этого уже не запускается: человек явно уснул, звонок идёт в пропуски.
-    static let queueStaleSeconds: TimeInterval = 2 * windowSeconds + recheckDelay
+    static let queueStaleSeconds: TimeInterval = 2 * windowSeconds + recheckDelay + Double(repeatCount) * repeatInterval
     /// Сколько ждать, что повторный звонок сам откроет приложение, прежде чем начать проверку из приложения.
     static let recheckGraceSeconds: TimeInterval = 20
     /// «Звонить, пока не выполню»: запасные звонки каждые 5 минут, не больше 6 раз.

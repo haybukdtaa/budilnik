@@ -246,7 +246,7 @@ struct PromiseEditView: View {
     private func create() {
         let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let promise = StepPromise(title: name.isEmpty ? "Пробежка" : ContentFilter.clean(name),
-                                  start: start, end: end, minSteps: minSteps, stake: stake)
+                                  start: start, end: end, minSteps: minSteps, stake: stake, createdAt: TrustedClock.now)
         Task {
             _ = await DeadlineNotifications.requestPermission()
             if let error = PromiseStore.shared.add(promise) {

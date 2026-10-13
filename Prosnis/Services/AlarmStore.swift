@@ -166,6 +166,7 @@ final class AlarmStore: ObservableObject {
         save()
         enqueueSync(item)
         sync(item)
+        if !item.isEnabled { WakeCoordinator.shared.alarmDisabled(item.id) }
         announce(item, now: now)
         return true
     }
@@ -192,6 +193,7 @@ final class AlarmStore: ObservableObject {
         }
         alarms.removeAll { $0.id == item.id }
         save()
+        WakeCoordinator.shared.alarmDisabled(item.id)
         if !(item.isPrayerRelated && !AppSettings.shared.data.privacy.syncPrayerData) {
             SyncEngine.shared.enqueueDeletion(.alarm, id: item.id, sensitive: item.isPrayerRelated)
         }
@@ -212,6 +214,7 @@ final class AlarmStore: ObservableObject {
             var copy = item
             copy.updatedAt = now
             if copy.weekdays.isEmpty && copy.effectiveHolidayMode != .workCalendar { copy.createdAt = now }
+            if copy.stakeEnabled && copy.stakeAmount < AppConfig.minObligation { copy.stakeAmount = AppConfig.minObligation }
             return copy
         }
         guard !added.isEmpty else { return }
