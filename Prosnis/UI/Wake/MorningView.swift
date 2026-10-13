@@ -183,7 +183,7 @@ struct ModuleProgramView: View {
         case .sport:
             SportProgramView(goal: settings.data.sportStepGoal)
         case .study:
-            FocusTimerView(minutes: settings.data.focusMinutes)
+            FocusTimerView()
         case .work:
             MainTaskView()
         case .prayer:
@@ -224,26 +224,27 @@ struct SportProgramView: View {
     }
 }
 
+/// Фокус-сессия вместо прежнего таймера: от 30 до 120 минут, с учётом времени вне приложения.
 struct FocusTimerView: View {
-    let minutes: Int
-    @State private var endDate: Date?
+    @EnvironmentObject private var wake: WakeCoordinator
+    @ObservedObject private var focus = FocusStore.shared
+    @State private var showStart = false
 
     var body: some View {
         ProgramCard(title: "Фокус перед учёбой", icon: "timer") {
-            if let endDate {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    let remaining = max(0, Int(endDate.timeIntervalSince(context.date)))
-                    Text(remaining == 0 ? "Готово, отличная работа!" : String(format: "%02d:%02d", remaining / 60, remaining % 60))
-                        .font(.system(size: 36, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                }
-                Button("Остановить") { self.endDate = nil }
-            } else {
-                Text("\(minutes) минут без отвлечений: самое продуктивное время дня.")
+            if focus.current != nil {
+                Text("Фокус-сессия уже идёт.")
                     .foregroundStyle(.secondary)
-                Button("Начать") { endDate = Date().addingTimeInterval(Double(minutes) * 60) }
+            } else {
+                Text("От 30 до 120 минут без отвлечений. Суммарно вне приложения можно провести 5 минут.")
+                    .foregroundStyle(.secondary)
+                Button("Начать фокус-сессию") { showStart = true }
                     .buttonStyle(.burgundy)
             }
+        }
+        .sheet(isPresented: $showStart) {
+            // Утренний экран закрывается, чтобы сессия показалась поверх приложения.
+            FocusStartView { wake.finishMorning() }
         }
     }
 }

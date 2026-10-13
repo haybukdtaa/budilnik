@@ -1,5 +1,6 @@
 import CoreMotion
 import Foundation
+import UIKit
 import UserNotifications
 
 /// Ответ можно отдать только один раз: либо данные, либо таймаут.
@@ -128,6 +129,7 @@ final class PromiseStore: ObservableObject {
         promises.sort { $0.start < $1.start }
         save()
         Task { await scheduleNotifications(promise) }
+        PromiseBackground.schedule()
         AlarmStore.shared.toast = "Обещание начнётся через \(DurationText.until(promise.start.timeIntervalSince(now)))"
         return nil
     }
@@ -245,6 +247,27 @@ final class PromiseStore: ObservableObject {
         lastCheck[promise.id] = nil
         save()
         cancelNotifications(promise.id)
+        notifyResult(resolution, promise: promise)
+        PromiseBackground.schedule()
+    }
+
+    /// Итог посчитан, пока приложение закрыто (например, в фоне): сообщаем уведомлением.
+    private func notifyResult(_ resolution: PromiseResolution, promise: StepPromise) {
+        guard UIApplication.shared.applicationState != .active else { return }
+        let content = UNMutableNotificationContent()
+        content.sound = .default
+        switch resolution {
+        case .kept:
+            content.title = "Обещание выполнено"
+            content.body = "«\(promise.title)»: \(PromiseRules.eventText(resolution, promise: promise))."
+        case .broken:
+            content.title = "Обещание не выполнено"
+            content.body = "«\(promise.title)»: списано \(promise.stake) ₽. \(PromiseRules.eventText(resolution, promise: promise))."
+        case .technical:
+            return
+        }
+        let request = UNNotificationRequest(identifier: "promise-result-\(promise.id.uuidString)", content: content, trigger: nil)
+        Task { try? await UNUserNotificationCenter.current().add(request) }
     }
 
     // MARK: - Уведомления (тихие)

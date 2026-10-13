@@ -17,6 +17,8 @@ struct ProsnisApp: App {
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
         MedStore.registerCategory()
         Theme.applyAppearance()
+        // Фоновая проверка шагов обещаний (по возможности): обработчик нужно зарегистрировать до конца запуска.
+        PromiseBackground.register()
     }
 
     var body: some Scene {
@@ -36,6 +38,8 @@ struct ProsnisApp: App {
                 .toggleStyle(SwitchToggleStyle(tint: Theme.toggle))
                 .task { await becameActive() }
                 .onChange(of: scenePhase) { _, phase in
+                    // Время вне приложения (в том числе с заблокированным экраном) считает фокус-сессия.
+                    FocusStore.shared.scenePhaseChanged(phase)
                     if phase == .active { Task { await becameActive() } }
                 }
                 // Сменился часовой пояс (поездка): будильники на конкретные даты переставляются сразу.
@@ -59,10 +63,13 @@ struct ProsnisApp: App {
         challenges.reloadIfNeeded()
         payments.reloadIfNeeded()
         wake.reconcile()
+        FocusStore.shared.reloadIfNeeded()
+        FocusStore.shared.scenePhaseChanged(.active)
         // Чтение шагов может занять время: остальное при открытии его не ждёт.
         Task {
             await PromiseStore.shared.reconcile(force: true)
             await PromiseStore.shared.restoreNotifications()
+            PromiseBackground.schedule()
         }
         store.refreshExpected()
         store.refreshDatedAlarms()
@@ -99,6 +106,7 @@ struct RootView: View {
     @ObservedObject private var alarmStore = AlarmStore.shared
     @ObservedObject private var router = NotificationRouter.shared
     @ObservedObject private var journal = JournalStore.shared
+    @ObservedObject private var focus = FocusStore.shared
     @State private var tab = 0
     /// Человек закрыл условия, не согласившись: до следующего запуска не спрашиваем.
     @State private var consentPostponed = false
@@ -223,7 +231,7 @@ struct RootView: View {
             }
             .fullScreenCover(
                 isPresented: Binding(
-                    get: { wake.session?.phase == .task },
+                    get: { wake.session?.phase == .task || focus.showsCover },
                     set: { _ in }
                 ),
                 onDismiss: {
@@ -231,10 +239,14 @@ struct RootView: View {
                     wake.presentPendingMorning()
                 }
             ) {
-                if let session = wake.session {
+                if let session = wake.session, session.phase == .task {
                     WakeTaskView(session: session)
                         .preferredColorScheme(.dark)
                         .foregroundStyle(.primary)
+                } else {
+                    // Фокус-сессия: идёт или показывает итог. Задание будильника важнее и перекрывает её.
+                    FocusCoverView()
+                        .preferredColorScheme(.dark)
                 }
             }
             .sheet(item: Binding(get: { chargeToShow }, set: { _ in })) { entry in
@@ -300,6 +312,7 @@ struct RootView: View {
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 30_000_000_000)
                     wake.reconcile()
+                    FocusStore.shared.evaluate()
                     Task { await PromiseStore.shared.reconcile() }
                 }
             }

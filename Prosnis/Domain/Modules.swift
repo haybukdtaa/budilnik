@@ -30,7 +30,7 @@ enum WakeModule: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .basic: return "Будильник с заданием и серией"
         case .sport: return "Шаги и зарядка после подъёма"
-        case .study: return "Фокус-таймер на утро"
+        case .study: return "Фокус-сессия: от 30 до 120 минут"
         case .work: return "Главная задача дня"
         case .prayer: return "Будильник по времени Фаджра"
         }

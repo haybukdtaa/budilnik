@@ -80,8 +80,14 @@ struct ModuleSettingsView: View {
                     Stepper("Цель: \(settings.data.sportStepGoal)", value: $settings.data.sportStepGoal, in: 500...20000, step: 500)
                 }
             case .study:
-                Section("Фокус-таймер") {
-                    Stepper("\(settings.data.focusMinutes) минут", value: $settings.data.focusMinutes, in: 5...90, step: 5)
+                Section {
+                    Stepper("По умолчанию: \(FocusRules.clampMinutes(settings.data.focusMinutes)) мин",
+                            value: $settings.data.focusMinutes,
+                            in: FocusRules.minMinutes...FocusRules.maxMinutes, step: 5)
+                } header: {
+                    Text("Фокус-сессия")
+                } footer: {
+                    Text("Сессию можно начать из меню «+» на вкладке будильников и из утренней программы.")
                 }
             case .prayer:
                 Section {

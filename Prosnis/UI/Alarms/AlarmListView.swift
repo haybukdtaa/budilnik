@@ -11,6 +11,7 @@ struct AlarmListView: View {
     @State private var editing: AlarmItem?
     @State private var showBedtime = false
     @State private var showPromise = false
+    @State private var showFocus = false
     @State private var openPromise: StepPromise?
     @State private var editMode: EditMode = .inactive
 
@@ -61,6 +62,13 @@ struct AlarmListView: View {
                         } label: {
                             Label("Обещание по шагам", systemImage: "figure.run")
                         }
+                        if settings.isEnabled(.study) {
+                            Button {
+                                showFocus = true
+                            } label: {
+                                Label("Фокус-сессия", systemImage: "timer")
+                            }
+                        }
                     } label: {
                         Image(systemName: "plus").font(.app(.title3))
                     }
@@ -73,6 +81,7 @@ struct AlarmListView: View {
                 BedtimeView()
             }
             .sheet(isPresented: $showPromise) { PromiseEditView() }
+            .sheet(isPresented: $showFocus) { FocusStartView() }
             .sheet(item: $openPromise) { PromiseDetailView(promise: $0) }
             .alert(
                 "Внимание",

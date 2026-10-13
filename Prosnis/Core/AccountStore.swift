@@ -242,6 +242,9 @@ final class AccountStore: ObservableObject {
         if AlarmStore.shared.alarms.contains(where: { AlarmStore.shared.isLocked($0) }) {
             return "Будильник с обязательством зазвонит меньше чем через 2 часа. Удалить данные можно после утра."
         }
+        if FocusStore.shared.current != nil {
+            return "Идёт фокус-сессия. Удалить данные можно после её окончания."
+        }
         if PromiseStore.shared.hasActive {
             return "Есть непроверенное обещание по шагам. Удалить аккаунт и данные можно после того, как оно будет проверено."
         }
@@ -279,6 +282,7 @@ final class AccountStore: ObservableObject {
         MedStore.shared.reload()
         MedStore.shared.refresh()
         PromiseStore.shared.reload()
+        FocusStore.shared.reload()
         await PromiseStore.shared.cancelAllNotifications()
         await WeeklyNotification.update(enabled: false)
         // Последним: перезагрузки выше могли поставить изменения в очередь.
