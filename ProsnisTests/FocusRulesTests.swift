@@ -34,8 +34,8 @@ final class FocusRulesTests: XCTestCase {
         let item = session(away: 4 * 60 + 1)
         XCTAssertNil(FocusRules.resolve(item, now: start.addingTimeInterval(30 * 60)))
         let away = session(away: 4 * 60, leftAt: start.addingTimeInterval(20 * 60))
-        XCTAssertNil(FocusRules.resolve(away, now: start.addingTimeInterval(24 * 60 + 59)))
-        XCTAssertEqual(FocusRules.resolve(away, now: start.addingTimeInterval(25 * 60 + 1)), .tooLongAway,
+        XCTAssertNil(FocusRules.resolve(away, now: start.addingTimeInterval(20 * 60 + 59)))
+        XCTAssertEqual(FocusRules.resolve(away, now: start.addingTimeInterval(21 * 60 + 1)), .tooLongAway,
                        "Ещё идущий выход тоже считается, даже если человек не вернулся")
         XCTAssertEqual(FocusRules.failureTime(away, now: start.addingTimeInterval(40 * 60)), start.addingTimeInterval(21 * 60),
                        "Лимит кончился ровно через минуту после выхода: 4 минуты уже были")
