@@ -30,7 +30,7 @@ struct SettingsData: Codable, Equatable {
     var lastWitnessNoticeDay: String?
     /// Сообщение свидетелям, которое ещё не удалось отправить (нет сети).
     var pendingWitnessNotice: MissedMorningNotice?
-    /// Согласие с условиями ставки.
+    /// Согласие с условиями обязательства.
     var stakeConsent: StakeConsent?
     /// Во сколько человек обычно вставал до приложения (минуты от полуночи) — для «выигранных часов».
     var usualWakeMinutes: Int?
@@ -51,8 +51,8 @@ struct SettingsData: Codable, Equatable {
     var identityCreated = false
     /// Аккаунт восстановлен, но данные с сервера ещё не загрузились: повторить при открытии.
     var pendingRestoreMerge = false
-    /// Модуль «Лекарства» (пятая вкладка).
-    var medsEnabled = false
+    /// Вкладка «Лекарства» показывается всегда; поле осталось для совместимости со старыми данными.
+    var medsEnabled = true
     /// Показывать название лекарства на экране блокировки. По умолчанию — нет.
     var medsShowNames = false
 
@@ -91,7 +91,7 @@ struct SettingsData: Codable, Equatable {
         recoverySaved = try c.decodeIfPresent(Bool.self, forKey: .recoverySaved) ?? base.recoverySaved
         identityCreated = try c.decodeIfPresent(Bool.self, forKey: .identityCreated) ?? base.identityCreated
         pendingRestoreMerge = try c.decodeIfPresent(Bool.self, forKey: .pendingRestoreMerge) ?? base.pendingRestoreMerge
-        medsEnabled = try c.decodeIfPresent(Bool.self, forKey: .medsEnabled) ?? base.medsEnabled
+        medsEnabled = true
         medsShowNames = try c.decodeIfPresent(Bool.self, forKey: .medsShowNames) ?? base.medsShowNames
     }
 }
@@ -156,7 +156,7 @@ final class AppSettings: ObservableObject {
 
     var scheduleContext: ScheduleContext { ScheduleContext(prayer: data.prayer) }
 
-    /// Человек согласился с условиями ставки на эту сумму. Согласие — доказательство при споре: уходит на сервер.
+    /// Человек согласился с условиями обязательства на эту сумму. Согласие — доказательство при споре: уходит на сервер.
     func acceptStakeTerms(amount: Int) {
         let previous = data.stakeConsent
         let consent = StakeConsent(

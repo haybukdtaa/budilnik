@@ -109,11 +109,8 @@ final class PromiseStore: ObservableObject {
         file.save(promises)
     }
 
-    /// Обещание, которое скоро начнётся или идёт: пока оно есть, данные удалять нельзя.
-    var hasActive: Bool {
-        let now = TrustedClock.now
-        return promises.contains { PromiseRules.isLocked($0, now: now) }
-    }
+    /// Есть непроверенное обещание: пока оно есть, данные удалять нельзя.
+    var hasActive: Bool { !promises.isEmpty }
 
     // MARK: - Создание и удаление
 
@@ -123,21 +120,22 @@ final class PromiseStore: ObservableObject {
         guard promise.start >= now.addingTimeInterval(PromiseRules.minLead) else {
             return "Начало должно быть хотя бы через 15 минут."
         }
-        guard promise.end > promise.start, promise.minSteps > 0, promise.stake > 0 else {
-            return "Проверьте окно, число шагов и ставку."
+        guard promise.end > promise.start, promise.minSteps > 0, promise.stake >= AppConfig.minObligation else {
+            return "Проверьте окно, число шагов и сумму обязательства (не меньше 250 ₽)."
         }
         guard !loadFailed else { return "Данные пока закрыты: разблокируйте телефон и повторите." }
         promises.append(promise)
         promises.sort { $0.start < $1.start }
         save()
         Task { await scheduleNotifications(promise) }
+        AlarmStore.shared.toast = "Обещание начнётся через \(DurationText.until(promise.start.timeIntervalSince(now)))"
         return nil
     }
 
-    /// Удаляет обещание, если оно ещё не закрыто (раньше чем за 2 часа до начала).
+    /// Отменяет обещание, только если с создания прошло не больше 5 минут.
     func delete(_ promise: StepPromise) -> String? {
-        guard !PromiseRules.isLocked(promise, now: TrustedClock.now) else {
-            return "Обещание нельзя изменить или удалить за 2 часа до начала и пока оно идёт."
+        guard PromiseRules.canCancel(promise, now: TrustedClock.now) else {
+            return "Обещание можно отменить только в течение 5 минут после создания."
         }
         promises.removeAll { $0.id == promise.id }
         save()
@@ -233,7 +231,8 @@ final class PromiseStore: ObservableObject {
             taskKind: .steps,
             paymentRef: reference,
             chargeSeen: outcome == .failed ? false : nil,
-            isPromise: true
+            isPromise: true,
+            kind: .promise
         ))
         if let reference {
             let amount = promise.stake

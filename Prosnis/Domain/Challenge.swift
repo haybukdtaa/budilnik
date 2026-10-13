@@ -53,6 +53,10 @@ struct Challenge: Codable, Identifiable, Equatable {
     var status: ChallengeStatus = .active
     var endedAt: Date?
     var updatedAt: Date? = Date()
+    /// Обязательство на челлендж, ₽. nil — без обязательства.
+    var stake: Int?
+
+    var hasStake: Bool { (stake ?? 0) > 0 }
 
     /// Сведения о намазе не покидают телефон без разрешения.
     var isPrivate: Bool { goal == .prayer }
@@ -68,6 +72,11 @@ struct ChallengeProgress: Equatable {
 }
 
 enum ChallengeEvaluator {
+    /// Сколько списать сверх того, что уже списано по будильнику в то же утро: в итоге платится большая из двух сумм.
+    static func extraCharge(amount: Int, alreadyCharged: Int) -> Int {
+        max(0, amount - max(0, alreadyCharged))
+    }
+
     /// Подходит ли утро под условие челленджа.
     static func passes(_ entry: JournalEntry, challenge: Challenge, calendar: Calendar) -> Bool {
         guard entry.outcome == .success else { return false }

@@ -26,21 +26,6 @@ struct ModulesView: View {
                 Text("Модули определяют шаблоны будильников, утренний чек-лист и программу после подъёма. Модуль «Утренний намаз» и всё, что с ним связано, хранится только на телефоне, пока вы сами не разрешите иное в Приватности.")
             }
 
-            Section {
-                Toggle(isOn: $settings.data.medsEnabled) {
-                    Label {
-                        VStack(alignment: .leading) {
-                            Text("Лекарства")
-                            Text("Напоминания о таблетках, курс и запас").font(.app(.caption)).foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "pills")
-                    }
-                }
-            } footer: {
-                Text("Отдельная вкладка. Без ставок и заданий: лекарства — это забота, а не испытание. Сведения о лекарствах не уходят на сервер и друзьям.")
-            }
-
             Section("Настройки модулей") {
                 ForEach(settings.data.modules) { module in
                     NavigationLink {
@@ -128,7 +113,7 @@ struct PrayerSettingsView: View {
     /// Человек сам поменял время в поле. До этого поле показывает расчёт для выбранного города.
     @State private var edited = false
 
-    /// Будильник на Фаджр со ставкой закрыт: менять расчёт нельзя, иначе звонок можно сдвинуть или убрать.
+    /// Будильник на Фаджр с обязательством закрыт: менять расчёт нельзя, иначе звонок можно сдвинуть или убрать.
     private var lockedByStake: Bool {
         store.alarms.contains { $0.isFajr && $0.stakeEnabled && store.isLocked($0) }
     }
@@ -138,7 +123,7 @@ struct PrayerSettingsView: View {
         Form {
             if lockedByStake {
                 Section {
-                    Label("Настройки закрыты: будильник на Фаджр со ставкой зазвонит меньше чем через 2 часа или идёт проверка.", systemImage: "lock.fill")
+                    Label("Настройки закрыты: будильник на Фаджр с обязательством зазвонит меньше чем через 2 часа или идёт проверка.", systemImage: "lock.fill")
                         .foregroundStyle(Theme.accent)
                 }
             }

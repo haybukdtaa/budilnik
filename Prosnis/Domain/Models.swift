@@ -66,7 +66,7 @@ struct AlarmItem: Identifiable, Codable, Equatable {
     /// Ставка. Списание идёт через платёжный модуль; сейчас он тренировочный.
     var stakeEnabled = false
     var stakeAmount = 500
-    /// Задание для выключения без ставки (у будильника со ставкой задание есть всегда).
+    /// Задание для выключения без обязательства (у будильника с обязательством задание есть всегда).
     var taskEnabled: Bool? = false
     /// Когда создан. Нужно, чтобы не засчитывать провалы до создания.
     var createdAt: Date? = Date()
@@ -78,14 +78,26 @@ struct AlarmItem: Identifiable, Codable, Equatable {
     var holidayMode: HolidayMode? = .off
     /// Смещение от времени Фаджра в минутах. nil = обычный будильник по часам.
     var fajrOffset: Int?
-    /// Повторная проверка через 10 минут у будильника без ставки. Со ставкой она обязательна всегда.
+    /// Повторная проверка через 10 минут у будильника без обязательства. С обязательством она обязательна всегда.
     var recheckEnabled: Bool?
+    /// Заметка, которую человек написал себе заранее: показывается при выключении будильника.
+    var note: String?
+    /// Звонить снова, если нажали «Выключить», но не выполнили задание. nil — включено (по умолчанию).
+    var repeatUntilDone: Bool?
 
     /// Нужно ли выполнять задание, чтобы выключить будильник.
     var hasTask: Bool { stakeEnabled || taskEnabled == true }
     /// Будет ли повторная проверка (без учёта согласия на ставку: его проверяет WakeCoordinator).
     var wantsRecheck: Bool { stakeEnabled || recheckEnabled == true }
+    /// Запасные звонки, пока задание не выполнено: только для будильника с заданием и без обязательства
+    /// (с обязательством действует правило 10 минут).
+    var repeatsUntilDone: Bool { hasTask && !stakeEnabled && repeatUntilDone != false }
     var isFajr: Bool { fajrOffset != nil }
+    /// Заметка без пробелов по краям; nil, если пусто.
+    var trimmedNote: String? {
+        let text = note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return text.isEmpty ? nil : text
+    }
     var effectiveTask: TaskKind { taskKind ?? .typing }
     var effectiveModule: WakeModule { module ?? .basic }
     var effectiveHolidayMode: HolidayMode { holidayMode ?? .off }

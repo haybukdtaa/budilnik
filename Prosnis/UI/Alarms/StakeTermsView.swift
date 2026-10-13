@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Условия ставки. Будильник со ставкой сохраняется только после «Согласен».
+/// Условия обязательства. Будильник с обязательством сохраняется только после «Согласен».
 struct StakeTermsView: View {
     @Environment(\.dismiss) private var dismiss
     let amount: Int
@@ -26,7 +26,7 @@ struct StakeTermsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)
-            .navigationTitle("Условия ставки")
+            .navigationTitle("Условия обязательства")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }

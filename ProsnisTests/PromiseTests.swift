@@ -54,10 +54,11 @@ final class PromiseTests: XCTestCase {
         XCTAssertEqual(PromiseRules.resolve(promise(), read: nil, now: late), .broken(.unverified, steps: nil), "Не открывали — невыполнено")
     }
 
-    func testLockTwoHoursBeforeStart() {
-        let item = promise()
-        XCTAssertFalse(PromiseRules.isLocked(item, now: T.date(2026, 10, 8, 19, 59)))
-        XCTAssertTrue(PromiseRules.isLocked(item, now: T.date(2026, 10, 8, 20, 0)))
+    func testLockAfterFiveMinutesFromCreation() {
+        var item = promise()
+        item.createdAt = T.date(2026, 10, 8, 12, 0)
+        XCTAssertFalse(PromiseRules.isLocked(item, now: T.date(2026, 10, 8, 12, 4)))
+        XCTAssertTrue(PromiseRules.isLocked(item, now: T.date(2026, 10, 8, 12, 6)))
         XCTAssertTrue(PromiseRules.isLocked(item, now: T.date(2026, 10, 8, 22, 30)))
     }
 

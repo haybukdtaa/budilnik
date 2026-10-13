@@ -48,7 +48,7 @@ struct ProgressTabView: View {
                             NavigationLink {
                                 MorningPhotosView()
                             } label: {
-                                row(icon: "photo.on.rectangle", title: "Мои утра", detail: "Фото дня и ролик за месяц")
+                                row(icon: "photo.on.rectangle", title: "Альбом", detail: "Фото дня и ролик за месяц")
                             }
                             .buttonStyle(.plain)
                         }
@@ -273,9 +273,25 @@ struct ChallengeRow: View {
                     .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
-            if challenge.status == .active {
-                Button("Остановить", role: .destructive) { confirmStop = true }
+            if let stake = challenge.stake, stake > 0 {
+                Text("Обязательство \(stake) ₽")
                     .font(.app(.caption))
+                    .foregroundStyle(Theme.accent)
+            }
+            if challenge.status == .active {
+                if challenges.canStop(challenge) {
+                    Button("Остановить", role: .destructive) { confirmStop = true }
+                        .font(.app(.caption))
+                    if challenge.hasStake {
+                        Text("Остановить без списания можно только в первые 5 минут.")
+                            .font(.app(.caption))
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Label("Остановить нельзя: челлендж с обязательством", systemImage: "lock.fill")
+                        .font(.app(.caption))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -297,6 +313,9 @@ struct ChallengeEditView: View {
     @State private var title = ""
     @State private var duration: Int? = 7
     @State private var wakeBefore = Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date()) ?? Date()
+    @State private var withStake = false
+    @State private var stake = 500
+    @State private var showTerms = false
 
     static let durations: [Int?] = [7, 14, 21, 30, 60, 90, 100, 180, 365, nil]
 
@@ -324,6 +343,31 @@ struct ChallengeEditView: View {
                         }
                     }
                 }
+                if settings.data.isAdult {
+                    Section {
+                        Toggle("С обязательством", isOn: $withStake)
+                        if withStake {
+                            HStack {
+                                Text("Сумма")
+                                Spacer()
+                                TextField("500", value: $stake, format: .number)
+                                    .keyboardType(.numberPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 100)
+                                Text("₽").foregroundStyle(.secondary)
+                            }
+                            if stake < AppConfig.minObligation {
+                                Label("Минимальная сумма — \(AppConfig.minObligation) ₽", systemImage: "exclamationmark.circle")
+                                    .font(.app(.footnote))
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    } footer: {
+                        if withStake {
+                            Text("Если челлендж сорвётся, сумма спишется один раз. В то утро, когда он сорван, спишется большая из двух сумм: этого обязательства или обязательства будильника. Остановить такой челлендж можно только в первые 5 минут.")
+                        }
+                    }
+                }
                 Section {
                     TextField("Название (необязательно)", text: $title)
                 } footer: {
@@ -337,22 +381,42 @@ struct ChallengeEditView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Начать") {
-                        let parts = Calendar.current.dateComponents([.hour, .minute], from: wakeBefore)
-                        let name = title.trimmingCharacters(in: .whitespaces)
-                        challenges.add(Challenge(
-                            title: name.isEmpty ? defaultTitle : name,
-                            goal: goal,
-                            wakeBeforeMinutes: goal == .wakeBefore ? (parts.hour ?? 7) * 60 + (parts.minute ?? 0) : nil,
-                            durationDays: duration,
-                            startDate: Date()
-                        ))
-                        dismiss()
-                    }
-                    .bold()
+                    Button("Начать") { start() }
+                        .bold()
+                        .disabled(withStake && stake < AppConfig.minObligation)
+                }
+            }
+            .sheet(isPresented: $showTerms) {
+                StakeTermsView(amount: stake) {
+                    settings.acceptStakeTerms(amount: stake)
+                    showTerms = false
+                    begin()
                 }
             }
         }
+    }
+
+    private func start() {
+        if withStake && StakeTerms.needsConsent(settings.data.stakeConsent, amount: stake) {
+            showTerms = true
+        } else {
+            begin()
+        }
+    }
+
+    private func begin() {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: wakeBefore)
+        let name = title.trimmingCharacters(in: .whitespaces)
+        let amount = withStake && settings.data.isAdult && stake >= AppConfig.minObligation ? stake : nil
+        challenges.add(Challenge(
+            title: name.isEmpty ? defaultTitle : name,
+            goal: goal,
+            wakeBeforeMinutes: goal == .wakeBefore ? (parts.hour ?? 7) * 60 + (parts.minute ?? 0) : nil,
+            durationDays: duration,
+            startDate: Date(),
+            stake: amount
+        ))
+        dismiss()
     }
 
     private var defaultTitle: String {

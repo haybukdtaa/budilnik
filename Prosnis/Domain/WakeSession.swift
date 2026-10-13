@@ -5,12 +5,17 @@ enum WakeRules {
     static let windowSeconds: TimeInterval = 600
     /// Через сколько после выполнения задания звонит повторная проверка.
     static let recheckDelay: TimeInterval = 600
-    /// За сколько до звонка будильник со ставкой закрыт для изменений.
+    /// За сколько до звонка будильник с обязательством закрыт для изменений.
     static let lockSeconds: TimeInterval = 2 * 3600
     /// Будильник из очереди старше этого уже не запускается: человек явно уснул, звонок идёт в пропуски.
     static let queueStaleSeconds: TimeInterval = 2 * windowSeconds + recheckDelay
     /// Сколько ждать, что повторный звонок сам откроет приложение, прежде чем начать проверку из приложения.
     static let recheckGraceSeconds: TimeInterval = 20
+    /// «Звонить, пока не выполню»: запасные звонки каждые 5 минут, не больше 6 раз.
+    static let repeatInterval: TimeInterval = 5 * 60
+    static let repeatCount = 6
+    /// Сколько всего даётся на первое задание, если будильник звонит снова: все повторы и ещё 5 минут после последнего.
+    static var untilDoneWindow: TimeInterval { Double(repeatCount + 1) * repeatInterval }
 
     /// Пора ли начать вторую проверку из самого приложения (если повторный звонок не открыл его).
     static func shouldStartRecheckInApp(recheckDate: Date, now: Date) -> Bool {
@@ -59,7 +64,7 @@ struct WakeSession: Codable {
     var qrCode: String?
     var module: WakeModule = .basic
     var isPrayer = false
-    /// Ссылка на блокировку суммы ставки.
+    /// Ссылка на блокировку суммы обязательства.
     var paymentRef: UUID?
     /// Будильники, которые прозвенели во время этой проверки: их задание начнётся следом.
     var queuedAlarmIDs: [UUID]?
@@ -69,10 +74,19 @@ struct WakeSession: Codable {
     var originalRing: Date?
     /// Будет ли повторная проверка. nil — данные старой версии, где она была всегда.
     var withRecheck: Bool?
+    /// Будильник звонит снова, пока задание не выполнено (без обязательства).
+    var untilDone: Bool?
+    /// Запасные системные звонки этого утра.
+    var repeatAlarmIDs: [UUID]?
+    /// Заметка, которую человек написал себе: показывается сразу после первого задания.
+    var noteText: String?
 
     var needsRecheck: Bool { withRecheck != false }
 
-    var deadline: Date { ringDate.addingTimeInterval(WakeRules.windowSeconds) }
+    var deadline: Date {
+        let window = stage == 1 && untilDone == true ? WakeRules.untilDoneWindow : WakeRules.windowSeconds
+        return ringDate.addingTimeInterval(window)
+    }
 }
 
 /// Время, которому можно верить, даже если на телефоне перевели часы.

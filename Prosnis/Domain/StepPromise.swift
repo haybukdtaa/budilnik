@@ -43,8 +43,8 @@ enum PromiseResolution: Equatable {
 
 /// Правила обещаний по шагам: чистые функции, проверяются тестами.
 enum PromiseRules {
-    /// За сколько до начала окна обещание закрыто для изменений (как будильник со ставкой).
-    static let lockSeconds: TimeInterval = WakeRules.lockSeconds
+    /// Сколько после создания обещание можно отменить. Дальше отменить или изменить его нельзя никогда.
+    static let cancelWindow: TimeInterval = 5 * 60
     /// Раньше чем за столько до начала создавать обещание нельзя.
     static let minLead: TimeInterval = 15 * 60
     /// Шаги за окно проверяются не позже чем через столько дней: телефон хранит данные о шагах неделю.
@@ -53,8 +53,13 @@ enum PromiseRules {
     /// Сколько ждать после конца окна, прежде чем решать «не хватило»: последние шаги доходят до счётчика не сразу.
     static let grace: TimeInterval = 120
 
+    static func canCancel(_ promise: StepPromise, now: Date) -> Bool {
+        now.timeIntervalSince(promise.createdAt) <= cancelWindow
+    }
+
+    /// Обещание закрыто: окно отмены прошло.
     static func isLocked(_ promise: StepPromise, now: Date) -> Bool {
-        now >= promise.start.addingTimeInterval(-lockSeconds)
+        !canCancel(promise, now: now)
     }
 
     static func verifyDeadline(_ promise: StepPromise) -> Date {

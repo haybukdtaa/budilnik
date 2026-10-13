@@ -133,10 +133,16 @@ struct JournalListView: View {
 
 private func outcomeTitle(_ entry: JournalEntry) -> (String, Color) {
     switch entry.outcome {
-    case .success: return (entry.isPromise == true ? "Выполнено" : "Встали", .green)
+    case .success:
+        if entry.kind == .focus { return ("Засчитана", .green) }
+        return (entry.isPromise == true ? "Выполнено" : "Встали", .green)
     case .failed:
         if entry.dispute == .refunded { return ("Возвращено", .blue) }
-        return (entry.isPromise == true ? "Не выполнено" : "Проспали", .red)
+        switch entry.kind {
+        case .challenge?: return ("Сорван", .red)
+        case .focus?: return ("Не засчитана", .red)
+        default: return (entry.isPromise == true ? "Не выполнено" : "Проспали", .red)
+        }
     case .technical: return ("Сбой, без списания", .gray)
     }
 }
@@ -183,7 +189,7 @@ struct JournalDetailView: View {
                         Text(title).foregroundStyle(color).bold()
                     }
                     HStack {
-                        Text("Ставка")
+                        Text("Обязательство")
                         Spacer()
                         Text("\(entry.stake) ₽").foregroundStyle(.secondary)
                     }

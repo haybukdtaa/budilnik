@@ -54,8 +54,19 @@ final class ChallengeStore: ObservableObject {
         save()
     }
 
+    /// Челлендж с обязательством можно остановить только в течение 5 минут после начала.
+    static let cancelWindow: TimeInterval = 5 * 60
+
+    func canStop(_ challenge: Challenge, now: Date = Date()) -> Bool {
+        !challenge.hasStake || now.timeIntervalSince(challenge.startDate) <= ChallengeStore.cancelWindow
+    }
+
+    /// Есть ли идущий челлендж с обязательством (тогда данные удалять нельзя).
+    var hasActiveStake: Bool { challenges.contains { $0.status == .active && $0.hasStake } }
+
     func abandon(_ id: UUID) {
-        guard let index = challenges.firstIndex(where: { $0.id == id }), challenges[index].status == .active else { return }
+        guard let index = challenges.firstIndex(where: { $0.id == id }), challenges[index].status == .active,
+              canStop(challenges[index]) else { return }
         challenges[index].status = .abandoned
         challenges[index].endedAt = Date()
         challenges[index].updatedAt = Date()
@@ -70,6 +81,7 @@ final class ChallengeStore: ObservableObject {
     /// Пересчитывает статусы идущих челленджей по журналу.
     func evaluateAll(now: Date = Date()) {
         var changed = false
+        var failed: [(Challenge, ChallengeProgress)] = []
         for index in challenges.indices where challenges[index].status == .active {
             let result = progress(for: challenges[index], now: now)
             if result.status != .active {
@@ -78,9 +90,52 @@ final class ChallengeStore: ObservableObject {
                 challenges[index].updatedAt = now
                 sync(challenges[index])
                 changed = true
+                if result.status == .failed, challenges[index].hasStake { failed.append((challenges[index], result)) }
             }
         }
         if changed { save() }
+        // Списание — после того, как статусы сохранены: запись в дневник снова пересчитывает челленджи.
+        for (challenge, result) in failed { chargeFailure(challenge, result) }
+    }
+
+    /// Челлендж сорван: сумма списывается один раз. Если в то же утро списана сумма будильника,
+    /// платится большая из двух, а не обе.
+    private func chargeFailure(_ challenge: Challenge, _ result: ChallengeProgress) {
+        guard let amount = challenge.stake, amount > 0 else { return }
+        let journal = JournalStore.shared
+        // Запись с номером челленджа уже есть: второй раз не списываем.
+        guard !journal.entries.contains(where: { $0.id == challenge.id }) else { return }
+        var alreadyCharged = 0
+        var events = [JournalEvent(date: Date(), text: "Челлендж «\(challenge.title)» сорван")]
+        if let failedOn = result.failedOn,
+           let entry = journal.entries.first(where: { $0.isPromise != true && $0.isDemo != true && abs($0.date.timeIntervalSince(failedOn)) < 1 }) {
+            alreadyCharged = entry.charged
+        }
+        let extra = ChallengeEvaluator.extraCharge(amount: amount, alreadyCharged: alreadyCharged)
+        if alreadyCharged > 0 {
+            events.append(JournalEvent(
+                date: Date(),
+                text: "В то же утро по будильнику уже списано \(alreadyCharged) ₽: списывается большая из двух сумм, по челленджу доплата \(extra) ₽"
+            ))
+        }
+        guard extra > 0 else { return }
+        let reference = UUID()
+        journal.add(JournalEntry(
+            id: challenge.id,
+            date: result.failedOn ?? result.endedAt ?? Date(),
+            alarmTitle: "Челлендж: \(challenge.title)",
+            timeText: "",
+            stake: extra,
+            outcome: .failed,
+            events: events,
+            isTraining: PaymentsStore.shared.isTraining,
+            paymentRef: reference,
+            chargeSeen: false,
+            isPromise: true,
+            kind: .challenge
+        ))
+        PaymentsStore.shared.markOutcome(reference: reference, success: false, amount: extra)
+        Task { await PaymentsStore.shared.hold(amount: extra, reference: reference) }
     }
 }
 

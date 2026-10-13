@@ -151,7 +151,7 @@ struct RootView: View {
         #endif
     }
 
-    /// Условия ставки изменились: ставки не действуют, пока человек не согласится заново.
+    /// Условия обязательства изменились: ставки не действуют, пока человек не согласится заново.
     private var reconsentAmount: Int? {
         guard !consentPostponed, wake.session == nil, wake.morning == nil, RootView.screenshotTab == nil else { return nil }
         return alarmStore.alarmsNeedingConsent.map(\.stakeAmount).max()
@@ -176,6 +176,11 @@ struct RootView: View {
         } else if !settings.data.onboardingDone && RootView.screenshotTab == nil {
             OnboardingView()
         } else {
+            VStack(spacing: 0) {
+            // Плашка повторной проверки сдвигает вкладки вниз, а не лежит поверх них: кнопка «+» остаётся доступной.
+            if let session = wake.session, session.phase == .waiting {
+                RecheckBanner(session: session)
+            }
             TabView(selection: $tab) {
                 AlarmListView()
                     .tag(0)
@@ -208,26 +213,23 @@ struct RootView: View {
                 CommunityView()
                     .tabItem { Label("Сообщество", systemImage: "person.3") }
                     .tag(2)
-                if settings.data.medsEnabled {
-                    MedsView()
-                        .tabItem { Label("Лекарства", systemImage: "pills") }
-                        .tag(4)
-                }
+                MedsView()
+                    .tabItem { Label("Лекарства", systemImage: "pills") }
+                    .tag(4)
                 ProfileView()
                     .tabItem { Label("Профиль", systemImage: "person.crop.circle") }
                     .tag(3)
             }
-            .overlay(alignment: .top) {
-                if let session = wake.session, session.phase == .waiting {
-                    RecheckBanner(session: session)
-                }
             }
             .fullScreenCover(
                 isPresented: Binding(
                     get: { wake.session?.phase == .task },
                     set: { _ in }
                 ),
-                onDismiss: { wake.presentPendingMorning() }
+                onDismiss: {
+                    wake.presentPendingNote()
+                    wake.presentPendingMorning()
+                }
             ) {
                 if let session = wake.session {
                     WakeTaskView(session: session)
@@ -246,6 +248,10 @@ struct RootView: View {
                 )
                 .interactiveDismissDisabled()
             }
+            .sheet(item: $wake.note) { state in
+                NoteView(state: state)
+                    .preferredColorScheme(.dark)
+            }
             .sheet(item: $wake.morning) { state in
                 MorningView(state: state)
                     .preferredColorScheme(.dark)
@@ -256,7 +262,6 @@ struct RootView: View {
                 // Тестовые данные, чтобы на скриншоте было что показать (только в отладочной сборке).
                 if JournalStore.shared.entries.isEmpty { JournalStore.shared.addDemoEntries() }
                 if !settings.data.useDemoSocial { settings.data.useDemoSocial = true }
-                if !settings.data.medsEnabled { settings.data.medsEnabled = true }
                 var work = AlarmItem()
                 work.hour = 6; work.minute = 30; work.weekdays = [1, 2, 3, 4, 5]; work.label = "Работа"
                 work.stakeEnabled = true; work.stakeAmount = 500; work.taskEnabled = true; work.taskKind = .steps
@@ -286,7 +291,7 @@ struct RootView: View {
             }
             .onChange(of: router.showMeds) { _, show in
                 if show {
-                    if settings.data.medsEnabled { tab = 4 }
+                    tab = 4
                     router.showMeds = false
                 }
             }

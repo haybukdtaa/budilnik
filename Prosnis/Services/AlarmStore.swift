@@ -8,6 +8,8 @@ final class AlarmStore: ObservableObject {
 
     @Published private(set) var alarms: [AlarmItem] = []
     @Published var message: String?
+    /// Короткая подпись внизу списка: «Будильник зазвонит через …». Гаснет сама.
+    @Published var toast: String?
 
     private let service = AlarmService.shared
     private let file = FileStore<[AlarmItem]>("alarms")
@@ -43,6 +45,13 @@ final class AlarmStore: ObservableObject {
             let now = Date()
             for index in alarms.indices where alarms[index].createdAt == nil {
                 alarms[index].createdAt = now
+            }
+            if result.state == .loaded { save() }
+        }
+        // Минимальное обязательство — 250 ₽: более мелкие суммы старых версий поднимаются до минимума.
+        if alarms.contains(where: { $0.stakeEnabled && $0.stakeAmount < AppConfig.minObligation }) {
+            for index in alarms.indices where alarms[index].stakeEnabled && alarms[index].stakeAmount < AppConfig.minObligation {
+                alarms[index].stakeAmount = AppConfig.minObligation
             }
             if result.state == .loaded { save() }
         }
@@ -87,12 +96,12 @@ final class AlarmStore: ObservableObject {
             && !StakeTerms.needsConsent(AppSettings.shared.data.stakeConsent, amount: item.stakeAmount)
     }
 
-    /// Включённые будильники со ставкой, для которых нужно заново согласиться с условиями (условия изменились).
+    /// Включённые будильники с обязательством, для которых нужно заново согласиться с условиями (условия изменились).
     var alarmsNeedingConsent: [AlarmItem] {
         alarms.filter { $0.isEnabled && $0.stakeEnabled && $0.stakeAmount > 0 && !isStakeActive($0) }
     }
 
-    /// Закрыт ли будильник со ставкой для изменений: за 2 часа до звонка и пока идёт проверка.
+    /// Закрыт ли будильник с обязательством для изменений: за 2 часа до звонка и пока идёт проверка.
     func isLocked(_ item: AlarmItem, now: Date = TrustedClock.now) -> Bool {
         guard isStakeActive(item), item.isEnabled else { return false }
         // После смены пояса утро ждёт своего второго времени звонка: пока оно не решено, менять нельзя.
@@ -111,7 +120,7 @@ final class AlarmStore: ObservableObject {
     }
 
     private func showLockedMessage() {
-        message = "Будильник со ставкой нельзя менять за 2 часа до звонка и пока идёт проверка."
+        message = "Будильник с обязательством нельзя менять за 2 часа до звонка и пока идёт проверка."
     }
 
     @discardableResult
@@ -131,14 +140,15 @@ final class AlarmStore: ObservableObject {
         }
         if !AppSettings.shared.data.isAdult { item.stakeEnabled = false }
         if item.stakeAmount <= 0 { item.stakeEnabled = false }
+        if item.stakeEnabled && item.stakeAmount < AppConfig.minObligation { item.stakeAmount = AppConfig.minObligation }
         if item.stakeEnabled && item.isEnabled {
             // Ставка без согласия с текущими условиями или без разрешения на будильники не включается.
             if StakeTerms.needsConsent(AppSettings.shared.data.stakeConsent, amount: item.stakeAmount) {
-                message = "Сначала согласитесь с условиями ставки: откройте будильник и нажмите «Сохранить»."
+                message = "Сначала согласитесь с условиями обязательства: откройте будильник и нажмите «Сохранить»."
                 return false
             }
             if !service.isAuthorized {
-                message = "Чтобы включить будильник со ставкой, разрешите будильники в Настройках iPhone."
+                message = "Чтобы включить будильник с обязательством, разрешите будильники в Настройках iPhone."
                 return false
             }
         }
@@ -156,7 +166,17 @@ final class AlarmStore: ObservableObject {
         save()
         enqueueSync(item)
         sync(item)
+        announce(item, now: now)
         return true
+    }
+
+    /// Подпись «Будильник зазвонит через …» после сохранения или включения.
+    private func announce(_ item: AlarmItem, now: Date) {
+        guard item.isEnabled, let next = nextOccurrence(of: item, after: now) else {
+            toast = nil
+            return
+        }
+        toast = "Будильник зазвонит через \(DurationText.until(next.timeIntervalSince(now)))"
     }
 
     func delete(_ item: AlarmItem) {
@@ -239,6 +259,7 @@ final class AlarmStore: ObservableObject {
     func cleanupOrphans() {
         var known = Set(alarms.map(\.id))
         if let recheck = WakeCoordinator.shared.session?.recheckAlarmID { known.insert(recheck) }
+        known.formUnion(WakeCoordinator.shared.session?.repeatAlarmIDs ?? [])
         known.formUnion(MedStore.shared.scheduledAlarmIDs)
         service.pruneOrphans(known: known)
         let used = Set(alarms.compactMap { alarm -> String? in

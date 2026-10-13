@@ -49,7 +49,7 @@ struct AlarmEditView: View {
         Binding(get: { draft.hasTask }, set: { draft.taskEnabled = $0 })
     }
 
-    /// Будильник со ставкой закрыт за 2 часа до звонка и пока идёт проверка.
+    /// Будильник с обязательством закрыт за 2 часа до звонка и пока идёт проверка.
     private var isLocked: Bool {
         guard !isNew, let stored = store.alarms.first(where: { $0.id == draft.id }) else { return false }
         return store.isLocked(stored)
@@ -64,7 +64,7 @@ struct AlarmEditView: View {
     private var canSave: Bool {
         if draft.hasTask && draft.effectiveTask == .qr && (draft.qrCode ?? "").isEmpty { return false }
         // Ставка без суммы бессмысленна: будильник закрывается для изменений, а на кону ничего нет.
-        if draft.stakeEnabled && draft.stakeAmount <= 0 { return false }
+        if draft.stakeEnabled && draft.stakeAmount < AppConfig.minObligation { return false }
         return true
     }
 
@@ -97,6 +97,11 @@ struct AlarmEditView: View {
 
                 Section {
                     TextField("Название", text: $draft.label)
+                    TextField("Заметка себе (покажется при выключении)", text: Binding(
+                        get: { draft.note ?? "" },
+                        set: { draft.note = $0 }
+                    ), axis: .vertical)
+                    .lineLimit(1...4)
                     NavigationLink {
                         SoundPickerView(selection: $draft.soundID)
                     } label: {
@@ -176,7 +181,7 @@ struct AlarmEditView: View {
             if store.upsert(draft) { dismiss() }
             return
         }
-        // Сначала согласие с условиями ставки: без него будильник со ставкой не сохраняется.
+        // Сначала согласие с условиями обязательства: без него будильник с обязательством не сохраняется.
         if StakeTerms.needsConsent(settings.data.stakeConsent, amount: draft.stakeAmount) {
             showTerms = true
             return
@@ -190,7 +195,7 @@ struct AlarmEditView: View {
             if await AlarmService.shared.requestAuthorization() {
                 if store.upsert(draft) { dismiss() }
             } else {
-                store.message = "Чтобы поставить будильник со ставкой, разрешите будильники в Настройках iPhone."
+                store.message = "Чтобы поставить будильник с обязательством, разрешите будильники в Настройках iPhone."
             }
         }
     }
@@ -336,7 +341,7 @@ struct AlarmEditView: View {
                     }
                 }
                 if draft.stakeEnabled {
-                    Label("Повторная проверка: обязательна со ставкой", systemImage: "checkmark.shield")
+                    Label("Повторная проверка: обязательна с обязательством", systemImage: "checkmark.shield")
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 } else {
@@ -345,14 +350,23 @@ struct AlarmEditView: View {
                         set: { draft.recheckEnabled = $0 }
                     ))
                 }
+                if !draft.stakeEnabled {
+                    Toggle("Звонить, пока не выполню", isOn: Binding(
+                        get: { draft.repeatUntilDone != false },
+                        set: { draft.repeatUntilDone = $0 }
+                    ))
+                    Text("Нажали «Выключить», но задание не выполнили и легли снова: будильник зазвонит опять, каждые 5 минут, до 6 раз. Потом утро запишется как невыполненное, без списания.")
+                        .font(.app(.footnote))
+                        .foregroundStyle(.secondary)
+                }
                 if draft.stakeEnabled && !draft.effectiveTask.requiresGettingUp {
-                    Text("Для будильника со ставкой лучше «Сканировать код» или «Пройти шаги»: их нельзя выполнить, лёжа в кровати.")
+                    Text("Для будильника с обязательством лучше «Сканировать код» или «Пройти шаги»: их нельзя выполнить, лёжа в кровати.")
                         .font(.app(.footnote))
                         .foregroundStyle(.orange)
                 }
             }
         } footer: {
-            Text("Чтобы выключить будильник, нужно выполнить задание. Повторная проверка через 10 минут ловит «выполнил и лёг обратно»: со ставкой она обязательна, без ставки — по желанию. В парных челленджах с друзьями засчитываются только утра с повторной проверкой.")
+            Text("Чтобы выключить будильник, нужно выполнить задание. Повторная проверка через 10 минут ловит «выполнил и лёг обратно»: с обязательством она обязательна, без обязательства — по желанию. В парных челленджах с друзьями засчитываются только утра с повторной проверкой.")
         }
     }
 
@@ -360,7 +374,7 @@ struct AlarmEditView: View {
     private var stakeSection: some View {
         Section {
             if settings.data.isAdult {
-                Toggle("Со ставкой", isOn: $draft.stakeEnabled)
+                Toggle("С обязательством", isOn: $draft.stakeEnabled)
                 if draft.stakeEnabled {
                     HStack {
                         Text("Сумма")
@@ -371,8 +385,8 @@ struct AlarmEditView: View {
                             .frame(width: 100)
                         Text("₽").foregroundStyle(.secondary)
                     }
-                    if draft.stakeAmount <= 0 {
-                        Label("Укажите сумму больше нуля", systemImage: "exclamationmark.circle")
+                    if draft.stakeAmount < AppConfig.minObligation {
+                        Label("Минимальная сумма — \(AppConfig.minObligation) ₽", systemImage: "exclamationmark.circle")
                             .font(.app(.footnote))
                             .foregroundStyle(.orange)
                     } else if draft.stakeAmount >= 3000 {
@@ -392,13 +406,13 @@ struct AlarmEditView: View {
                     }
                 }
             } else {
-                Label("Ставки доступны с \(AppConfig.adultAge) лет. Подтвердить возраст можно в Профиле.", systemImage: "person.crop.circle.badge.exclamationmark")
+                Label("Обязательства доступны с \(AppConfig.adultAge) лет. Подтвердить возраст можно в Профиле.", systemImage: "person.crop.circle.badge.exclamationmark")
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Ставка")
+            Text("Обязательство")
         } footer: {
-            Text("Если не встанете, сумма спишется. Ставку видите только вы.")
+            Text("Если не встанете, сумма спишется. Обязательство видите только вы.")
         }
         .onChange(of: draft.stakeEnabled) { _, isOn in
             if isOn { draft.taskEnabled = true }

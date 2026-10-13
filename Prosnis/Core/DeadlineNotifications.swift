@@ -1,7 +1,7 @@
 import Foundation
 import UserNotifications
 
-/// Уведомление «время вышло» через 10 минут после звонка будильника со ставкой.
+/// Уведомление «время вышло» через 10 минут после звонка будильника с обязательством.
 /// Ставится заранее: iOS покажет его сама, даже если приложение закрыто. Снимается, когда задание начато.
 @MainActor
 enum DeadlineNotifications {
@@ -48,7 +48,7 @@ enum DeadlineNotifications {
     /// Идущая перестановка: следующая ждёт её окончания, чтобы две не перемешали уведомления.
     private static var chain: Task<Void, Never>?
 
-    /// Переставляет уведомления для будильников со ставкой на 10 дней вперёд. Берёт будильники в момент выполнения.
+    /// Переставляет уведомления для будильников с обязательством на 10 дней вперёд. Берёт будильники в момент выполнения.
     static func refresh() async {
         let previous = chain
         let task = Task { @MainActor in
@@ -68,7 +68,7 @@ enum DeadlineNotifications {
         return JournalStore.shared.hasEntry(alarmID: alarm.id, near: ring)
     }
 
-    /// Будильник всё ещё со ставкой и включён (между ожиданиями его могли изменить).
+    /// Будильник всё ещё с обязательством и включён (между ожиданиями его могли изменить).
     private static func stillStaked(_ alarmID: UUID) -> AlarmItem? {
         AlarmStore.shared.alarms.first { $0.id == alarmID && $0.isEnabled && AlarmStore.shared.isStakeActive($0) }
     }

@@ -7,6 +7,11 @@ enum Outcome: String, Codable {
     case technical  // сбой приложения или телефона: без списания
 }
 
+/// Виды записей дневника, которые не являются подъёмами.
+enum EntryKind: String, Codable {
+    case promise, challenge, focus
+}
+
 enum DisputeState: String, Codable {
     case none
     case pending    // спор отправлен и рассматривается по журналу и событиям утра
@@ -47,12 +52,14 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var routineTotal: Int?
     /// Ссылка на платёжную операцию по ставке этого утра.
     var paymentRef: UUID?
-    /// Была ли повторная проверка. false — утро без неё (будильник без ставки). nil — старые записи и пропуски.
+    /// Была ли повторная проверка. false — утро без неё (будильник без обязательства). nil — старые записи и пропуски.
     var rechecked: Bool?
     /// Списание ещё не показано карточкой в приложении (false). nil — показывать нечего или уже показано.
     var chargeSeen: Bool?
     /// Обещание по шагам, а не подъём: в серию, дерево, статус друзьям и челленджи не идёт.
     var isPromise: Bool?
+    /// Что за запись, если это не подъём: обещание, челлендж или фокус-сессия (все они вне серии и дерева).
+    var kind: EntryKind?
 
     /// Сколько реально списано по этой записи.
     var charged: Int {
@@ -94,13 +101,13 @@ enum StakeAdvisor {
         if fails >= 3 {
             let raised = max(current + 100, Int((Double(current) * 1.5 / 50).rounded()) * 50)
             return StakeHint(
-                text: "Вы проспали \(fails) из последних \(recent.count) раз. Возможно, ставка \(current) ₽ слишком мала. Попробуйте \(raised) ₽.",
+                text: "Вы проспали \(fails) из последних \(recent.count) раз. Возможно, обязательство \(current) ₽ слишком мала. Попробуйте \(raised) ₽.",
                 suggested: raised
             )
         }
         if fails == 0 {
             return StakeHint(
-                text: "Последние \(recent.count) раз вы вставали вовремя. Ставка \(current) ₽ работает, менять её не нужно.",
+                text: "Последние \(recent.count) раз вы вставали вовремя. Обязательство \(current) ₽ работает, менять его не нужно.",
                 suggested: nil
             )
         }

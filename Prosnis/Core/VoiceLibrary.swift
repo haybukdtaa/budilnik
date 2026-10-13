@@ -67,7 +67,7 @@ final class VoiceLibrary: ObservableObject {
         let manager = FileManager.default
         let recording = VoiceRecording(
             id: UUID(),
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Мой голос" : title,
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? VoiceLibrary.defaultTitle() : title,
             createdAt: Date()
         )
         do {
@@ -82,6 +82,48 @@ final class VoiceLibrary: ObservableObject {
         recordings.append(recording)
         file.save(recordings)
         return recording.soundID
+    }
+
+    /// Название по умолчанию: «Голос · 11 окт, 07:12».
+    nonisolated static func defaultTitle(_ date: Date = Date(), calendar: Calendar = .current) -> String {
+        let months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
+        let parts = calendar.dateComponents([.day, .month, .hour, .minute], from: date)
+        let month = months[max(0, min(11, (parts.month ?? 1) - 1))]
+        let time = String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+        return "Голос · \(parts.day ?? 1) \(month), \(time)"
+    }
+
+    /// Переименовывает запись. Пустое название игнорируется.
+    func rename(_ recording: VoiceRecording, to title: String) {
+        reloadIfNeeded()
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !loadFailed, !clean.isEmpty, let index = recordings.firstIndex(where: { $0.id == recording.id }) else { return }
+        recordings[index].title = clean
+        file.save(recordings)
+    }
+
+    /// Заменяет звук записи новым из черновика. Номер и название остаются, поэтому будильники с этой записью
+    /// менять не нужно: они сами зазвонят новым голосом.
+    @discardableResult
+    func replaceAudio(of recording: VoiceRecording) -> Bool {
+        reloadIfNeeded()
+        guard !loadFailed, recordings.contains(where: { $0.id == recording.id }),
+              FileManager.default.fileExists(atPath: VoiceLibrary.draftURL.path) else { return false }
+        let manager = FileManager.default
+        let target = VoiceLibrary.fileURL(soundID: recording.soundID)
+        do {
+            if manager.fileExists(atPath: target.path) {
+                _ = try manager.replaceItemAt(target, withItemAt: VoiceLibrary.draftURL)
+            } else {
+                try manager.createDirectory(at: VoiceLibrary.soundsFolder, withIntermediateDirectories: true)
+                try manager.moveItem(at: VoiceLibrary.draftURL, to: target)
+            }
+            try? manager.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: target.path)
+        } catch {
+            return false
+        }
+        objectWillChange.send()
+        return true
     }
 
     /// Будильники, на которых стоит эта запись.

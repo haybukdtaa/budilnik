@@ -240,14 +240,17 @@ final class AccountStore: ObservableObject {
             return "Сейчас идёт утренняя проверка. Удалить данные можно после её окончания."
         }
         if AlarmStore.shared.alarms.contains(where: { AlarmStore.shared.isLocked($0) }) {
-            return "Будильник со ставкой зазвонит меньше чем через 2 часа. Удалить данные можно после утра."
+            return "Будильник с обязательством зазвонит меньше чем через 2 часа. Удалить данные можно после утра."
         }
         if PromiseStore.shared.hasActive {
-            return "Есть обещание по шагам, которое скоро начнётся или идёт. Удалить данные можно после него."
+            return "Есть непроверенное обещание по шагам. Удалить аккаунт и данные можно после того, как оно будет проверено."
+        }
+        if ChallengeStore.shared.hasActiveStake {
+            return "Идёт челлендж с обязательством. Удалить данные можно после его окончания."
         }
         await PaymentsStore.shared.retryPending()
         if PaymentsStore.shared.hasOpenOperations {
-            return "Есть незавершённые операции по ставкам. Попробуйте позже, когда они завершатся."
+            return "Есть незавершённые операции по обязательствам. Попробуйте позже, когда они завершатся."
         }
         let backend = BackendRegistry.current
         if backend.isOnline && !backend.isDemo {

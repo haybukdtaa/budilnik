@@ -73,13 +73,13 @@ struct ProfileView: View {
                 Section("Настройки") {
                     NavigationLink { ModulesView() } label: { Label("Модули и чек-листы", systemImage: "square.grid.2x2") }
                     NavigationLink { PrivacyView() } label: { Label("Приватность", systemImage: "hand.raised") }
-                    NavigationLink { PaymentsView() } label: { Label("Ставки и платежи", systemImage: "creditcard") }
+                    NavigationLink { PaymentsView() } label: { Label("Обязательства и платежи", systemImage: "creditcard") }
                 }
 
                 Section {
                     Toggle("Мне \(AppConfig.adultAge) лет или больше", isOn: $settings.data.isAdult)
                 } footer: {
-                    Text("Ставки и чаты доступны только совершеннолетним.")
+                    Text("Обязательства и чаты доступны только совершеннолетним.")
                 }
 
                 Section {
@@ -239,7 +239,7 @@ struct PrivacyView: View {
             } header: {
                 Text("Что могут видеть друзья")
             } footer: {
-                Text("Всё выключено по умолчанию. Для каждого друга можно сузить список в его карточке. Ставки, деньги и дневник подъёмов не видит никто.")
+                Text("Всё выключено по умолчанию. Для каждого друга можно сузить список в его карточке. Обязательства, деньги и дневник подъёмов не видит никто.")
             }
 
             Section {
@@ -303,7 +303,7 @@ struct PaymentsView: View {
             } header: {
                 Text("Способ оплаты")
             } footer: {
-                Text("Сейчас ставки тренировочные: операции записываются, но деньги не двигаются. Карта и СБП подключаются после регистрации, без переделки остального приложения.")
+                Text("Сейчас обязательства тренировочные: операции записываются, но деньги не двигаются. Карта и СБП подключаются после регистрации, без переделки остального приложения.")
             }
 
             Section("Операции (видны только вам)") {
@@ -326,7 +326,7 @@ struct PaymentsView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Theme.background)
-        .navigationTitle("Ставки и платежи")
+        .navigationTitle("Обязательства и платежи")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

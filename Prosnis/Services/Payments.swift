@@ -18,7 +18,7 @@ enum LedgerKind: String, Codable {
 
     var title: String {
         switch self {
-        case .hold: return "Блокировка ставки"
+        case .hold: return "Блокировка суммы"
         case .capture: return "Списание"
         case .release: return "Снятие блокировки"
         case .refund: return "Возврат"
@@ -76,7 +76,7 @@ struct PendingOutcome: Codable, Equatable {
     var attempts: Int?
 }
 
-/// Ставки и деньги. Данные хранятся отдельно от всего социального и никогда не публикуются.
+/// Обязательства и деньги. Данные хранятся отдельно от всего социального и никогда не публикуются.
 /// Всё незавершённое (итоги, возвраты) сохраняется на диск и повторяется при следующем запуске.
 @MainActor
 final class PaymentsStore: ObservableObject {

@@ -44,7 +44,7 @@ struct BedtimeView: View {
                 Section("Не забудьте") {
                     Label("Положите телефон на зарядку", systemImage: "bolt.fill")
                     Label("Проверьте громкость: звонок должен быть слышен", systemImage: "speaker.wave.2.fill")
-                    Label("Не закрывайте приложение: оно нужно утром для задания", systemImage: "app.badge")
+                    Label("Ничего закрывать не нужно: после «Выключить» само откроется задание", systemImage: "app.badge")
                 }
                 .foregroundStyle(.secondary)
 
@@ -96,11 +96,11 @@ struct BedtimeView: View {
             let minutes = Int(date.timeIntervalSinceNow / 60)
             row(
                 ok: true,
-                good: "Ближайший со ставкой: \(alarm.timeText) «\(alarm.displayTitle)», через \(minutes / 60) ч \(minutes % 60) мин, ставка \(alarm.stakeAmount) ₽",
+                good: "Ближайший с обязательством: \(alarm.timeText) «\(alarm.displayTitle)», через \(minutes / 60) ч \(minutes % 60) мин, обязательство \(alarm.stakeAmount) ₽",
                 bad: ""
             )
         } else {
-            row(ok: false, good: "", bad: "Нет включённого будильника со ставкой")
+            row(ok: false, good: "", bad: "Нет включённого будильника с обязательством")
         }
     }
 

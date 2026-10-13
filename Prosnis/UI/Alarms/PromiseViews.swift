@@ -61,7 +61,7 @@ struct PromiseDetailView: View {
                 Section {
                     row("Окно", "\(Format.dayMonth(promise.start)), \(promise.windowText)")
                     row("Нужно шагов", "\(promise.minSteps)")
-                    row("Ставка", "\(promise.stake) ₽")
+                    row("Обязательство", "\(promise.stake) ₽")
                     if now >= promise.start {
                         row("Сейчас", "\(store.liveSteps[promise.id] ?? 0) шагов")
                     }
@@ -70,13 +70,17 @@ struct PromiseDetailView: View {
                 }
                 Section {
                     if locked {
-                        Label("Изменить или удалить можно не позже чем за 2 часа до начала.", systemImage: "lock.fill")
+                        Label("Отменить нельзя: с создания прошло больше 5 минут.", systemImage: "lock.fill")
                             .foregroundStyle(Theme.accent)
                     } else {
-                        Button("Удалить обещание", role: .destructive) {
+                        let left = max(1, Int((promise.createdAt.addingTimeInterval(PromiseRules.cancelWindow).timeIntervalSince(now) / 60).rounded(.up)))
+                        Button("Отменить обещание", role: .destructive) {
                             message = store.delete(promise)
                             if message == nil { dismiss() }
                         }
+                        Text("Отменить можно ещё \(left) мин. Потом обещание останется до проверки шагов.")
+                            .font(.app(.footnote))
+                            .foregroundStyle(.secondary)
                     }
                     if let message { Text(message).font(.app(.footnote)).foregroundStyle(Theme.accent) }
                 }
@@ -110,6 +114,7 @@ struct PromiseEditView: View {
     @State private var agreed = false
     @State private var message: String?
     @State private var showTerms = false
+    @State private var showConfirm = false
     /// Номер последнего запроса доступа: поздний ответ на отменённый запрос игнорируется.
     @State private var accessRequest = 0
 
@@ -135,18 +140,16 @@ struct PromiseEditView: View {
                     Stepper("Не меньше \(minSteps) шагов", value: $minSteps, in: 500...50000, step: 500)
                 } footer: {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Нужно набрать шаги с \(Format.time(start)) до \(Format.time(end)). Не набрали — ставка спишется.")
-                        if PromiseRules.isLocked(StepPromise(start: start, end: end), now: TrustedClock.now) {
-                            Text("До начала меньше 2 часов: после создания обещание уже нельзя будет изменить или удалить.")
-                                .foregroundStyle(Theme.accent)
-                        }
+                        Text("Нужно набрать шаги с \(Format.time(start)) до \(Format.time(end)). Не набрали — сумма спишется.")
+                        Text("Отменить обещание можно только в течение 5 минут после создания. Потом его нельзя ни отменить, ни изменить.")
+                            .foregroundStyle(Theme.accent)
                     }
                 }
 
                 Section {
                     if settings.data.isAdult {
                         HStack {
-                            Text("Ставка")
+                            Text("Обязательство")
                             Spacer()
                             TextField("500", value: $stake, format: .number)
                                 .keyboardType(.numberPad)
@@ -154,8 +157,13 @@ struct PromiseEditView: View {
                                 .frame(width: 100)
                             Text("₽").foregroundStyle(.secondary)
                         }
+                        if stake < AppConfig.minObligation {
+                            Label("Минимальная сумма — \(AppConfig.minObligation) ₽", systemImage: "exclamationmark.circle")
+                                .font(.app(.footnote))
+                                .foregroundStyle(.orange)
+                        }
                     } else {
-                        Label("Ставки доступны с \(AppConfig.adultAge) лет. Подтвердить возраст можно в Профиле.", systemImage: "person.crop.circle.badge.exclamationmark")
+                        Label("Обязательства доступны с \(AppConfig.adultAge) лет. Подтвердить возраст можно в Профиле.", systemImage: "person.crop.circle.badge.exclamationmark")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -179,7 +187,7 @@ struct PromiseEditView: View {
                         }
                     ))
                 } footer: {
-                    Text("Шаги берутся только из счётчика телефона и никуда не уходят. Телефон должен быть с вами. Изменить или удалить обещание можно не позже чем за 2 часа до начала.")
+                    Text("Шаги берутся только из счётчика телефона и никуда не уходят. Телефон должен быть с вами. Шаги проверяются при открытии приложения и, если система позволит, в фоне.")
                 }
 
                 if let message {
@@ -194,15 +202,25 @@ struct PromiseEditView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Создать") { save() }
-                        .disabled(!agreed || stake <= 0 || !settings.data.isAdult)
+                        .disabled(!agreed || stake < AppConfig.minObligation || !settings.data.isAdult)
                 }
             }
             .sheet(isPresented: $showTerms) {
                 StakeTermsView(amount: stake) {
                     settings.acceptStakeTerms(amount: stake)
                     showTerms = false
-                    create()
+                    // Окно предупреждения показываем, когда окно условий уже закрылось.
+                    Task {
+                        try? await Task.sleep(nanoseconds: 600_000_000)
+                        showConfirm = true
+                    }
                 }
+            }
+            .alert("Создать обещание?", isPresented: $showConfirm) {
+                Button("Создать") { create() }
+                Button("Отмена", role: .cancel) {}
+            } message: {
+                Text("Отменить обещание можно только в течение 5 минут после создания. Потом его нельзя ни отменить, ни изменить: если не наберёте \(minSteps) шагов, спишется \(stake) ₽.")
             }
         }
     }
@@ -221,7 +239,7 @@ struct PromiseEditView: View {
         if StakeTerms.needsConsent(settings.data.stakeConsent, amount: stake) {
             showTerms = true
         } else {
-            create()
+            showConfirm = true
         }
     }
 

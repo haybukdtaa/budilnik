@@ -19,6 +19,23 @@ struct AlarmListView: View {
             TimelineView(.everyMinute) { context in
                 list(now: context.date)
             }
+            .overlay(alignment: .bottom) {
+                if let toast = store.toast {
+                    Text(toast)
+                        .font(.app(.subheadline))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Theme.card, in: Capsule())
+                        .overlay(Capsule().stroke(Theme.separator))
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .task(id: toast) {
+                            try? await Task.sleep(nanoseconds: 4_000_000_000)
+                            if store.toast == toast { store.toast = nil }
+                        }
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: store.toast)
             .background(Theme.background)
             .navigationTitle("Будильники")
             .toolbar {
@@ -175,7 +192,7 @@ private struct AlarmRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 if alarm.stakeEnabled {
-                    Text("Ставка \(alarm.stakeAmount) ₽")
+                    Text("Обязательство \(alarm.stakeAmount) ₽")
                         .font(.app(.caption))
                         .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 9)

@@ -69,7 +69,7 @@ struct MorningPhotoCard: View {
     }
 }
 
-/// «Мои утра»: фото по месяцам, просмотр роликом и сохранение видео.
+/// «Альбом»: фото по месяцам, просмотр роликом и сохранение видео.
 struct MorningPhotosView: View {
     @ObservedObject private var photos = MorningPhotoStore.shared
     @State private var month: String?
@@ -148,7 +148,7 @@ struct MorningPhotosView: View {
             .padding(16)
         }
         .background(Theme.background)
-        .navigationTitle("Мои утра")
+        .navigationTitle("Альбом")
         // Фото удалили или пересняли: старый ролик уже не тот.
         .onChange(of: photos.days) { _, _ in exported = nil }
         .fullScreenCover(isPresented: $showSlideshow) {
@@ -160,7 +160,7 @@ struct MorningPhotosView: View {
         exporting = true
         exportError = nil
         let urls = days.map { MorningPhotoStore.url(for: $0) }
-        let output = FileManager.default.temporaryDirectory.appendingPathComponent("Мои утра \(currentMonth ?? "").mp4")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("Альбом \(currentMonth ?? "").mp4")
         Task {
             let result: Result<URL, Error> = await Task.detached(priority: .userInitiated) {
                 do {

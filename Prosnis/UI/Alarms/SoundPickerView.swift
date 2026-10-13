@@ -5,15 +5,17 @@ struct SoundPickerView: View {
     @Binding var selection: String
     @ObservedObject private var voices = VoiceLibrary.shared
     @State private var deleteProblem: String?
+    @State private var editingVoice: VoiceRecording?
 
     var body: some View {
         List {
             Section {
                 ForEach(voices.recordings) { recording in
-                    let option = SoundLibrary.option(recording.soundID)
-                    row(option)
+                    voiceRow(recording)
                         .swipeActions {
                             Button("Удалить", role: .destructive) { delete(recording) }
+                            Button("Изменить") { editingVoice = recording }
+                                .tint(Theme.burgundy)
                         }
                 }
                 NavigationLink {
@@ -26,7 +28,7 @@ struct SoundPickerView: View {
             } header: {
                 Text("Мой голос")
             } footer: {
-                Text("Запишите себе утреннее послание: «Вставай, сегодня важный день!». Запись до 30 секунд, хранится только на телефоне.")
+                Text("Запишите себе утреннее послание: «Вставай, сегодня важный день!». Запись до 30 секунд, хранится только на телефоне. Нажмите на карандаш, чтобы переименовать запись или записать её заново.")
             }
 
             ForEach(SoundCategory.allCases, id: \.self) { category in
@@ -42,10 +44,43 @@ struct SoundPickerView: View {
         .navigationTitle("Звук")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { SoundPreview.shared.stop() }
+        .sheet(item: $editingVoice) { VoiceEditView(recording: $0) }
         .alert("Запись не удалена", isPresented: Binding(get: { deleteProblem != nil }, set: { if !$0 { deleteProblem = nil } })) {
             Button("Понятно", role: .cancel) {}
         } message: {
             Text(deleteProblem ?? "")
+        }
+    }
+
+    /// Своя запись: нажатие выбирает и проигрывает, карандаш открывает переименование и перезапись.
+    private func voiceRow(_ recording: VoiceRecording) -> some View {
+        let option = SoundLibrary.option(recording.soundID)
+        return HStack(spacing: 12) {
+            Button {
+                selection = option.id
+                SoundPreview.shared.play(option)
+            } label: {
+                HStack {
+                    Image(systemName: "waveform").foregroundStyle(Theme.accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(recording.title).foregroundStyle(.primary)
+                        Text(Format.dateTime(recording.createdAt))
+                            .font(.app(.caption))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if option.id == selection {
+                        Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                    }
+                }
+            }
+            .buttonStyle(.borderless)
+            Button {
+                editingVoice = recording
+            } label: {
+                Image(systemName: "pencil").foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.borderless)
         }
     }
 
@@ -86,7 +121,7 @@ struct SoundPickerView: View {
 struct VoiceRecorderView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var recorder = VoiceRecorder()
-    @State private var title = "Мой голос"
+    @State private var title = ""
     let onSaved: (String) -> Void
 
     var body: some View {
@@ -110,7 +145,7 @@ struct VoiceRecorderView: View {
 
             if recorder.state == .recorded {
                 Section("Название") {
-                    TextField("Мой голос", text: $title)
+                    TextField(VoiceLibrary.defaultTitle(), text: $title)
                 }
                 Section {
                     Button("Сохранить и поставить на будильник") {
@@ -160,6 +195,99 @@ struct VoiceRecorderView: View {
         case .recording: return "Говорите. Запись остановится сама через 30 секунд."
         case .recorded: return "Прослушайте запись. Если нравится — сохраните."
         case .idle: return "Скажите себе то, что поможет встать: зачем вы встаёте, что ждёт вас сегодня."
+        }
+    }
+}
+
+/// Переименование и перезапись своего голоса. Номер записи не меняется, поэтому будильники с ней менять не нужно.
+struct VoiceEditView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var recorder = VoiceRecorder()
+    let recording: VoiceRecording
+    @State private var title: String
+    @State private var replaced = false
+
+    init(recording: VoiceRecording) {
+        self.recording = recording
+        _title = State(initialValue: recording.title)
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Название") {
+                    TextField("Название", text: $title)
+                }
+                Section {
+                    Button {
+                        recorder.play(VoiceLibrary.fileURL(soundID: recording.soundID))
+                    } label: {
+                        Label("Прослушать запись", systemImage: "play.fill")
+                    }
+                }
+                Section {
+                    controls
+                } header: {
+                    Text("Записать заново")
+                } footer: {
+                    Text(message)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
+            .navigationTitle("Моя запись")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Закрыть") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Готово") {
+                        VoiceLibrary.shared.rename(recording, to: title)
+                        dismiss()
+                    }
+                    .bold()
+                }
+            }
+            .onDisappear {
+                if recorder.state == .recording { recorder.stop() }
+                recorder.stopPlayback()
+                recorder.discard()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var controls: some View {
+        switch recorder.state {
+        case .recording:
+            Button("Остановить (\(Int(recorder.elapsed)) с)") { recorder.stop() }
+                .buttonStyle(.stop)
+        case .recorded:
+            Button("Прослушать новую запись") { recorder.playDraft() }
+            Button("Заменить старую запись новой") {
+                recorder.stopPlayback()
+                if VoiceLibrary.shared.replaceAudio(of: recording) {
+                    replaced = true
+                    recorder.discard()
+                }
+            }
+            .bold()
+            Button("Отменить новую запись", role: .destructive) { recorder.discard() }
+        default:
+            Button("Начать запись") {
+                replaced = false
+                Task { await recorder.start() }
+            }
+        }
+    }
+
+    private var message: String {
+        if replaced { return "Запись заменена. Будильники, где она стоит, зазвонят новым голосом." }
+        switch recorder.state {
+        case .denied: return "Нет доступа к микрофону. Разрешите его в Настройках iPhone → Prosnis."
+        case .failed: return "Запись не получилась. Попробуйте ещё раз и говорите хотя бы секунду."
+        case .recording: return "Говорите. Запись остановится сама через 30 секунд."
+        case .recorded: return "Прослушайте новую запись. Если нравится, замените ею старую."
+        case .idle: return "Новая запись заменит старую под тем же названием."
         }
     }
 }

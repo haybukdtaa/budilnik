@@ -7,6 +7,15 @@ struct ChargeCardView: View {
     let onDismiss: () -> Void
     let onDispute: () -> Void
 
+    static func heading(_ entry: JournalEntry) -> String {
+        switch entry.kind {
+        case .challenge?: return "Челлендж сорван"
+        case .focus?: return "Фокус-сессия не засчитана"
+        case .promise?: return "Обещание не выполнено"
+        case nil: return entry.isPromise == true ? "Обещание не выполнено" : "Вы проспали"
+        }
+    }
+
     var body: some View {
         VStack(spacing: 22) {
             Spacer()
@@ -14,7 +23,7 @@ struct ChargeCardView: View {
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(Theme.accent)
             VStack(spacing: 6) {
-                Text(entry.isPromise == true ? "Обещание не выполнено" : "Вы проспали").font(.app(.title))
+                Text(ChargeCardView.heading(entry)).font(.app(.title))
                 Text(Format.dateTime(entry.date))
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)

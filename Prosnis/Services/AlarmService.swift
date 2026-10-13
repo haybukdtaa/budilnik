@@ -96,7 +96,8 @@ final class AlarmService {
     }
 
     private func stopIntent(for item: AlarmItem, systemID: UUID) -> (any LiveActivityIntent)? {
-        guard item.hasTask else { return nil }
+        // Заметка без задания тоже требует открыть приложение, чтобы её показать.
+        guard item.hasTask || item.trimmedNote != nil else { return nil }
         return WakeStopIntent(alarmID: item.id.uuidString, systemID: systemID.uuidString, isRecheck: false)
     }
 
@@ -218,7 +219,7 @@ final class AlarmService {
         /// Разрешение на будильники выключил сам человек.
         case permissionMissing
         /// Будильник с меняющимся временем не поставлен, потому что приложение не открывали дольше 10 дней.
-        /// Об этом предупреждают условия ставки и напоминание: это ответственность человека.
+        /// Об этом предупреждают условия обязательства и напоминание: это ответственность человека.
         case notRefreshed
         /// Сбой системы или приложения: человек не виноват.
         case systemFailure
@@ -394,6 +395,29 @@ final class AlarmService {
         } catch {
             return nil
         }
+    }
+
+    /// Запасные звонки, пока задание не выполнено. Возвращает идентификаторы поставленных; сбой одного не отменяет остальных.
+    func scheduleRepeats(alarmID: UUID, title: String, soundID: String, dates: [Date]) async -> [UUID] {
+        guard await ensureAuthorization() else { return [] }
+        var ids: [UUID] = []
+        for date in dates where date > Date().addingTimeInterval(5) {
+            let systemID = UUID()
+            protect(systemID)
+            let configuration = AlarmManager.AlarmConfiguration.alarm(
+                schedule: .fixed(date),
+                attributes: attributes(title: title),
+                stopIntent: WakeStopIntent(alarmID: alarmID.uuidString, systemID: systemID.uuidString, isRecheck: false),
+                sound: .named(SoundLibrary.option(soundID).fileName)
+            )
+            do {
+                _ = try await manager.schedule(id: systemID, configuration: configuration)
+                ids.append(systemID)
+            } catch {
+                continue
+            }
+        }
+        return ids
     }
 
     /// Громкое напоминание о лекарстве. Возвращает id системного будильника или nil.
