@@ -64,7 +64,7 @@ struct AlarmEditView: View {
     private var canSave: Bool {
         if draft.hasTask && draft.effectiveTask == .qr && (draft.qrCode ?? "").isEmpty { return false }
         // Ставка без суммы бессмысленна: будильник закрывается для изменений, а на кону ничего нет.
-        if draft.stakeEnabled && draft.stakeAmount < AppConfig.minObligation { return false }
+        if draft.stakeEnabled && settings.data.isAdult && draft.stakeAmount < AppConfig.minObligation { return false }
         return true
     }
 
@@ -97,7 +97,7 @@ struct AlarmEditView: View {
 
                 Section {
                     TextField("Название", text: $draft.label)
-                    TextField("Заметка себе (после первого задания)", text: Binding(
+                    TextField("Заметка себе (покажется при выключении)", text: Binding(
                         get: { draft.note ?? "" },
                         set: { draft.note = $0 }
                     ), axis: .vertical)
@@ -379,10 +379,7 @@ struct AlarmEditView: View {
                     HStack {
                         Text("Сумма")
                         Spacer()
-                        TextField("500", value: $draft.stakeAmount, format: .number)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 100)
+                        AmountField(value: $draft.stakeAmount)
                         Text("₽").foregroundStyle(.secondary)
                     }
                     if draft.stakeAmount < AppConfig.minObligation {

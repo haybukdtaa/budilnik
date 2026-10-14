@@ -39,16 +39,22 @@ final class ChallengeStore: ObservableObject {
     }
 
     func add(_ challenge: Challenge) {
-        challenges.append(challenge)
+        var item = challenge
+        if let amount = item.stake, amount < AppConfig.minObligation { item.stake = AppConfig.minObligation }
+        challenges.append(item)
         save()
-        sync(challenge)
+        sync(item)
         evaluateAll()
     }
 
     /// Добавляет челленджи, восстановленные с сервера (которых ещё нет на телефоне).
     func mergeRestored(_ restored: [Challenge]) {
         let known = Set(challenges.map(\.id))
-        let added = restored.filter { !known.contains($0.id) }
+        let added = restored.filter { !known.contains($0.id) }.map { item -> Challenge in
+            var copy = item
+            if let amount = copy.stake, amount < AppConfig.minObligation { copy.stake = AppConfig.minObligation }
+            return copy
+        }
         guard !added.isEmpty else { return }
         challenges += added
         save()
@@ -74,12 +80,12 @@ final class ChallengeStore: ObservableObject {
         sync(challenges[index])
     }
 
-    func progress(for challenge: Challenge, now: Date = Date()) -> ChallengeProgress {
+    func progress(for challenge: Challenge, now: Date = TrustedClock.now) -> ChallengeProgress {
         ChallengeEvaluator.evaluate(challenge, entries: JournalStore.shared.realEntries, now: now)
     }
 
     /// Пересчитывает статусы идущих челленджей по журналу.
-    func evaluateAll(now: Date = Date()) {
+    func evaluateAll(now: Date = TrustedClock.now) {
         var changed = false
         var failed: [(Challenge, ChallengeProgress)] = []
         for index in challenges.indices where challenges[index].status == .active {
@@ -96,6 +102,13 @@ final class ChallengeStore: ObservableObject {
         if changed { save() }
         // Списание — после того, как статусы сохранены: запись в дневник снова пересчитывает челленджи.
         for (challenge, result) in failed { chargeFailure(challenge, result) }
+        // Приложение закрыли между «сорван» и записью списания: догоняем.
+        for challenge in challenges where challenge.status == .failed && challenge.hasStake
+            && !failed.contains(where: { $0.0.id == challenge.id })
+            && !JournalStore.shared.entries.contains(where: { $0.id == challenge.id }) {
+            let result = progress(for: challenge, now: now)
+            if result.status == .failed { chargeFailure(challenge, result) }
+        }
     }
 
     /// Челлендж сорван: сумма списывается один раз. Если в то же утро списана сумма будильника,
@@ -132,6 +145,8 @@ final class ChallengeStore: ObservableObject {
             outcome: .failed,
             events: events,
             isTraining: PaymentsStore.shared.isTraining,
+            // Челлендж по Фаджру: запись о нём не уходит на сервер без согласия, как и сам челлендж.
+            isPrayer: challenge.isPrivate ? true : nil,
             paymentRef: reference,
             chargeSeen: false,
             isPromise: true,

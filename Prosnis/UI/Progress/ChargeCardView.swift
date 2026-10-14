@@ -31,6 +31,11 @@ struct ChargeCardView: View {
             VStack(spacing: 4) {
                 Text("Списано").font(.app(.subheadline)).foregroundStyle(.secondary)
                 Text("\(entry.stake) ₽").font(.app(.largeTitle))
+                if entry.isTraining {
+                    Text("Тренировка: деньги не тронуты")
+                        .font(.app(.caption))
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)

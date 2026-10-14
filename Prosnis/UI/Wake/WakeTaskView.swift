@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Экран задания: выполнить задание, пока не вышло время.
 struct WakeTaskView: View {
@@ -13,7 +14,7 @@ struct WakeTaskView: View {
             Color.black.opacity(0.6).ignoresSafeArea()
 
             VStack(spacing: 14) {
-                Text(session.stage == 1 ? "Задание 1 из 2" : "Повторная проверка · задание 2 из 2")
+                Text(session.stage == 1 ? (session.needsRecheck ? "Задание 1 из 2" : "Задание") : "Повторная проверка · задание 2 из 2")
                     .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
 
@@ -46,6 +47,9 @@ struct WakeTaskView: View {
             }
             .padding(20)
         }
+        // Пока идёт задание (ходьба, камера), экран не должен погаснуть.
+        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
         .id("\(session.alarmID)-\(session.startDate.timeIntervalSince1970)-\(session.stage)-\(session.taskKind.rawValue)")
         .task {
             while !Task.isCancelled {

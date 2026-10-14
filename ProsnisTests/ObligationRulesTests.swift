@@ -114,3 +114,23 @@ final class ObligationRulesTests: XCTestCase {
         XCTAssertTrue(decoded.medsEnabled, "Вкладка «Лекарства» показывается всегда")
     }
 }
+
+final class AuditFixesTests: XCTestCase {
+    func testTypingTreatsYoAndYeAsTheSameLetter() {
+        XCTAssertEqual(TypingFold.fold("Ёлка и всё"), TypingFold.fold("Елка и все"))
+        XCTAssertEqual(TypingFold.fold("ёж").count, 2, "Длина не меняется: подсветка по буквам остаётся верной")
+    }
+
+    func testTermsAreNeutralAboutWhatTheObligationIsFor() {
+        let text = StakeTerms.clauses(amount: 400, isTraining: false).first ?? ""
+        XCTAssertTrue(text.contains("400 ₽"))
+        XCTAssertTrue(text.contains("фокус-сессию"))
+        XCTAssertTrue(StakeTerms.clauses(amount: 400, isTraining: false)[1].contains("от звонка"),
+                      "Десять минут считаются от звонка, а не от нажатия «Выключить»")
+    }
+
+    func testPrayerChallengeIsPrivate() {
+        let prayer = Challenge(title: "Фаджр", goal: .prayer, startDate: T.date(2026, 10, 8), stake: 500)
+        XCTAssertTrue(prayer.isPrivate, "Запись о его провале помечается как намаз и не уходит без согласия")
+    }
+}

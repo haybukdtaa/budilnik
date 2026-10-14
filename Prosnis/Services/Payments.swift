@@ -216,16 +216,18 @@ final class PaymentsStore: ObservableObject {
         }
         let task = Task { () -> Void in
             do {
+                // Блокировка и итог снимаются в памяти до записи на диск: запись одна, а не две.
                 if success {
                     try await provider.release(hold)
+                    holds[reference] = nil
+                    pendingOutcomes[reference] = nil
                     record(.release, amount: hold.amount, reference: reference)
                 } else {
                     try await provider.capture(hold)
+                    holds[reference] = nil
+                    pendingOutcomes[reference] = nil
                     record(.capture, amount: hold.amount, reference: reference)
                 }
-                holds[reference] = nil
-                pendingOutcomes[reference] = nil
-                save()
             } catch {
                 markOutcome(reference: reference, success: success, amount: hold.amount)
             }
@@ -290,6 +292,9 @@ final class PaymentsStore: ObservableObject {
             }
             // Возвращаем только реально списанное.
             if ledger.contains(where: { $0.reference == reference && $0.kind == .capture }) {
+                // Возврат записывается до обращения к платёжному модулю: если приложение закроют, он повторится.
+                pendingRefunds[reference] = amount
+                save()
                 await performRefund(reference: reference, amount: amount)
             }
         }

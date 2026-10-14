@@ -184,6 +184,7 @@ final class WakeCoordinator: ObservableObject {
         current.events.append(JournalEvent(date: current.ringDate, text: "Прозвенела повторная проверка"))
         current.events.append(JournalEvent(date: now, text: noteText))
         setSession(current)
+        prepareForTask()
         evaluate(now)
     }
 
@@ -246,7 +247,23 @@ final class WakeCoordinator: ObservableObject {
         DeadlineNotifications.cancel(alarmID: alarm.id, ring: morningRing)
         if let started = session { emit(.started, session: started, at: now) }
         if untilDone, let started = session { armRepeats(started) }
+        prepareForTask()
         evaluate(now)
+    }
+
+    /// Задание должно появиться поверх всего: утренний экран возвращается в очередь, остальные окна закрываются.
+    private func prepareForTask() {
+        if let shown = morning {
+            pendingMornings.insert(shown, at: 0)
+            morning = nil
+        }
+        guard !FocusStore.shared.showsCover else { return }
+        ModalDismisser.dismissAll()
+        // Окно задания запрашивается ещё раз, когда прежние окна точно закрылись.
+        Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            objectWillChange.send()
+        }
     }
 
     /// Ставит запасные звонки: каждые 5 минут от первого звонка, не больше 6.

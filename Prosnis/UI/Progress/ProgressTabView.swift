@@ -350,10 +350,7 @@ struct ChallengeEditView: View {
                             HStack {
                                 Text("Сумма")
                                 Spacer()
-                                TextField("500", value: $stake, format: .number)
-                                    .keyboardType(.numberPad)
-                                    .multilineTextAlignment(.trailing)
-                                    .frame(width: 100)
+                                AmountField(value: $stake)
                                 Text("₽").foregroundStyle(.secondary)
                             }
                             if stake < AppConfig.minObligation {

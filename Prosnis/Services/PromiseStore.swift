@@ -50,7 +50,9 @@ enum StepCounting {
         guard isAvailable else { return .unavailable }
         // Системный запрос доступа при чтении не показываем: отказ — только явный «Не разрешать».
         switch CMPedometer.authorizationStatus() {
-        case .denied, .restricted: return .denied
+        case .denied: return .denied
+        // Доступ запрещён родительским контролем или администратором: человек его не выключал, не списываем.
+        case .restricted: return .unavailable
         case .notDetermined: return .needsAccess
         default: break
         }

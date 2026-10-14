@@ -50,7 +50,10 @@ struct FileStore<Value: Codable> {
     }
 
     func delete() {
-        try? FileManager.default.removeItem(at: url)
+        let manager = FileManager.default
+        // Файл, который сейчас нельзя прочитать (телефон не разблокирован), не удаляем: в нём могут быть данные.
+        if manager.fileExists(atPath: url.path), (try? Data(contentsOf: url)) == nil { return }
+        try? manager.removeItem(at: url)
     }
 }
 

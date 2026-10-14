@@ -14,9 +14,13 @@ struct NoteView: View {
             Text(state.alarmTitle)
                 .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
-            Text(state.text)
-                .font(.app(.title2, weight: .semibold))
-                .multilineTextAlignment(.center)
+            ScrollView {
+                Text(state.text)
+                    .font(.app(.title2, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(maxHeight: 340)
             Spacer()
             Button {
                 wake.dismissNote()

@@ -222,7 +222,7 @@ private struct AlarmRow: View {
             Spacer()
 
             Toggle(
-                "",
+                alarm.displayTitle,
                 isOn: Binding(
                     get: { alarm.isEnabled },
                     set: { store.setEnabled(alarm, $0) }

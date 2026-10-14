@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 import Security
 import SwiftUI
 import UIKit
@@ -285,6 +286,9 @@ final class AccountStore: ObservableObject {
         FocusStore.shared.reload()
         await PromiseStore.shared.cancelAllNotifications()
         await WeeklyNotification.update(enabled: false)
+        // Ни одно запланированное уведомление («Списано …», напоминания) не должно пережить удаление данных.
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         // Последним: перезагрузки выше могли поставить изменения в очередь.
         SyncEngine.shared.clear()
         return nil

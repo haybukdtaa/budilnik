@@ -76,7 +76,10 @@ final class AlarmStore: ObservableObject {
 
     private func enqueueSync(_ item: AlarmItem) {
         if item.isPrayerRelated && !AppSettings.shared.data.privacy.syncPrayerData { return }
-        SyncEngine.shared.enqueue(.alarm, id: item.id, value: item, sensitive: item.isPrayerRelated)
+        // Личная заметка остаётся на телефоне и на сервер не уходит.
+        var shared = item
+        shared.note = nil
+        SyncEngine.shared.enqueue(.alarm, id: item.id, value: shared, sensitive: item.isPrayerRelated)
     }
 
     func nextOccurrence(of item: AlarmItem, after now: Date = TrustedClock.now) -> Date? {
@@ -194,6 +197,8 @@ final class AlarmStore: ObservableObject {
         alarms.removeAll { $0.id == item.id }
         save()
         WakeCoordinator.shared.alarmDisabled(item.id)
+        // Уведомления «Списано …» удалённого будильника больше не нужны.
+        Task { await DeadlineNotifications.refresh() }
         if !(item.isPrayerRelated && !AppSettings.shared.data.privacy.syncPrayerData) {
             SyncEngine.shared.enqueueDeletion(.alarm, id: item.id, sensitive: item.isPrayerRelated)
         }

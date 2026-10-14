@@ -24,7 +24,7 @@ struct TypingTaskView: View {
                 .frame(height: 130)
         }
         .onChange(of: typed) { _, newValue in
-            if newValue == sentence { onDone() }
+            if TypingFold.fold(newValue) == TypingFold.fold(sentence) { onDone() }
         }
     }
 
@@ -36,7 +36,7 @@ struct TypingTaskView: View {
         for index in 0..<target.count {
             var piece = AttributedString(String(target[index]))
             if index < input.count {
-                piece.foregroundColor = input[index] == target[index] ? Color.green : Color.red
+                piece.foregroundColor = TypingFold.fold(String(input[index])) == TypingFold.fold(String(target[index])) ? Color.green : Color.red
             } else {
                 piece.foregroundColor = Color.white.opacity(0.6)
             }
@@ -305,5 +305,12 @@ struct StepsTaskView: View {
                 onDone()
             }
         }
+    }
+}
+
+/// На русской клавиатуре «ё» набирается долгим нажатием на «е»: при проверке они считаются одной буквой.
+enum TypingFold {
+    static func fold(_ text: String) -> String {
+        text.replacingOccurrences(of: "ё", with: "е").replacingOccurrences(of: "Ё", with: "Е")
     }
 }
