@@ -11,7 +11,17 @@ final class HTTPBackend: SocialBackend, SyncBackend {
     var isOnline: Bool { true }
     var isDemo: Bool { false }
 
-    init(baseURL: URL, session: URLSession = .shared) {
+    /// Сеанс без кеша и без cookie: ответы сервера (дневник, данные аккаунта) не оседают на диске телефона.
+    nonisolated static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        return URLSession(configuration: configuration)
+    }
+
+    init(baseURL: URL, session: URLSession = HTTPBackend.makeSession()) {
         self.baseURL = baseURL
         self.session = session
         encoder = JSONEncoder()
@@ -198,6 +208,42 @@ final class HTTPBackend: SocialBackend, SyncBackend {
         try await call("POST", "v1/friend-requests/\(id.uuidString)/decline", body: Empty())
         return nil
     }
+
+    // MARK: Аккаунт: почта, согласия, выгрузка данных
+
+    private struct EmailRequestBody: Codable { var email: String; var purpose: String }
+    private struct EmailVerifyBody: Codable { var email: String; var code: String }
+    private struct EmailRestoreBody: Codable { var email: String; var code: String; var secret: String }
+    private struct EmailRestoreResponse: Codable { var token: String; var userID: UUID; var number: String? }
+    private struct ConsentsBody: Codable { var consents: [ConsentRecord] }
+
+    /// Отправляет письмо с кодом. purpose: bind — привязать почту к аккаунту, restore — вернуть аккаунт.
+    func requestEmailCode(email: String, restore: Bool) async throws {
+        try await call("POST", "v1/auth/email/request", body: EmailRequestBody(email: email, purpose: restore ? "restore" : "bind"))
+    }
+
+    /// Подтверждает почту кодом из письма и привязывает её к аккаунту (нужен вход).
+    func verifyEmail(email: String, code: String) async throws {
+        try await call("POST", "v1/me/email/verify", body: EmailVerifyBody(email: email, code: code))
+    }
+
+    func removeEmail() async throws { try await call("DELETE", "v1/me/email") }
+
+    /// Восстановление по почте: сервер проверяет код и привязывает к аккаунту новый секрет этого телефона.
+    func restoreByEmail(email: String, code: String, secret: String) async throws -> (token: String, userID: UUID, number: String?) {
+        let response = try await send("POST", "v1/auth/email/restore",
+                                      body: EmailRestoreBody(email: email, code: code, secret: secret),
+                                      as: EmailRestoreResponse.self)
+        return (response.token, response.userID, response.number)
+    }
+
+    /// Журнал согласий: сервер хранит каждое решение (версия текста, время, отпечаток) как доказательство.
+    func recordConsents(_ records: [ConsentRecord]) async throws {
+        try await call("PUT", "v1/me/consents", body: ConsentsBody(consents: records))
+    }
+
+    /// Всё, что сервер хранит об аккаунте (право на получение копии данных).
+    func exportData() async throws -> JSONValue { try await get("v1/me/export", as: JSONValue.self) }
 
     func push(_ items: [OutboxItem]) async throws -> [UUID] {
         try await send("POST", "v1/sync", body: items, as: SyncResponse.self).accepted

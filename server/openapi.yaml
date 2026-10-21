@@ -20,7 +20,7 @@ info:
     - Автоматического возврата по спору нет: каждый спор рассматривается по журналу и событиям утра.
       Решение сервер присылает приложению; при решении в пользу человека делается возврат.
     - Будильник по Фаджру или календарю, не поставленный потому, что приложение не открывали дольше 10 дней,
-      — провал со списанием (об этом сказано в условиях ставки, версия 3).
+      — провал со списанием (об этом сказано в условиях обязательства, версия 5).
     - 401 означает «токен недействителен»: приложение забывает токен и заново проходит /v1/auth/register.
 
     Списание ставки делает сервер, по таймеру, без участия приложения:
@@ -97,7 +97,7 @@ paths:
         Первый вызов создаёт пользователя с этим userID и выдаёт ему номер для друзей; повторный с тем же
         секретом возвращает новый токен для того же пользователя; с другим секретом — 403.
         restore=true — восстановление по коду на новом телефоне: если такого userID нет, 404 и новый аккаунт не создаётся.
-        Сервер хранит не сам секрет, а его хеш, и ограничивает число попыток с одного адреса.
+        Секрет нужен серверу и для входа, и для проверки подписи событий утра (HMAC), поэтому хеша недостаточно: хранить его нужно зашифрованным (ключ шифрования отдельно от базы). Число попыток с одного адреса ограничено.
         Номер для друзей: 9 случайных цифр (PRO-XXX-XXX-XXX), уникальный, выдаётся не по порядку.
       security: []
       requestBody:
@@ -118,7 +118,7 @@ paths:
   /v1/me/backup:
     get:
       summary: Данные аккаунта для восстановления на новом телефоне (профиль, приватность, будильники, дневник, челленджи)
-      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { alarms: { type: array, items: { type: object } }, journal: { type: array, items: { type: object } }, challenges: { type: array, items: { type: object } } } } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { profile: { $ref: "#/components/schemas/UserProfile" }, privacy: { type: object }, alarms: { type: array, items: { type: object } }, journal: { type: array, items: { type: object } }, challenges: { type: array, items: { type: object } } } } } } } }
   /v1/friend-requests:
     get:
       summary: Входящие заявки в друзья
@@ -277,6 +277,117 @@ paths:
     post:
       requestBody: { content: { application/json: { schema: { type: object, properties: { friendID: { type: string, format: uuid }, title: { type: string }, days: { type: integer } } } } } }
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PairChallenge" } } } } }
+  /v1/auth/email/request:
+    post:
+      summary: Отправить на почту код (привязка почты или восстановление аккаунта)
+      description: |
+        purpose=bind — привязать почту к текущему аккаунту (нужен токен); purpose=restore — вернуть аккаунт на новом телефоне (токена нет).
+        Сервер всегда отвечает 204 одинаково, есть такая почта в базе или нет (чтобы нельзя было проверять чужие адреса).
+        Код: 6 цифр, действует 10 минут, одна попытка = одна проверка, после 5 неверных код сгорает.
+        Не чаще 1 письма в минуту и 5 в час на адрес и на IP. Письма отправляет российский поставщик.
+        Почта хранится в нормализованном виде (нижний регистр); в базе — хеш для поиска и зашифрованное значение.
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, purpose]
+              properties:
+                email: { type: string, format: email }
+                purpose: { type: string, enum: [bind, restore] }
+      responses:
+        "204": { description: Принято }
+        "422": { description: Адрес не похож на почту }
+        "429": { description: Слишком часто }
+  /v1/me/email/verify:
+    post:
+      summary: Подтвердить почту кодом и привязать к аккаунту
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email: { type: string, format: email }
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "204": { description: Привязано }
+        "422": { description: Код не подошёл или устарел }
+        "429": { description: Слишком много попыток }
+  /v1/me/email:
+    delete:
+      summary: Отвязать почту и удалить её из базы
+      responses: { "204": { description: Удалено } }
+  /v1/auth/email/restore:
+    post:
+      summary: Восстановить аккаунт по почте и коду из письма
+      description: |
+        Сервер проверяет код, находит аккаунт по почте и ДОБАВЛЯЕТ к нему новый секрет устройства (secret с этого телефона),
+        не трогая код восстановления из 16 слов: старые секреты остаются действительными. Возвращает прежний userID аккаунта,
+        новый токен и номер для друзей. Дальше приложение работает как обычно: /v1/auth/register с этим userID и новым секретом
+        возвращает токен, а /v1/me/backup отдаёт данные.
+        Если почты в базе нет — 404 (после успешной проверки кода, не раньше). Одна почта — один аккаунт.
+        Об успешном восстановлении на почту уходит уведомление.
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code, secret]
+              properties:
+                email: { type: string, format: email }
+                code: { type: string, pattern: "^[0-9]{6}$" }
+                secret: { type: string, description: "Новый секрет устройства (32 байта, hex)" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { token: { type: string }, userID: { type: string, format: uuid }, number: { type: string } } } } } }
+        "404": { description: Аккаунта с такой почтой нет }
+        "422": { description: Код не подошёл или устарел }
+        "429": { description: Слишком много попыток }
+  /v1/me/consents:
+    put:
+      summary: Журнал согласий (доказательство по 152-ФЗ)
+      description: |
+        Приложение присылает каждое решение человека: дано или отозвано, версия текста, время, отпечаток текста (SHA-256).
+        Сервер ХРАНИТ ВСЕ записи (ничего не перезаписывает) и не удаляет их при удалении аккаунта в течение срока,
+        нужного для защиты от претензий (рекомендуется 3 года, только идентификатор, вид, решение, версия, время и отпечаток).
+        Повтор записи с тем же id игнорируется (идемпотентность).
+        Сервер обязан применять решения: kind=personalData granted=false — прекратить обработку и удалить данные аккаунта в срок до 30 дней;
+        kind=specialData granted=false — удалить все данные о намазе (isPrayer, модуль prayer, статусы Фаджра);
+        kind=distribution granted=false — убрать человека из таблиц, комнат и клубов в течение 3 рабочих дней.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                consents: { type: array, items: { $ref: "#/components/schemas/ConsentRecord" } }
+      responses:
+        "204": { description: Принято }
+    get:
+      summary: Текущее состояние согласий на сервере
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ConsentRecord" } } } } }
+  /v1/me/export:
+    get:
+      summary: Копия всех данных аккаунта (право на доступ, статья 14 152-ФЗ)
+      description: |
+        Всё, что сервер хранит об аккаунте: профиль, почта (маскированная), настройки приватности, будильники, журнал,
+        челленджи, друзья (имена), журнал согласий, платёжные операции без реквизитов. Формат — произвольный JSON,
+        приложение сохраняет его в файл как есть. Секреты и хеши в выгрузку не входят.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object } } } }
+  /v1/legal/versions:
+    get:
+      summary: Действующие редакции юридических документов (публичный)
+      description: |
+        Приложение сверяет номер редакции с LegalVersion.current. Если на сервере редакция новее, а приложение старое —
+        сервер вправе отвечать 426 на запросы, пока приложение не обновят и человек не примет новую редакцию.
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { version: { type: integer }, publishedAt: { type: string, format: date-time }, urls: { type: object, additionalProperties: { type: string, format: uri } } } } } } }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer }
@@ -417,3 +528,13 @@ components:
         deleted: { type: boolean }
         createdAt: { type: string, format: date-time }
         isSensitive: { type: boolean, nullable: true, description: "Данные о намазе: хранить отдельно, удалить при отзыве согласия" }
+    ConsentRecord:
+      type: object
+      required: [id, kind, granted, version, at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [terms, personalData, specialData, distribution, marketing] }
+        granted: { type: boolean }
+        version: { type: integer, description: "Редакция документов (LegalVersion.current в приложении)" }
+        at: { type: string, format: date-time, description: "Время решения по защищённым часам приложения; сервер хранит ещё и время получения" }
+        textHash: { type: string, nullable: true, description: "SHA-256 текста документа, который видел человек" }

@@ -64,8 +64,19 @@ struct ProfileView: View {
                             }
                         }
                     }
+                    NavigationLink { EmailLinkView() } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Почта для восстановления", systemImage: "envelope")
+                            Text(settings.data.recoveryEmailVerified ? (settings.data.recoveryEmail ?? "") : "Не привязана")
+                                .font(.app(.caption))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     NavigationLink { RestoreAccountView() } label: {
                         Label("Восстановить аккаунт по коду", systemImage: "arrow.counterclockwise")
+                    }
+                    NavigationLink { RestoreByEmailView() } label: {
+                        Label("Восстановить аккаунт по почте", systemImage: "envelope.arrow.triangle.branch")
                     }
                 } header: {
                     Text("Аккаунт без регистрации")
@@ -74,6 +85,7 @@ struct ProfileView: View {
                 Section("Настройки") {
                     NavigationLink { ModulesView() } label: { Label("Модули и чек-листы", systemImage: "square.grid.2x2") }
                     NavigationLink { PrivacyView() } label: { Label("Приватность", systemImage: "hand.raised") }
+                    NavigationLink { ConsentsView() } label: { Label("Документы и согласия", systemImage: "doc.text") }
                     NavigationLink { PaymentsView() } label: { Label("Обязательства и платежи", systemImage: "creditcard") }
                 }
 
@@ -250,6 +262,23 @@ struct ProfileEditView: View {
 
 struct PrivacyView: View {
     @EnvironmentObject private var settings: AppSettings
+    @State private var requesting: ConsentKind?
+    @State private var afterGrant: (() -> Void)?
+
+    /// Переключатель, для включения которого нужно согласие: без него сначала показывается запрос.
+    private func guarded(_ kind: ConsentKind, _ keyPath: WritableKeyPath<PrivacySettings, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { settings.data.privacy[keyPath: keyPath] },
+            set: { on in
+                if on && !settings.isConsentGranted(kind) {
+                    afterGrant = { settings.data.privacy[keyPath: keyPath] = true }
+                    requesting = kind
+                } else {
+                    settings.data.privacy[keyPath: keyPath] = on
+                }
+            }
+        )
+    }
 
     var body: some View {
         Form {
@@ -266,7 +295,7 @@ struct PrivacyView: View {
             }
 
             Section {
-                Toggle("Участвовать в таблицах", isOn: $settings.data.privacy.joinLeaderboards)
+                Toggle("Участвовать в таблицах", isOn: guarded(.distribution, \.joinLeaderboards))
             } footer: {
                 Text("В таблицах видны имя, аватар и результат. Без участия вы видите таблицы, но вас в них нет.")
             }
@@ -283,8 +312,8 @@ struct PrivacyView: View {
 
             if settings.isEnabled(.prayer) {
                 Section {
-                    Toggle("Показывать подъём на Фаджр", isOn: $settings.data.privacy.sharePrayer)
-                    Toggle("Хранить данные о намазе на сервере", isOn: $settings.data.privacy.syncPrayerData)
+                    Toggle("Показывать подъём на Фаджр", isOn: guarded(.specialData, \.sharePrayer))
+                    Toggle("Хранить данные о намазе на сервере", isOn: guarded(.specialData, \.syncPrayerData))
                 } header: {
                     Text("Намаз")
                 } footer: {
@@ -294,6 +323,10 @@ struct PrivacyView: View {
         }
         .navigationTitle("Приватность")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $requesting) { kind in
+            ConsentRequestSheet(kind: kind) { afterGrant?() }
+                .preferredColorScheme(.dark)
+        }
     }
 }
 

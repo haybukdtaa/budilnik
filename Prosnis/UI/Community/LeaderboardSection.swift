@@ -4,6 +4,7 @@ struct LeaderboardSection: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettings
     @State private var kind: LeaderboardKind = .weekRegularity
+    @State private var askConsent = false
 
     var body: some View {
         List {
@@ -18,7 +19,13 @@ struct LeaderboardSection: View {
             if !settings.data.privacy.joinLeaderboards {
                 Section {
                     Text("Вы не участвуете в таблицах. Ваше имя и результаты никто не видит.")
-                    Button("Участвовать") { settings.data.privacy.joinLeaderboards = true }
+                    Button("Участвовать") {
+                        if settings.isConsentGranted(.distribution) {
+                            settings.data.privacy.joinLeaderboards = true
+                        } else {
+                            askConsent = true
+                        }
+                    }
                 }
             }
 
@@ -60,6 +67,10 @@ struct LeaderboardSection: View {
         }
         .scrollContentBackground(.hidden)
         .task(id: "\(kind.rawValue)-\(settings.data.privacy.joinLeaderboards)") { await social.loadLeaderboard(kind) }
+        .sheet(isPresented: $askConsent) {
+            ConsentRequestSheet(kind: .distribution) { settings.data.privacy.joinLeaderboards = true }
+                .preferredColorScheme(.dark)
+        }
     }
 }
 

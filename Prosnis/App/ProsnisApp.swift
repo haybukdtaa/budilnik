@@ -87,6 +87,7 @@ struct ProsnisApp: App {
         MedStore.shared.refresh()
         await WeeklyNotification.update(enabled: settings.data.weeklySummaryOn)
         await HealthCheck.shared.refresh()
+        await ConsentSync.flush()
         AccountStore.shared.ensureIdentity()
         await AccountStore.shared.ensureSignedIn()
         await AccountStore.shared.mergeRestoredData()
@@ -114,6 +115,8 @@ struct RootView: View {
     @State private var tab = 0
     /// Человек закрыл условия, не согласившись: до следующего запуска не спрашиваем.
     @State private var consentPostponed = false
+    /// Окно документов и согласий закрыли («Позже»): до следующего запуска не спрашиваем.
+    @State private var legalPostponed = false
 
     /// Запуск с «-screenshotTab N» (для скриншотов в автотестах): сразу вкладка N с тестовыми данными.
     /// Работает только в отладочной сборке.
@@ -168,6 +171,13 @@ struct RootView: View {
         guard !consentPostponed, wake.session == nil, wake.morning == nil, wake.note == nil, !focus.showsCover,
               RootView.screenshotTab == nil else { return nil }
         return alarmStore.alarmsNeedingConsent.map(\.stakeAmount).max()
+    }
+
+    /// Нужно ли показать окно документов и согласий (не поверх задания, утра, фокус-сессии).
+    private var legalToShow: Bool {
+        guard !legalPostponed, settings.data.onboardingDone, wake.session == nil, wake.morning == nil, wake.note == nil,
+              !focus.showsCover, RootView.screenshotTab == nil, RootView.screenshotScreen == nil else { return false }
+        return ConsentRules.needsPrompt(settings.data.consents)
     }
 
     var body: some View {
@@ -265,6 +275,13 @@ struct RootView: View {
                     }
                 )
                 .interactiveDismissDisabled()
+            }
+            .sheet(isPresented: Binding(
+                get: { legalToShow && chargeToShow == nil && reconsentAmount == nil },
+                set: { if !$0 { legalPostponed = true } }
+            )) {
+                ConsentGateSheet { legalPostponed = true }
+                    .preferredColorScheme(.dark)
             }
             .sheet(item: $wake.note) { state in
                 NoteView(state: state)

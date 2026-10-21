@@ -9,6 +9,7 @@ struct OnboardingView: View {
     @State private var reason = ""
     @State private var isAdult = false
     @State private var permissionText: String?
+    @State private var consent = ConsentChoice()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,19 +25,20 @@ struct OnboardingView: View {
                     text: "Каждый подъём растит ваше дерево и серию. Друзья видят только то, что вы сами разрешили. Обязательства и деньги не видит никто."
                 ).tag(1)
                 modulesPage.tag(2)
-                profilePage.tag(3)
+                documentsPage.tag(3)
+                profilePage.tag(4)
             }
             .tabViewStyle(.page)
             .indexViewStyle(.page(backgroundDisplayMode: .always))
 
             Button {
-                if page < 3 {
+                if page < 4 {
                     withAnimation { page += 1 }
                 } else {
                     finish()
                 }
             } label: {
-                Text(page < 3 ? "Дальше" : "Начать")
+                Text(page < 4 ? "Дальше" : "Начать")
                     .font(.app(.headline))
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -101,6 +103,22 @@ struct OnboardingView: View {
         .padding(.horizontal, 20)
     }
 
+    private var documentsPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Документы и согласия")
+                    .font(.app(.title2, weight: .bold))
+                    .padding(.top, 32)
+                Text("Будильники, задания и прогресс работают на телефоне и без согласий. Они нужны для друзей, сообщества и восстановления. Всё можно изменить позже в Профиле.")
+                    .font(.app(.footnote))
+                    .foregroundStyle(.secondary)
+                ConsentChoiceForm(choice: $consent, showSpecial: modules.contains(.prayer))
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+    }
+
     private var profilePage: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Пара деталей")
@@ -144,5 +162,6 @@ struct OnboardingView: View {
         data.wakeReason = String(reason.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
         data.onboardingDone = true
         settings.data = data
+        consent.apply(to: settings)
     }
 }

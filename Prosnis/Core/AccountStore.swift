@@ -25,6 +25,126 @@ final class AccountStore: ObservableObject {
 
     var isSignedIn: Bool { token != nil }
 
+    // MARK: Почта и согласия
+
+    /// Можно ли сейчас обращаться к серверу, и если нет — что сказать человеку.
+    private func serverForAccount() -> (backend: HTTPBackend?, problem: String?) {
+        guard let url = AppConfig.serverURL else {
+            return (nil, "Сервер ещё не подключён: эта возможность заработает вместе с ним.")
+        }
+        guard ConsentRules.serverAllowed(AppSettings.shared.data.consents) else {
+            return (nil, "Нужны согласия: Профиль → Документы и согласия (соглашение и обработка персональных данных).")
+        }
+        return (BackendRegistry.httpBackend(url), nil)
+    }
+
+    private func message(for error: Error) -> String {
+        switch error {
+        case BackendError.notFound: return "Аккаунт с такой почтой не найден."
+        case BackendError.invalidCode, BackendError.forbidden: return "Код не подошёл или устарел. Запросите новый."
+        case BackendError.rateLimited: return "Слишком много попыток. Подождите немного и повторите."
+        case BackendError.serverUnavailable: return "Нет связи с сервером. Повторите позже."
+        default: return "Не получилось. Повторите позже."
+        }
+    }
+
+    /// Просит сервер отправить на почту код. Возвращает текст ошибки или nil.
+    func requestEmailCode(_ rawEmail: String, restore: Bool) async -> String? {
+        guard let email = EmailAddress.normalize(rawEmail) else { return "Проверьте адрес почты." }
+        let (backend, problem) = serverForAccount()
+        guard let backend else { return problem }
+        if !restore && !isSignedIn { await ensureSignedIn() }
+        if !restore && !isSignedIn { return "Не удалось войти на сервер. Повторите позже." }
+        do {
+            try await backend.requestEmailCode(email: email, restore: restore)
+            return nil
+        } catch {
+            return message(for: error)
+        }
+    }
+
+    /// Подтверждает привязку почты кодом из письма.
+    func confirmEmail(_ rawEmail: String, code rawCode: String) async -> String? {
+        guard let email = EmailAddress.normalize(rawEmail), let code = EmailAddress.normalizeCode(rawCode) else {
+            return "Проверьте адрес и код (6 цифр)."
+        }
+        let (backend, problem) = serverForAccount()
+        guard let backend else { return problem }
+        do {
+            try await backend.verifyEmail(email: email, code: code)
+            AppSettings.shared.data.recoveryEmail = email
+            AppSettings.shared.data.recoveryEmailVerified = true
+            return nil
+        } catch {
+            return message(for: error)
+        }
+    }
+
+    /// Отвязывает почту (на сервере и на телефоне).
+    func removeEmail() async -> String? {
+        let (backend, problem) = serverForAccount()
+        guard let backend else { return problem }
+        do {
+            try await backend.removeEmail()
+            AppSettings.shared.data.recoveryEmail = nil
+            AppSettings.shared.data.recoveryEmailVerified = false
+            return nil
+        } catch {
+            return message(for: error)
+        }
+    }
+
+    /// Восстанавливает аккаунт по письму с кодом. У этого телефона будет свой секрет; код из 16 слов остаётся прежним.
+    func restoreByEmail(email rawEmail: String, code rawCode: String) async -> String? {
+        guard let email = EmailAddress.normalize(rawEmail), let code = EmailAddress.normalizeCode(rawCode) else {
+            return "Проверьте адрес и код (6 цифр)."
+        }
+        guard !isRestoring else { return "Восстановление уже идёт." }
+        if WakeCoordinator.shared.session != nil {
+            return "Сейчас идёт утренняя проверка. Восстановить аккаунт можно после неё."
+        }
+        if hasLocalData {
+            return "На этом телефоне уже есть свои будильники или дневник. Восстановить аккаунт можно только на чистом телефоне: сначала удалите данные в Профиле."
+        }
+        let (backend, problem) = serverForAccount()
+        guard let backend else { return problem }
+        isRestoring = true
+        defer { isRestoring = false }
+        let secret = AccountStore.randomSecret()
+        let result: (token: String, userID: UUID, number: String?)
+        do {
+            result = try await backend.restoreByEmail(email: email, code: code, secret: secret)
+        } catch {
+            return message(for: error)
+        }
+        if hasLocalData { return "Пока шло восстановление, на телефоне появились свои данные. Удалите их в Профиле и повторите." }
+        guard Keychain.set(secret, for: AccountStore.secretKey, migratable: true),
+              Keychain.set(result.userID.uuidString, for: AccountStore.userIDKey, migratable: true) else {
+            return "Не удалось сохранить ключ на телефоне. Разблокируйте телефон и повторите."
+        }
+        // Кода из 16 слов у этого телефона нет: старый код (если был) больше не принадлежит этому телефону.
+        Keychain.set(nil, for: AccountStore.phraseKey)
+        switchProfile(to: result.userID)
+        AppSettings.shared.data.identityCreated = true
+        AppSettings.shared.data.restoredByEmail = true
+        AppSettings.shared.data.recoveryEmail = email
+        AppSettings.shared.data.recoveryEmailVerified = true
+        AppSettings.shared.data.recoverySaved = true
+        AppSettings.shared.data.pendingRestoreMerge = true
+        signIn(token: result.token)
+        if let number = result.number { AppSettings.shared.data.friendNumber = number }
+        if let problem = await mergeRestoredData() { return "Аккаунт восстановлен. \(problem)" }
+        return nil
+    }
+
+    /// Случайный секрет устройства: 32 байта, шестнадцатеричной строкой.
+    private static func randomSecret() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        if status != errSecSuccess { bytes = (0..<32).map { _ in UInt8.random(in: 0...255) } }
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
     /// Сохраняет токен, выданный сервером после входа.
     func signIn(token: String) {
         Keychain.set(token, for: AccountStore.tokenKey)
@@ -43,7 +163,8 @@ final class AccountStore: ObservableObject {
 
     /// Код восстановления пропал (перенос на новый телефон без связки ключей): нужно ввести свой код.
     var needsRecoveryCode: Bool {
-        AppSettings.shared.data.identityCreated && Keychain.exists(AccountStore.phraseKey) == false
+        AppSettings.shared.data.identityCreated && !AppSettings.shared.data.restoredByEmail
+            && Keychain.exists(AccountStore.phraseKey) == false
     }
 
     /// Номер для друзей: выданный сервером, а в демо-режиме — демонстрационный.
@@ -95,6 +216,7 @@ final class AccountStore: ObservableObject {
               Keychain.get(AccountStore.phraseKey) == text else { return false }
         switchProfile(to: identity.userID)
         AppSettings.shared.data.identityCreated = true
+        AppSettings.shared.data.restoredByEmail = false
         return true
     }
 
@@ -126,7 +248,8 @@ final class AccountStore: ObservableObject {
 
     /// Если сервер подключён, а токена нет, регистрирует устройство. Без сервера ничего не делает.
     func ensureSignedIn() async {
-        guard token == nil, !isRestoring, let url = AppConfig.serverURL, let secret = deviceSecret else { return }
+        guard token == nil, !isRestoring, let url = AppConfig.serverURL,
+              ConsentRules.serverAllowed(AppSettings.shared.data.consents), let secret = deviceSecret else { return }
         let backend = BackendRegistry.httpBackend(url)
         let profile = AppSettings.shared.data.profile
         do {
@@ -165,6 +288,9 @@ final class AccountStore: ObservableObject {
         }
         guard let url = AppConfig.serverURL else {
             return "Сервер ещё не подключён: восстанавливать пока неоткуда. Код начнёт работать вместе с сервером."
+        }
+        guard ConsentRules.serverAllowed(AppSettings.shared.data.consents) else {
+            return "Нужны согласия: Профиль → Документы и согласия (соглашение и обработка персональных данных)."
         }
         isRestoring = true
         defer { isRestoring = false }
@@ -256,7 +382,9 @@ final class AccountStore: ObservableObject {
         if PaymentsStore.shared.hasOpenOperations {
             return "Есть незавершённые операции по обязательствам. Попробуйте позже, когда они завершатся."
         }
-        let backend = BackendRegistry.current
+        // Удаление на сервере работает всегда, в том числе после отзыва согласия.
+        let backend: SocialBackend
+        if let url = AppConfig.serverURL { backend = BackendRegistry.httpBackend(url) } else { backend = BackendRegistry.current }
         if backend.isOnline && !backend.isDemo {
             do {
                 try await backend.deleteAccount()
@@ -310,9 +438,28 @@ enum BackendRegistry {
 
     static var current: SocialBackend & SyncBackend {
         if let url = AppConfig.serverURL {
+            // Без соглашения и согласия на обработку данных приложение с сервером не общается.
+            guard ConsentRules.serverAllowed(AppSettings.shared.data.consents) else { return offline }
             return httpBackend(url)
         }
         if AppSettings.shared.data.useDemoSocial { return DemoBackend.shared }
         return offline
+    }
+}
+
+/// Отправка журнала согласий на сервер. Работает и после отзыва согласия: отзыв тоже нужно записать.
+@MainActor
+enum ConsentSync {
+    static func flush() async {
+        guard let url = AppConfig.serverURL, AccountStore.shared.isSignedIn else { return }
+        let records = AppSettings.shared.data.unsentConsents
+        guard !records.isEmpty else { return }
+        do {
+            try await BackendRegistry.httpBackend(url).recordConsents(records)
+            let sent = Set(records.map(\.id))
+            AppSettings.shared.data.unsentConsents.removeAll { sent.contains($0.id) }
+        } catch {
+            // Не ушло: повторим при следующем открытии.
+        }
     }
 }

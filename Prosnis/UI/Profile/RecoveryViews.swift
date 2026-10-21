@@ -8,6 +8,11 @@ struct RecoveryCodeView: View {
 
     var body: some View {
         List {
+            if settings.data.restoredByEmail {
+                Section {
+                    Label("Аккаунт восстановлен по почте. Код из 16 слов остался прежним: храните тот, что вы записали раньше. Новый код для этого телефона не создаётся.", systemImage: "envelope")
+                }
+            }
             if AccountStore.shared.needsRecoveryCode {
                 Section {
                     Label("Код этого аккаунта не перенёсся на телефон. Введите его в «Восстановить аккаунт по коду».", systemImage: "exclamationmark.triangle")
@@ -32,7 +37,7 @@ struct RecoveryCodeView: View {
                     .padding(.vertical, 6)
                 } else if words.count == RecoveryPhrase.wordCount {
                     Button("Показать код") { revealed = true }
-                } else {
+                } else if !settings.data.restoredByEmail {
                     Text("Код сейчас недоступен. Разблокируйте телефон и откройте экран снова.").foregroundStyle(.secondary)
                 }
             } footer: {

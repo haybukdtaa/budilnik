@@ -51,6 +51,15 @@ struct SettingsData: Codable, Equatable {
     var identityCreated = false
     /// Аккаунт восстановлен, но данные с сервера ещё не загрузились: повторить при открытии.
     var pendingRestoreMerge = false
+    /// Согласия (ключ — ConsentKind.rawValue): последнее решение по каждому, с версией и временем.
+    var consents: [String: ConsentEntry] = [:]
+    /// Решения по согласиям, о которых сервер ещё не знает (отправляются, когда есть связь).
+    var unsentConsents: [ConsentRecord] = []
+    /// Почта для восстановления и подтверждена ли она кодом из письма.
+    var recoveryEmail: String?
+    var recoveryEmailVerified = false
+    /// Аккаунт на этом телефоне восстановлен по почте: кода из 16 слов у этого телефона нет, и это нормально.
+    var restoredByEmail = false
     /// Вкладка «Лекарства» показывается всегда; поле осталось для совместимости со старыми данными.
     var medsEnabled = true
     /// Показывать название лекарства на экране блокировки. По умолчанию — нет.
@@ -91,6 +100,11 @@ struct SettingsData: Codable, Equatable {
         recoverySaved = (try? c.decodeIfPresent(Bool.self, forKey: .recoverySaved)) ?? base.recoverySaved
         identityCreated = (try? c.decodeIfPresent(Bool.self, forKey: .identityCreated)) ?? base.identityCreated
         pendingRestoreMerge = (try? c.decodeIfPresent(Bool.self, forKey: .pendingRestoreMerge)) ?? base.pendingRestoreMerge
+        consents = (try? c.decodeIfPresent([String: ConsentEntry].self, forKey: .consents)) ?? [:]
+        unsentConsents = (try? c.decodeIfPresent([ConsentRecord].self, forKey: .unsentConsents)) ?? []
+        recoveryEmail = try? c.decodeIfPresent(String.self, forKey: .recoveryEmail)
+        recoveryEmailVerified = (try? c.decodeIfPresent(Bool.self, forKey: .recoveryEmailVerified)) ?? false
+        restoredByEmail = (try? c.decodeIfPresent(Bool.self, forKey: .restoredByEmail)) ?? false
         medsEnabled = true
         medsShowNames = (try? c.decodeIfPresent(Bool.self, forKey: .medsShowNames)) ?? base.medsShowNames
     }
@@ -106,6 +120,14 @@ final class AppSettings: ObservableObject {
             // Свидетели из демо-режима — вымышленные люди: при выключении демо они не нужны.
             if oldValue.useDemoSocial && !data.useDemoSocial && AppConfig.serverURL == nil {
                 data.witnesses = []
+            }
+            // Без согласия на особые категории данные о намазе на сервер не уходят и друзьям не показываются.
+            if !ConsentRules.isGranted(.specialData, in: data.consents) {
+                if data.privacy.syncPrayerData { data.privacy.syncPrayerData = false }
+                if data.privacy.sharePrayer { data.privacy.sharePrayer = false }
+            }
+            if !ConsentRules.isGranted(.distribution, in: data.consents), data.privacy.joinLeaderboards {
+                data.privacy.joinLeaderboards = false
             }
             file.save(data)
             // При перезагрузке с диска побочные действия не нужны: они бы сработали на старых данных.
@@ -168,6 +190,32 @@ final class AppSettings: ObservableObject {
         // Каждое согласие хранится отдельно: история согласий нужна при споре.
         SyncEngine.shared.enqueue(.consent, id: UUID(), value: consent)
     }
+
+    /// Записывает решение по согласию (дано или отозвано) и применяет последствия.
+    /// Решение уходит на сервер как доказательство, когда есть связь.
+    func setConsent(_ kind: ConsentKind, granted: Bool) {
+        if let existing = data.consents[kind.rawValue], existing.granted == granted, existing.version == LegalVersion.current { return }
+        let hash = kind.document.map { ConsentRules.hash(LegalTexts.document($0).plainText) }
+        let now = TrustedClock.now
+        data.consents[kind.rawValue] = ConsentEntry(version: LegalVersion.current, date: now, granted: granted, textHash: hash)
+        var pending = data.unsentConsents
+        pending.append(ConsentRecord(kind: kind.rawValue, granted: granted, version: LegalVersion.current, at: now, textHash: hash))
+        data.unsentConsents = Array(pending.suffix(200))
+        if !granted {
+            switch kind {
+            case .specialData:
+                data.privacy.syncPrayerData = false
+                data.privacy.sharePrayer = false
+            case .distribution:
+                data.privacy.joinLeaderboards = false
+            default:
+                break
+            }
+        }
+        Task { await ConsentSync.flush() }
+    }
+
+    func isConsentGranted(_ kind: ConsentKind) -> Bool { ConsentRules.isGranted(kind, in: data.consents) }
 
     func isEnabled(_ module: WakeModule) -> Bool { data.modules.contains(module) }
 

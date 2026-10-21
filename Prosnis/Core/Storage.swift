@@ -159,5 +159,6 @@ enum AppFiles {
         if let domain = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: domain)
         }
+        URLCache.shared.removeAllCachedResponses()
     }
 }
