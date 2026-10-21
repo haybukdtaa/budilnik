@@ -45,7 +45,7 @@ struct ProsnisApp: App {
                 // Сменился часовой пояс (поездка): будильники на конкретные даты переставляются сразу.
                 .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
                     // Календарь и пояс кешируются: без сброса расчёт пошёл бы по старому поясу.
-                    TimeZone.resetSystemTimeZone()
+                    NSTimeZone.resetSystemTimeZone()
                     store.refreshDatedAlarms(force: true)
                     // Ожидания по старому поясу остаются: утро не теряется, а одно утро не списывается дважды.
                     store.refreshExpected()
