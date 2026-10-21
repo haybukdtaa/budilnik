@@ -256,6 +256,12 @@ final class AlarmService {
         }
     }
 
+    /// Снимает все системные звонки нашего будильника сразу и проверяет, что их не осталось.
+    func cancelNow(_ id: UUID) {
+        cancelAll(for: id)
+        verifyGone(id)
+    }
+
     /// После отмены проверяем, что системный будильник действительно исчез; если нет, снимаем ещё раз.
     private func verifyGone(_ id: UUID) {
         guard let all = try? manager.alarms else { return }
@@ -374,6 +380,8 @@ final class AlarmService {
             for date in dates {
                 guard stillWanted(item, generation: generation) else { break }
                 let systemID = UUID()
+                // Пока будильник ставится, уборка лишних его не трогает.
+                protect(systemID)
                 let configuration = AlarmManager.AlarmConfiguration.alarm(
                     schedule: .fixed(date),
                     attributes: attributes(title: item.displayTitle),
@@ -407,6 +415,12 @@ final class AlarmService {
             return failed ? "Часть будильников поставить не удалось. Попробуйте ещё раз." : nil
         }
 
+        // Одноразовый будильник, чей час уже прошёл, заново не ставим: иначе он прозвенел бы завтра, хотя уже отработал.
+        if item.weekdays.isEmpty, let once = ScheduleCalculator.onceDate(for: item, context: context),
+           once < Date().addingTimeInterval(-60) {
+            markFailed(key, false)
+            return nil
+        }
         let time = Alarm.Schedule.Relative.Time(hour: item.hour, minute: item.minute)
         let recurrence: Alarm.Schedule.Relative.Recurrence = item.weekdays.isEmpty
             ? .never

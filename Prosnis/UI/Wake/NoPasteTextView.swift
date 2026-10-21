@@ -15,6 +15,8 @@ struct NoPasteTextView: UIViewRepresentable {
         view.smartDashesType = .no
         view.smartInsertDeleteType = .no
         view.inlinePredictionType = .no
+        // Перетаскивание текста в поле тоже обход: выключаем.
+        view.textDragInteraction?.isEnabled = false
         view.font = .systemFont(ofSize: 20, weight: .medium)
         view.textColor = .white
         view.backgroundColor = UIColor(white: 1, alpha: 0.14)
@@ -28,6 +30,7 @@ struct NoPasteTextView: UIViewRepresentable {
         // Печатаемый текст приходит только из самого поля. Переписывать его обратно нельзя:
         // устаревшее значение стирало бы только что набранные буквы. Сбрасываем лишь пустое значение.
         if text.isEmpty && !view.text.isEmpty { view.text = "" }
+        context.coordinator.parent = self
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -38,9 +41,10 @@ struct NoPasteTextView: UIViewRepresentable {
         init(_ parent: NoPasteTextView) { self.parent = parent }
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-            // Вставка, подсказки и диктовка приносят больше одного символа за раз.
-            if text.count > 1 { return false }
             if text == "\n" { return false }
+            // Вставка заблокирована отдельно (paste). Слово целиком, набранное проведением по клавиатуре,
+            // допускается; слишком длинный кусок за один раз — нет.
+            if text.count > 30 { return false }
             return true
         }
 

@@ -134,3 +134,17 @@ final class AuditFixesTests: XCTestCase {
         XCTAssertTrue(prayer.isPrivate, "Запись о его провале помечается как намаз и не уходит без согласия")
     }
 }
+
+final class TypingTolerantTests: XCTestCase {
+    func testTypedTextIgnoresCaseSpacesAndPunctuation() {
+        let target = "Хрупкая снежинка, подхваченная ветром, плавно опустилась на подоконник"
+        XCTAssertTrue(TypingFold.matches(target, target))
+        XCTAssertTrue(TypingFold.matches("хрупкая снежинка подхваченная ветром плавно  опустилась на подоконник ", target),
+                      "Без запятых, с лишним пробелом и строчной первой буквой")
+        XCTAssertTrue(TypingFold.matches("Лёгкий бриз", "Легкий бриз"), "ё и е — одна буква")
+        XCTAssertFalse(TypingFold.matches("хрупкая снежинка подхваченная ветром плавно опустилась на подоконни", target))
+        XCTAssertFalse(TypingFold.matches("хрупкая снежинка подхваченная ветром плавно опустилась на подоконникк", target),
+                       "Лишняя буква в конце — ошибка")
+        XCTAssertFalse(TypingFold.matches("", ""), "Пустое предложение не засчитывается")
+    }
+}

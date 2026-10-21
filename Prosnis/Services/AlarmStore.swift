@@ -169,7 +169,11 @@ final class AlarmStore: ObservableObject {
         save()
         enqueueSync(item)
         sync(item)
-        if !item.isEnabled { WakeCoordinator.shared.alarmDisabled(item.id) }
+        if !item.isEnabled {
+            // Выключенный будильник снимается с системы сразу, а не после очереди перестановок.
+            service.cancelNow(item.id)
+            WakeCoordinator.shared.alarmDisabled(item.id)
+        }
         announce(item, now: now)
         return true
     }
@@ -196,6 +200,7 @@ final class AlarmStore: ObservableObject {
         }
         alarms.removeAll { $0.id == item.id }
         save()
+        service.cancelNow(item.id)
         WakeCoordinator.shared.alarmDisabled(item.id)
         // Уведомления «Списано …» удалённого будильника больше не нужны.
         Task { await DeadlineNotifications.refresh() }
@@ -234,6 +239,8 @@ final class AlarmStore: ObservableObject {
         guard let index = alarms.firstIndex(where: { $0.id == id }), alarms[index].isEnabled else { return }
         alarms[index].isEnabled = false
         save()
+        // Выключили у нас — снимаем и в системе, чтобы он не прозвенел завтра.
+        service.cancelNow(id)
     }
 
     /// Переставляет будильники на конкретные даты (Фаджр и календарь РФ) на 10 дней вперёд.
@@ -275,6 +282,8 @@ final class AlarmStore: ObservableObject {
     }
 
     func cleanupOrphans() {
+        // Список не прочитался (телефон не разблокирован): пустой список снял бы все будильники.
+        guard !loadFailed else { return }
         let wanted = wantedSystemIDs()
         service.pruneOrphans(known: wanted.known, enabledKeys: wanted.enabledKeys)
         let used = Set(alarms.compactMap { alarm -> String? in

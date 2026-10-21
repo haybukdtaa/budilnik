@@ -22,6 +22,11 @@ struct TypingTaskView: View {
             .frame(maxHeight: 170)
             NoPasteTextView(text: $typed)
                 .frame(height: 130)
+            if hasMistake {
+                Text("Есть ошибка: проверьте буквы, выделенные красным, или лишние буквы в конце.")
+                    .font(.app(.footnote))
+                    .foregroundStyle(.orange)
+            }
         }
         .onChange(of: typed) { _, newValue in
             if TypingFold.matches(newValue, sentence) { onDone() }
@@ -29,20 +34,34 @@ struct TypingTaskView: View {
     }
 
     /// Верно набранное зелёным, ошибки красным, остальное приглушено.
+    /// Подсветка идёт по буквам: пропущенная запятая или лишний пробел не сдвигают цвета остальных букв.
     private var styledSentence: AttributedString {
-        let target = Array(sentence)
-        let input = Array(typed)
+        let typedLetters = Array(TypingFold.letters(typed))
+        var position = 0
         var result = AttributedString()
-        for index in 0..<target.count {
-            var piece = AttributedString(String(target[index]))
-            if index < input.count {
-                piece.foregroundColor = TypingFold.sameLetter(input[index], target[index]) ? Color.green : Color.red
+        for character in sentence {
+            var piece = AttributedString(String(character))
+            if character.isLetter || character.isNumber {
+                if position < typedLetters.count {
+                    let expected = Array(TypingFold.letters(String(character))).first
+                    piece.foregroundColor = typedLetters[position] == expected ? Color.green : Color.red
+                    position += 1
+                } else {
+                    piece.foregroundColor = Color.white.opacity(0.6)
+                }
             } else {
-                piece.foregroundColor = Color.white.opacity(0.6)
+                piece.foregroundColor = position > 0 && position <= typedLetters.count ? Color.green : Color.white.opacity(0.6)
             }
             result += piece
         }
         return result
+    }
+
+    /// Все буквы набраны, но есть ошибка: подсказываем, где искать.
+    private var hasMistake: Bool {
+        let expected = TypingFold.letters(sentence)
+        let got = TypingFold.letters(typed)
+        return got.count >= expected.count && got != expected
     }
 }
 

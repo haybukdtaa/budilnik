@@ -35,6 +35,8 @@ final class WakeCoordinator: ObservableObject {
     /// Заметка себе, которая показывается сейчас.
     @Published var note: NoteState?
     private var pendingNote: NoteState?
+    /// Окно задания предыдущего будильника ещё на экране: следующее задание начинается поверх него.
+    private var taskCoverUp = false
     /// Утренние экраны, которые покажутся по очереди, когда закроется экран задания.
     private var pendingMornings: [MorningState] = []
 
@@ -257,7 +259,8 @@ final class WakeCoordinator: ObservableObject {
             pendingMornings.insert(shown, at: 0)
             morning = nil
         }
-        guard !FocusStore.shared.showsCover else { return }
+        // Окно прежнего задания ещё на экране (следующий будильник из очереди): его не трогаем, иначе набранный текст пропадёт.
+        guard !FocusStore.shared.showsCover, !taskCoverUp else { return }
         ModalDismisser.dismissAll()
         // Окно задания запрашивается ещё раз, когда прежние окна точно закрылись.
         Task {
@@ -563,7 +566,9 @@ final class WakeCoordinator: ObservableObject {
             ))
         }
 
+        taskCoverUp = wasOnTaskScreen
         startQueued(finished.queuedAlarmIDs ?? [], rings: finished.queuedRings ?? [:], now: TrustedClock.now)
+        taskCoverUp = false
 
         // Экран задания закроется сам; утро покажется после этого (см. RootView). Иначе показываем сразу.
         if !wasOnTaskScreen { presentPendingMorning() }
