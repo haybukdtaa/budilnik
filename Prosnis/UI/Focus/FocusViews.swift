@@ -144,6 +144,7 @@ struct FocusSessionView: View {
     @State private var confirmEnd = false
     /// Решается в момент нажатия кнопки: это отмена без последствий или досрочное завершение.
     @State private var endIsCancel = true
+    @State private var tapTime = Date()
 
     var body: some View {
         let live = store.current ?? session
@@ -187,7 +188,8 @@ struct FocusSessionView: View {
                     .padding(.horizontal, 12)
                 Spacer(minLength: 0)
                 Button(role: canCancel ? .cancel : .destructive) {
-                    endIsCancel = FocusRules.canCancel(live, now: TrustedClock.now)
+                    tapTime = TrustedClock.now
+                    endIsCancel = FocusRules.canCancel(live, now: tapTime)
                     confirmEnd = true
                 } label: {
                     Text(canCancel ? "Отменить сессию" : "Завершить раньше времени")
@@ -209,7 +211,11 @@ struct FocusSessionView: View {
             endIsCancel ? "Отменить сессию?" : "Завершить раньше времени?",
             isPresented: $confirmEnd, titleVisibility: .visible
         ) {
-            Button(endIsCancel ? "Отменить сессию" : "Завершить", role: .destructive) { store.endEarly() }
+            Button(endIsCancel ? "Отменить сессию" : "Завершить", role: .destructive) {
+                // Отмена считается по моменту нажатия, если подтвердили почти сразу: диалог не должен менять смысл кнопки.
+                let confirmed = TrustedClock.now
+                store.endEarly(now: endIsCancel && confirmed.timeIntervalSince(tapTime) < 30 ? tapTime : confirmed)
+            }
             Button("Продолжить", role: .cancel) {}
         } message: {
             Text(endIsCancel
@@ -223,8 +229,8 @@ struct FocusSessionView: View {
             }
         }
         // Экран во время сессии не гаснет.
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
-        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .onAppear { IdleLock.acquire() }
+        .onDisappear { IdleLock.release() }
     }
 }
 

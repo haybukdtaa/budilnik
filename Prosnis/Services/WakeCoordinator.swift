@@ -139,7 +139,7 @@ final class WakeCoordinator: ObservableObject {
         let now = TrustedClock.now
 
         if isRecheck {
-            guard let current = session, current.alarmID == alarmID, current.phase == .waiting else { return }
+            guard let current = session, current.alarmID == alarmID, current.phase == .waiting, isStillOn(current) else { return }
             startStageTwo(current, now: now, note: "Нажато «Выключить»")
             return
         }
@@ -190,14 +190,37 @@ final class WakeCoordinator: ObservableObject {
         evaluate(now)
     }
 
-    /// Будильник выключили или удалили посреди утра: запасные звонки больше не нужны.
+    /// Включён ли будильник этого утра. Утро с обязательством заблокировано от выключения, поэтому оно всегда «живое».
+    private func isStillOn(_ value: WakeSession) -> Bool {
+        if value.isDemo || value.stake > 0 { return true }
+        return AlarmStore.shared.alarms.contains { $0.id == value.alarmID && $0.isEnabled }
+    }
+
+    /// Будильник выключили или удалили посреди утра: запасные и повторные звонки больше не нужны.
     func alarmDisabled(_ alarmID: UUID) {
-        guard var current = session, current.alarmID == alarmID, current.stage == 1,
-              current.repeatAlarmIDs?.isEmpty == false else { return }
+        guard var current = session, current.alarmID == alarmID, current.stake == 0, !current.isDemo else { return }
+        let hadExtras = current.repeatAlarmIDs?.isEmpty == false || current.recheckAlarmID != nil
         cancelRepeats(current)
+        if let recheckID = current.recheckAlarmID {
+            service.stop(id: recheckID)
+            service.cancel(id: recheckID)
+        }
+        if let recheck = current.recheckDate {
+            DeadlineNotifications.cancelRecheck(alarmID: current.alarmID, recheck: recheck)
+        }
         current.repeatAlarmIDs = nil
-        current.events.append(JournalEvent(date: TrustedClock.now, text: "Будильник выключен, запасные звонки сняты"))
-        setSession(current)
+        current.recheckAlarmID = nil
+        // Повторной проверки у выключенного будильника не будет.
+        current.withRecheck = false
+        if hadExtras {
+            current.events.append(JournalEvent(date: TrustedClock.now, text: "Будильник выключен, запасные звонки сняты"))
+        }
+        if current.phase == .waiting {
+            // Первое задание уже выполнено, а второго не будет: утро засчитано.
+            finish(current, outcome: .success)
+        } else {
+            setSession(current)
+        }
     }
 
     private func begin(
@@ -277,8 +300,8 @@ final class WakeCoordinator: ObservableObject {
                 alarmID: snapshot.alarmID, title: snapshot.alarmTitle, soundID: snapshot.soundID, dates: dates
             )
             guard var latest = session, latest.alarmID == snapshot.alarmID, latest.startDate == snapshot.startDate,
-                  latest.stage == 1, latest.phase == .task else {
-                // Пока ставились, задание уже выполнено или утро закончилось: запасные звонки не нужны.
+                  latest.stage == 1, latest.phase == .task, isStillOn(latest) else {
+                // Пока ставились, задание уже выполнено, утро закончилось или будильник выключили: запасные звонки не нужны.
                 ids.forEach { service.cancel(id: $0) }
                 return
             }
@@ -328,6 +351,9 @@ final class WakeCoordinator: ObservableObject {
         }
         ringing.sort { $0.1 < $1.1 }
         guard let (first, firstRing) = ringing.first else { return }
+        // Задание начато без нажатия «Выключить»: звонок мог продолжаться, останавливаем его.
+        service.stop(id: first.id)
+        for id in service.registeredIDs(for: first.id) { service.stop(id: id) }
         // Остальные прозвеневшие будильники ждут в очереди, а не считаются проспанными.
         let rest = ringing.dropFirst()
         begin(
@@ -470,7 +496,7 @@ final class WakeCoordinator: ObservableObject {
             defer { isArmingRecheck = false }
             let id = await service.scheduleRecheck(alarmID: snapshot.alarmID, soundID: snapshot.soundID, at: recheckAt)
             guard var latest = session, latest.alarmID == snapshot.alarmID, latest.startDate == snapshot.startDate,
-                  latest.stage == 1, latest.phase == .waiting else {
+                  latest.stage == 1, latest.phase == .waiting, isStillOn(latest) else {
                 if let id { service.cancel(id: id) }
                 return
             }
@@ -537,8 +563,9 @@ final class WakeCoordinator: ObservableObject {
             chargeSeen: outcome == .failed && finished.stake > 0 && !finished.isDemo ? false : nil
         )
         let wasOnTaskScreen = finished.phase == .task
-        setSession(nil)
+        // Сначала запись в дневник, потом удаление утра: если запись не удалась, утро не пропадёт бесследно.
         JournalStore.shared.add(entry)
+        setSession(nil)
 
         if let reference = finished.paymentRef {
             let amount = finished.stake

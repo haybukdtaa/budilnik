@@ -17,6 +17,17 @@ struct ChargeCardView: View {
     }
 
     var body: some View {
+        // Прокрутка нужна на маленьких экранах и крупном шрифте: иначе кнопка «Понятно» могла уйти за край.
+        GeometryReader { geo in
+            ScrollView {
+                content.frame(minHeight: geo.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .background { Theme.background.ignoresSafeArea() }
+    }
+
+    private var content: some View {
         VStack(spacing: 22) {
             Spacer()
             Image(systemName: "moon.zzz")
@@ -61,6 +72,5 @@ struct ChargeCardView: View {
             }
         }
         .padding(24)
-        .background { Theme.background.ignoresSafeArea() }
     }
 }

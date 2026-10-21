@@ -63,7 +63,7 @@ struct PromiseDetailView: View {
                     row("Нужно шагов", "\(promise.minSteps)")
                     row("Обязательство", "\(promise.stake) ₽")
                     if now >= promise.start {
-                        row("Сейчас", "\(store.liveSteps[promise.id] ?? 0) шагов")
+                        row("Сейчас", "\(store.liveSteps[promise.id] ?? 0) \(HoursWon.plural(store.liveSteps[promise.id] ?? 0, "шаг", "шага", "шагов"))")
                     }
                 } footer: {
                     Text("Шаги считает счётчик телефона. Телефон должен быть с вами. После окна откройте приложение — оно посчитает итог.")

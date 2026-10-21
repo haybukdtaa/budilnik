@@ -256,6 +256,9 @@ final class AlarmService {
         }
     }
 
+    /// Системные звонки, записанные за этим будильником (в том числе на конкретные даты).
+    func registeredIDs(for alarmID: UUID) -> [UUID] { registry.ids[alarmID.uuidString] ?? [] }
+
     /// Снимает все системные звонки нашего будильника сразу и проверяет, что их не осталось.
     func cancelNow(_ id: UUID) {
         cancelAll(for: id)
@@ -491,6 +494,8 @@ final class AlarmService {
     func scheduleMedAlarm(at date: Date, title: String, medicationID: UUID, scheduled: Date) async -> UUID? {
         guard date > Date(), await ensureAuthorization() else { return nil }
         let systemID = UUID()
+        // Пока будильник ставится, уборка лишних его не трогает.
+        protect(systemID)
         let taken = AlarmButton(text: "Принял(а)", textColor: .white, systemImageName: "checkmark.circle")
         let later = AlarmButton(text: "Через \(MedStore.snoozeMinutes) минут", textColor: .white, systemImageName: "clock")
         let alert = AlarmPresentation.Alert(

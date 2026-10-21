@@ -15,16 +15,16 @@ struct RecoveryCodeView: View {
                 }
             }
             Section {
-                Text("Регистрации нет: ни телефона, ни почты. Ваш аккаунт — это эти 16 слов. Запишите их на бумаге и храните дома. На новом телефоне они вернут дерево, друзей и дневник подъёмов.")
+                Text("Регистрации нет: ни телефона, ни почты. Ваш аккаунт — это эти 16 слов. Запишите их на бумаге и храните дома. Когда подключится сервер, они вернут на новом телефоне дерево, друзей и дневник подъёмов. Пока сервера нет, восстановить из них нечего: храните код про запас.")
                     .foregroundStyle(.secondary)
             }
             Section {
                 if revealed {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                         ForEach(Array(words.enumerated()), id: \.offset) { index, word in
                             HStack(spacing: 4) {
                                 Text("\(index + 1).").font(.app(.caption)).foregroundStyle(.secondary).monospacedDigit()
-                                Text(word).font(.app(.body, weight: .medium))
+                                Text(word).font(.app(.body, weight: .medium)).lineLimit(1).minimumScaleFactor(0.7)
                                 Spacer(minLength: 0)
                             }
                         }

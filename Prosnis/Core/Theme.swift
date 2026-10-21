@@ -149,7 +149,8 @@ struct WallpaperView: View {
             LinearGradient(colors: Theme.gradient(index), startPoint: .topLeading, endPoint: .bottomTrailing)
         case .photo(let name):
             if let image = WallpaperStorage.load(name) {
-                Image(uiImage: image).resizable().scaledToFill()
+                // Фото заполняет область, но не раздвигает её: иначе экран задания вылезает за края.
+                Color.clear.overlay(Image(uiImage: image).resizable().scaledToFill()).clipped()
             } else {
                 LinearGradient(colors: Theme.gradient(0), startPoint: .topLeading, endPoint: .bottomTrailing)
             }

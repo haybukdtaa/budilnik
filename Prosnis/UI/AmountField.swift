@@ -4,6 +4,7 @@ import SwiftUI
 /// поэтому кнопка «Сохранить» всегда видит то, что на экране.
 struct AmountField: View {
     @Binding var value: Int
+    @FocusState private var focused: Bool
 
     var body: some View {
         TextField("500", text: Binding(
@@ -14,6 +15,14 @@ struct AmountField: View {
             }
         ))
         .keyboardType(.numberPad)
+        .focused($focused)
+        .toolbar {
+            // У цифровой клавиатуры нет кнопки возврата: закрыть её иначе нечем.
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                if focused { Button("Готово") { focused = false } }
+            }
+        }
         .multilineTextAlignment(.trailing)
         .frame(width: 100)
     }

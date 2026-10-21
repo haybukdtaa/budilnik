@@ -174,6 +174,7 @@ struct MemoryTaskView: View {
 
     private func play() async {
         sequence = MemorySequence.make(length: TaskRules.memoryLength)
+        highlighted = nil
         showing = true
         inputIndex = 0
         message = "Запомните порядок клеток"
@@ -205,6 +206,7 @@ struct MemoryTaskView: View {
         } else {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             message = "Ошибка. Смотрим заново"
+            highlighted = nil
             attempt += 1
         }
     }

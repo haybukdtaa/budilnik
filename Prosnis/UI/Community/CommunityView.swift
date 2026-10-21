@@ -99,7 +99,7 @@ struct StatsCard: View {
         HStack(spacing: 12) {
             Image(systemName: "sunrise.fill").font(.app(.title2)).foregroundStyle(Theme.accent)
             VStack(alignment: .leading) {
-                Text("Сегодня встали \(stats.wokeToday.formatted()) человек").font(.app(.subheadline, weight: .semibold))
+                Text("Сегодня встали \(stats.wokeToday.formatted()) \(HoursWon.plural(stats.wokeToday, "человек", "человека", "человек"))").font(.app(.subheadline, weight: .semibold))
                 Text("Идёт челленджей: \(stats.activeChallenges.formatted())").font(.app(.caption)).foregroundStyle(.secondary)
             }
             Spacer()

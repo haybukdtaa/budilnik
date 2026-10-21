@@ -16,6 +16,8 @@ final class AlarmStore: ObservableObject {
     private static let lastDatedRefreshKey = "lastDatedRefresh"
 
     private var loadFailed = false
+    /// Файл есть, но не прочитался как список: пустой список не должен снимать все системные будильники.
+    private var loadCorrupt = false
 
     private init() {
         load()
@@ -40,6 +42,7 @@ final class AlarmStore: ObservableObject {
         let result = file.loadWithState()
         alarms = result.value ?? []
         loadFailed = result.state == .unreadable
+        loadCorrupt = result.state == .corrupt
         // Данные старых версий без даты создания: считаем созданными сейчас, иначе одноразовый будильник «звонил» бы в 1 году.
         if alarms.contains(where: { $0.createdAt == nil }) {
             let now = Date()
@@ -68,7 +71,9 @@ final class AlarmStore: ObservableObject {
         save()
     }
 
-    private func save() { file.save(alarms) }
+    private func save() {
+        if file.save(alarms) { loadCorrupt = false }
+    }
 
     private func sort() {
         alarms.sort { ($0.isFajr ? 1 : 0, $0.hour, $0.minute) < ($1.isFajr ? 1 : 0, $1.hour, $1.minute) }
@@ -283,7 +288,7 @@ final class AlarmStore: ObservableObject {
 
     func cleanupOrphans() {
         // Список не прочитался (телефон не разблокирован): пустой список снял бы все будильники.
-        guard !loadFailed else { return }
+        guard !loadFailed, !loadCorrupt else { return }
         let wanted = wantedSystemIDs()
         service.pruneOrphans(known: wanted.known, enabledKeys: wanted.enabledKeys)
         let used = Set(alarms.compactMap { alarm -> String? in

@@ -100,7 +100,9 @@ struct BedtimeView: View {
                 bad: ""
             )
         } else {
-            row(ok: false, good: "", bad: "Нет включённого будильника с обязательством")
+            Label("Обязательство не используется: будильники без суммы", systemImage: "info.circle")
+                .font(.app(.footnote))
+                .foregroundStyle(.secondary)
         }
     }
 

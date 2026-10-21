@@ -37,7 +37,8 @@ struct FileStore<Value: Codable> {
             if (try? JSONDecoder().decode(Value.self, from: existing)) == nil {
                 let stamp = Int(Date().timeIntervalSince1970)
                 let backup = url.deletingPathExtension().appendingPathExtension("corrupt-\(stamp).json")
-                try? manager.copyItem(at: url, to: backup)
+                // Без копии старый файл не затираем: в нём могут быть данные, которые ещё можно спасти.
+                do { try manager.copyItem(at: url, to: backup) } catch { return false }
             }
         }
         guard let data = try? JSONEncoder().encode(value) else { return false }

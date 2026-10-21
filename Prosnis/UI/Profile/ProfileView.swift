@@ -214,11 +214,12 @@ struct ProfileEditView: View {
                 TextField("Как вас видят друзья", text: $settings.data.profile.displayName)
             }
             Section("Аватар") {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 10) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 10) {
                     ForEach(ProfileEditView.avatars, id: \.self) { emoji in
                         Text(emoji)
                             .font(.app(.title2))
-                            .frame(width: 36, height: 36)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
                             .background(settings.data.profile.avatar == emoji ? Theme.accent.opacity(0.35) : Color.clear, in: Circle())
                             .onTapGesture { settings.data.profile.avatar = emoji }
                     }

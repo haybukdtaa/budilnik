@@ -41,6 +41,7 @@ jobs:
             -scheme Prosnis \
             -destination "id=$DEVICE_ID" \
             -derivedDataPath build-tests \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log | { grep -E ': error:|Executed [0-9]+ tests|TEST (SUCCEEDED|FAILED)' || true; }
 
       - name: Собрать без подписи
@@ -52,6 +53,7 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \

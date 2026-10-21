@@ -42,7 +42,7 @@ struct RoomsSection: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(room.name).font(.app(.headline))
-                        Text(room.topic ?? "\(room.members.count) участников")
+                        Text(room.topic ?? "\(room.members.count) \(HoursWon.plural(room.members.count, "участник", "участника", "участников"))")
                             .font(.app(.caption))
                             .foregroundStyle(.secondary)
                         let woke = room.members.filter { $0.status?.woke == true && Calendar.current.isDateInToday($0.status!.day) }.count

@@ -179,7 +179,7 @@ struct ProgressTabView: View {
                             Text("Уровень \(snapshot.level)").font(.app(.caption)).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text("\(snapshot.unlocked.count) значков")
+                        Text("\(snapshot.unlocked.count) \(HoursWon.plural(snapshot.unlocked.count, "значок", "значка", "значков"))")
                             .foregroundStyle(.secondary)
                         Image(systemName: "chevron.right").foregroundStyle(.secondary)
                     }

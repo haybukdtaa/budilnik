@@ -48,8 +48,8 @@ struct WakeTaskView: View {
             .padding(20)
         }
         // Пока идёт задание (ходьба, камера), экран не должен погаснуть.
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
-        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .onAppear { IdleLock.acquire() }
+        .onDisappear { IdleLock.release() }
         .id("\(session.alarmID)-\(session.startDate.timeIntervalSince1970)-\(session.stage)-\(session.taskKind.rawValue)")
         .task {
             while !Task.isCancelled {
@@ -81,6 +81,23 @@ struct WakeTaskView: View {
                 wake.switchToTyping(reason: reason)
             }
         }
+    }
+}
+
+/// Экран не гаснет, пока открыто хотя бы одно окно, которому это нужно (задание, фокус-сессия).
+/// Счётчик нужен, потому что при смене окна новое появляется раньше, чем старое исчезает.
+@MainActor
+enum IdleLock {
+    private static var count = 0
+
+    static func acquire() {
+        count += 1
+        UIApplication.shared.isIdleTimerDisabled = true
+    }
+
+    static func release() {
+        count = max(0, count - 1)
+        if count == 0 { UIApplication.shared.isIdleTimerDisabled = false }
     }
 }
 
