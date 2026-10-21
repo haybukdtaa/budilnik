@@ -19,7 +19,7 @@ struct TypingTaskView: View {
                     .font(.system(size: 22, weight: .semibold, design: .rounded))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxHeight: 170)
+            .frame(minHeight: 90, maxHeight: 170)
             NoPasteTextView(text: $typed)
                 .frame(height: 130)
             if hasMistake {
@@ -107,6 +107,7 @@ struct MathTaskView: View {
                             .foregroundStyle(Color.white)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(key == "⌫" ? "Стереть" : (key == "✓" ? "Проверить ответ" : key))
                 }
             }
         }
@@ -322,6 +323,82 @@ struct StepsTaskView: View {
         .onDisappear { counter.stop() }
         .onChange(of: counter.steps) { _, steps in
             if steps >= goal && !finished {
+                finished = true
+                onDone()
+            }
+        }
+    }
+}
+
+// MARK: - Встряхивание
+
+@MainActor
+final class ShakeCounter: ObservableObject {
+    @Published private(set) var shakes = 0
+    private let motion = CMMotionManager()
+    private var lastShake = Date.distantPast
+
+    /// Резким считается удар сильнее 2,2 g; не чаще, чем раз в 0,3 секунды.
+    func start(onUnavailable: @escaping (String) -> Void) {
+        guard motion.isAccelerometerAvailable else {
+            onUnavailable("Датчик движения недоступен, задание заменено на печать")
+            return
+        }
+        motion.accelerometerUpdateInterval = 1.0 / 30
+        motion.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
+            guard let a = data?.acceleration else { return }
+            let force = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()
+            DispatchQueue.main.async { self?.register(force: force) }
+        }
+    }
+
+    private func register(force: Double) {
+        let now = Date()
+        guard force > 2.2, now.timeIntervalSince(lastShake) > 0.3 else { return }
+        lastShake = now
+        shakes += 1
+    }
+
+    func stop() { motion.stopAccelerometerUpdates() }
+}
+
+struct ShakeTaskView: View {
+    let goal: Int
+    let onDone: () -> Void
+    let onUnavailable: (String) -> Void
+    @StateObject private var counter = ShakeCounter()
+    @State private var finished = false
+
+    var body: some View {
+        VStack(spacing: 18) {
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.15), lineWidth: 16)
+                Circle()
+                    .trim(from: 0, to: min(1, Double(counter.shakes) / Double(goal)))
+                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: 16, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                VStack {
+                    Text("\(min(counter.shakes, goal))")
+                        .font(.system(size: 54, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    Text("из \(goal) встряхиваний")
+                        .font(.app(.subheadline))
+                }
+                .foregroundStyle(.white)
+            }
+            .frame(width: 220, height: 220)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Встряхнуто \(min(counter.shakes, goal)) из \(goal)")
+
+            Text("Возьмите телефон в руку и энергично потрясите его")
+                .font(.app(.headline))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+        }
+        .onAppear { counter.start(onUnavailable: onUnavailable) }
+        .onDisappear { counter.stop() }
+        .onChange(of: counter.shakes) { _, shakes in
+            if shakes >= goal && !finished {
                 finished = true
                 onDone()
             }

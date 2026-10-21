@@ -182,6 +182,7 @@ struct InviteSheet: View {
             .navigationTitle("Друзья")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Закрыть") { dismiss() } } }
+            .socialErrorAlert()
         }
     }
 }
@@ -327,13 +328,15 @@ struct PairCreateView: View {
             }
             .navigationTitle("Вместе с \(friend.profile.displayName)")
             .navigationBarTitleDisplayMode(.inline)
+            .socialErrorAlert()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Создать") {
                         Task {
+                            social.errorText = nil
                             await social.createPair(with: friend, title: title, days: days)
-                            dismiss()
+                            if social.errorText == nil { dismiss() }
                         }
                     }
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)

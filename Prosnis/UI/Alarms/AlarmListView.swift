@@ -72,6 +72,7 @@ struct AlarmListView: View {
                     } label: {
                         Image(systemName: "plus").font(.app(.title3))
                     }
+                    .accessibilityLabel("Добавить")
                 }
             }
             .sheet(item: $editing) { alarm in
@@ -222,7 +223,7 @@ private struct AlarmRow: View {
             Spacer()
 
             Toggle(
-                alarm.displayTitle,
+                "\(alarm.timeText) \(alarm.displayTitle)",
                 isOn: Binding(
                     get: { alarm.isEnabled },
                     set: { store.setEnabled(alarm, $0) }
@@ -235,5 +236,6 @@ private struct AlarmRow: View {
         .opacity(alarm.isEnabled ? 1 : 0.5)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+        .accessibilityAddTraits(.isButton)
     }
 }

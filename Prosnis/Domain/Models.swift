@@ -8,7 +8,7 @@ enum Wallpaper: Codable, Equatable, Hashable {
 
 /// Чем человек доказывает, что проснулся.
 enum TaskKind: String, Codable, CaseIterable, Identifiable {
-    case typing, math, memory, qr, steps
+    case typing, math, memory, qr, steps, shake
 
     var id: String { rawValue }
 
@@ -19,6 +19,7 @@ enum TaskKind: String, Codable, CaseIterable, Identifiable {
         case .memory: return "Запомнить клетки"
         case .qr: return "Сканировать код"
         case .steps: return "Пройти шаги"
+        case .shake: return "Потрясти телефон"
         }
     }
 
@@ -29,6 +30,7 @@ enum TaskKind: String, Codable, CaseIterable, Identifiable {
         case .memory: return "square.grid.3x3"
         case .qr: return "qrcode.viewfinder"
         case .steps: return "figure.walk"
+        case .shake: return "iphone.radiowaves.left.and.right"
         }
     }
 

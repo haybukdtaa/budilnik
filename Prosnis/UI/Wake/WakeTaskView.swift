@@ -13,6 +13,8 @@ struct WakeTaskView: View {
                 .ignoresSafeArea()
             Color.black.opacity(0.6).ignoresSafeArea()
 
+            GeometryReader { geo in
+            ScrollView {
             VStack(spacing: 14) {
                 Text(session.stage == 1 ? (session.needsRecheck ? "Задание 1 из 2" : "Задание") : "Повторная проверка · задание 2 из 2")
                     .font(.app(.subheadline, weight: .semibold))
@@ -46,6 +48,11 @@ struct WakeTaskView: View {
                 Spacer(minLength: 0)
             }
             .padding(20)
+            .frame(minHeight: geo.size.height)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .scrollBounceBehavior(.basedOnSize)
+            }
         }
         // Пока идёт задание (ходьба, камера), экран не должен погаснуть.
         .onAppear { IdleLock.acquire() }
@@ -76,6 +83,12 @@ struct WakeTaskView: View {
             }
         case .steps:
             StepsTaskView(goal: TaskRules.stepsGoal) {
+                wake.submit()
+            } onUnavailable: { reason in
+                wake.switchToTyping(reason: reason)
+            }
+        case .shake:
+            ShakeTaskView(goal: TaskRules.shakeGoal) {
                 wake.submit()
             } onUnavailable: { reason in
                 wake.switchToTyping(reason: reason)

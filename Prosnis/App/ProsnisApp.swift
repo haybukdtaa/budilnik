@@ -86,6 +86,7 @@ struct ProsnisApp: App {
         MedStore.shared.reloadIfNeeded()
         MedStore.shared.refresh()
         await WeeklyNotification.update(enabled: settings.data.weeklySummaryOn)
+        await HealthCheck.shared.refresh()
         AccountStore.shared.ensureIdentity()
         await AccountStore.shared.ensureSignedIn()
         await AccountStore.shared.mergeRestoredData()
@@ -109,6 +110,7 @@ struct RootView: View {
     @ObservedObject private var router = NotificationRouter.shared
     @ObservedObject private var journal = JournalStore.shared
     @ObservedObject private var focus = FocusStore.shared
+    @ObservedObject private var health = HealthCheck.shared
     @State private var tab = 0
     /// Человек закрыл условия, не согласившись: до следующего запуска не спрашиваем.
     @State private var consentPostponed = false
@@ -229,6 +231,7 @@ struct RootView: View {
                     .tag(4)
                 ProfileView()
                     .tabItem { Label("Профиль", systemImage: "person.crop.circle") }
+                    .badge(health.issueCount)
                     .tag(3)
             }
             }

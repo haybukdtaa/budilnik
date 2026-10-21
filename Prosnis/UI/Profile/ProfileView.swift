@@ -13,6 +13,7 @@ struct ProfileView: View {
     @EnvironmentObject private var journal: JournalStore
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var sync: SyncEngine
+    @ObservedObject private var health = HealthCheck.shared
     @State private var confirmDelete = false
     @State private var deleting = false
     @State private var deleteError: String?
@@ -113,6 +114,22 @@ struct ProfileView: View {
 
                 Section("Проверка") {
                     NavigationLink {
+                        HealthView()
+                    } label: {
+                        HStack {
+                            Label("Здоровье будильников", systemImage: "heart.text.square")
+                            Spacer()
+                            if health.issueCount > 0 {
+                                Text("\(health.issueCount)")
+                                    .font(.app(.footnote, weight: .bold))
+                                    .padding(.horizontal, 8).padding(.vertical, 2)
+                                    .background(Color.orange, in: Capsule())
+                                    .foregroundStyle(.black)
+                                    .accessibilityLabel("Требует внимания: \(health.issueCount)")
+                            }
+                        }
+                    }
+                    NavigationLink {
                         SystemAlarmsView()
                     } label: {
                         Label("Системные будильники", systemImage: "alarm.waves.left.and.right")
@@ -122,7 +139,7 @@ struct ProfileView: View {
                     } label: {
                         Label("Проверить звонок через минуту", systemImage: "bell.badge")
                     }
-                    ForEach([TaskKind.typing, .math, .memory, .steps]) { kind in
+                    ForEach([TaskKind.typing, .math, .memory, .steps, .shake]) { kind in
                         Button {
                             WakeCoordinator.shared.startDemo(task: kind)
                         } label: {

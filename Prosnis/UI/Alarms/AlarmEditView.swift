@@ -299,6 +299,8 @@ struct AlarmEditView: View {
                         .foregroundStyle(isOn ? Color.white : Color.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Weekdays.short[day - 1])
+                .accessibilityAddTraits(isOn ? .isSelected : [])
             }
         }
         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))

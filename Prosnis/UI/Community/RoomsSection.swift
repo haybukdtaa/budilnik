@@ -102,6 +102,7 @@ struct RoomCreateView: View {
             }
             .navigationTitle(isClub ? "Новый клуб" : "Новая комната")
             .navigationBarTitleDisplayMode(.inline)
+            .socialErrorAlert()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -247,6 +248,7 @@ struct ChatView: View {
                     } label: {
                         Image(systemName: "arrow.up.circle.fill").font(.app(.title))
                     }
+                    .accessibilityLabel("Отправить сообщение")
                     .disabled(!ContentFilter.isSendable(text))
                 }
                 .padding(12)

@@ -50,6 +50,7 @@ struct MedsView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("Добавить лекарство")
                 }
             }
             .sheet(item: $editing) { med in
@@ -129,6 +130,8 @@ private struct DoseRow: View {
                 Image(systemName: icon)
                     .font(.system(size: 26, weight: .light))
                     .foregroundStyle(isTaken ? Theme.mint : Color.secondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isTaken ? "Снять отметку" : "Принял(а)")

@@ -48,4 +48,6 @@ enum TaskRules {
     static let memoryLength = 5
     static let memoryRounds = 2
     static let stepsGoal = 40
+    /// Сколько резких встряхиваний нужно сделать.
+    static let shakeGoal = 30
 }

@@ -387,7 +387,7 @@ final class AlarmService {
                 protect(systemID)
                 let configuration = AlarmManager.AlarmConfiguration.alarm(
                     schedule: .fixed(date),
-                    attributes: attributes(title: item.displayTitle),
+                    attributes: attributes(title: item.isPrayerRelated ? "Будильник" : item.displayTitle),
                     stopIntent: stopIntent(for: item, systemID: systemID),
                     sound: .named(sound)
                 )
@@ -430,7 +430,7 @@ final class AlarmService {
             : .weekly(item.weekdays.sorted().map(Weekdays.locale))
         let configuration = AlarmManager.AlarmConfiguration.alarm(
             schedule: .relative(.init(time: time, repeats: recurrence)),
-            attributes: attributes(title: item.displayTitle),
+            attributes: attributes(title: item.isPrayerRelated ? "Будильник" : item.displayTitle),
             stopIntent: stopIntent(for: item, systemID: item.id),
             sound: .named(sound)
         )
