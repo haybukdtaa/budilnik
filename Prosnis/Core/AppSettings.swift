@@ -92,7 +92,7 @@ struct SettingsData: Codable, Equatable {
         identityCreated = (try? c.decodeIfPresent(Bool.self, forKey: .identityCreated)) ?? base.identityCreated
         pendingRestoreMerge = (try? c.decodeIfPresent(Bool.self, forKey: .pendingRestoreMerge)) ?? base.pendingRestoreMerge
         medsEnabled = true
-        medsShowNames = try c.decodeIfPresent(Bool.self, forKey: .medsShowNames) ?? base.medsShowNames
+        medsShowNames = (try? c.decodeIfPresent(Bool.self, forKey: .medsShowNames)) ?? base.medsShowNames
     }
 }
 

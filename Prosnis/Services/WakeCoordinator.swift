@@ -353,7 +353,6 @@ final class WakeCoordinator: ObservableObject {
         guard let (first, firstRing) = ringing.first else { return }
         // Задание начато без нажатия «Выключить»: звонок мог продолжаться, останавливаем его.
         service.stop(id: first.id)
-        for id in service.registeredIDs(for: first.id) { service.stop(id: id) }
         // Остальные прозвеневшие будильники ждут в очереди, а не считаются проспанными.
         let rest = ringing.dropFirst()
         begin(
@@ -564,6 +563,13 @@ final class WakeCoordinator: ObservableObject {
         )
         let wasOnTaskScreen = finished.phase == .task
         // Сначала запись в дневник, потом удаление утра: если запись не удалась, утро не пропадёт бесследно.
+        // Запись для этого звонка уже есть (приложение закрыли между записью и удалением утра): не дублируем.
+        let alreadyRecorded = !finished.isDemo && JournalStore.shared.hasEntry(alarmID: finished.alarmID, near: entry.date)
+        if alreadyRecorded {
+            // Итог уже записан раньше и считается верным: второй раз ни дневник, ни платёж не трогаем.
+            setSession(nil)
+            return
+        }
         JournalStore.shared.add(entry)
         setSession(nil)
 
