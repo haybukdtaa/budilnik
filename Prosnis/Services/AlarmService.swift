@@ -144,6 +144,7 @@ final class AlarmService {
         let previous = inFlight[id]
         _ = await previous?.value
         cancelAll(for: id)
+        verifyGone(id)
         registry.expected?[id.uuidString] = nil
         saveRegistry()
     }
@@ -200,18 +201,68 @@ final class AlarmService {
         saveRegistry()
     }
 
-    /// Снимает системные будильники, которых нет ни у одного нашего будильника («призраки» после сбоев).
-    func pruneOrphans(known: Set<UUID>) {
+    /// Системный будильник нужен, только если он принадлежит ВКЛЮЧЁННОМУ нашему будильнику, идущему утру,
+    /// лекарству или только что поставленной проверке. Выключенный будильник звонить не должен.
+    private func isWanted(_ id: UUID, known: Set<UUID>, enabledKeys: Set<String>) -> Bool {
+        if known.contains(id) { return true }
+        if let tests = registry.tests, let at = tests[id], Date().timeIntervalSince(at) < 3600 { return true }
+        for (key, ids) in registry.ids where enabledKeys.contains(key) && ids.contains(id) { return true }
+        return false
+    }
+
+    /// Снимает системные будильники, которым нет места в расписании («призраки» после сбоев или старых версий).
+    /// Будильник, который у нас есть, но выключен, тоже считается лишним: он не должен звонить.
+    func pruneOrphans(known: Set<UUID>, enabledKeys: Set<String>) {
         guard let all = try? manager.alarms else { return }
         let now = Date()
         var tests = registry.tests ?? [:]
         tests = tests.filter { now.timeIntervalSince($0.value) < 3600 }
         registry.tests = tests
-        let registered = Set(registry.ids.values.flatMap { $0 })
-        for alarm in all where !known.contains(alarm.id) && !registered.contains(alarm.id) && tests[alarm.id] == nil {
+        for alarm in all where !isWanted(alarm.id, known: known, enabledKeys: enabledKeys) {
+            try? manager.stop(id: alarm.id)
             try? manager.cancel(id: alarm.id)
         }
+        // В записях о постановке не должно быть выключенных будильников.
+        for key in registry.ids.keys where !enabledKeys.contains(key) {
+            for id in registry.ids[key] ?? [] { try? manager.cancel(id: id) }
+            registry.ids[key] = nil
+        }
         saveRegistry()
+    }
+
+    /// Что сейчас стоит в системе от нашего приложения (для экрана проверки).
+    struct SystemAlarmInfo: Identifiable {
+        let id: UUID
+        let state: String
+        let when: String
+        let ownerKey: String
+        let isExtra: Bool
+    }
+
+    func systemAlarms(known: Set<UUID>, enabledKeys: Set<String>) -> [SystemAlarmInfo] {
+        let all = (try? manager.alarms) ?? []
+        return all.map { alarm in
+            var when = "—"
+            if case .fixed(let date)? = alarm.schedule {
+                when = Format.dateTime(date)
+            } else if case .relative(let relative)? = alarm.schedule {
+                when = String(format: "%02d:%02d", relative.time.hour, relative.time.minute)
+            }
+            let key = registry.ids.first(where: { $0.value.contains(alarm.id) })?.key ?? alarm.id.uuidString
+            return SystemAlarmInfo(
+                id: alarm.id, state: String(describing: alarm.state), when: when, ownerKey: key,
+                isExtra: !isWanted(alarm.id, known: known, enabledKeys: enabledKeys)
+            )
+        }
+    }
+
+    /// После отмены проверяем, что системный будильник действительно исчез; если нет, снимаем ещё раз.
+    private func verifyGone(_ id: UUID) {
+        guard let all = try? manager.alarms else { return }
+        for alarm in all where alarm.id == id || (registry.ids[id.uuidString] ?? []).contains(alarm.id) {
+            try? manager.stop(id: alarm.id)
+            try? manager.cancel(id: alarm.id)
+        }
     }
 
     enum ScheduleState: Equatable {
@@ -296,6 +347,8 @@ final class AlarmService {
         let key = item.id.uuidString
         guard item.isEnabled else {
             markFailed(key, false)
+            // Выключенный будильник не должен звонить: проверяем, что в системе его не осталось.
+            verifyGone(item.id)
             return nil
         }
         guard await ensureAuthorization() else {

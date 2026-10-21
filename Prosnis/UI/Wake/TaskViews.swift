@@ -24,7 +24,7 @@ struct TypingTaskView: View {
                 .frame(height: 130)
         }
         .onChange(of: typed) { _, newValue in
-            if TypingFold.fold(newValue) == TypingFold.fold(sentence) { onDone() }
+            if TypingFold.matches(newValue, sentence) { onDone() }
         }
     }
 
@@ -36,7 +36,7 @@ struct TypingTaskView: View {
         for index in 0..<target.count {
             var piece = AttributedString(String(target[index]))
             if index < input.count {
-                piece.foregroundColor = TypingFold.fold(String(input[index])) == TypingFold.fold(String(target[index])) ? Color.green : Color.red
+                piece.foregroundColor = TypingFold.sameLetter(input[index], target[index]) ? Color.green : Color.red
             } else {
                 piece.foregroundColor = Color.white.opacity(0.6)
             }
@@ -312,5 +312,20 @@ struct StepsTaskView: View {
 enum TypingFold {
     static func fold(_ text: String) -> String {
         text.replacingOccurrences(of: "ё", with: "е").replacingOccurrences(of: "Ё", with: "Е")
+    }
+
+    /// Только буквы и цифры, без регистра и без «ё»: лишний пробел, тире или заглавная буква не мешают пройти задание.
+    static func letters(_ text: String) -> String {
+        String(fold(text).lowercased().filter { $0.isLetter || $0.isNumber })
+    }
+
+    static func matches(_ typed: String, _ target: String) -> Bool {
+        let expected = letters(target)
+        return !expected.isEmpty && letters(typed) == expected
+    }
+
+    /// Совпадают ли две буквы для подсветки (без учёта регистра и «ё»).
+    static func sameLetter(_ a: Character, _ b: Character) -> Bool {
+        fold(String(a)).lowercased() == fold(String(b)).lowercased()
     }
 }

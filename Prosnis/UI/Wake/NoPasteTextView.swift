@@ -25,7 +25,9 @@ struct NoPasteTextView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
-        if view.text != text { view.text = text }
+        // Печатаемый текст приходит только из самого поля. Переписывать его обратно нельзя:
+        // устаревшее значение стирало бы только что набранные буквы. Сбрасываем лишь пустое значение.
+        if text.isEmpty && !view.text.isEmpty { view.text = "" }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }

@@ -112,6 +112,11 @@ struct ProfileView: View {
                 }
 
                 Section("Проверка") {
+                    NavigationLink {
+                        SystemAlarmsView()
+                    } label: {
+                        Label("Системные будильники", systemImage: "alarm.waves.left.and.right")
+                    }
                     Button {
                         AlarmStore.shared.runTest()
                     } label: {

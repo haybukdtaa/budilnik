@@ -264,12 +264,19 @@ final class AlarmStore: ObservableObject {
     }
 
     /// Убирает системные будильники-«призраки» и фото фонов, которые больше ни к чему не относятся.
-    func cleanupOrphans() {
-        var known = Set(alarms.map(\.id))
+    /// Какие системные будильники нужны: только включённые наши, идущее утро и лекарства.
+    func wantedSystemIDs() -> (known: Set<UUID>, enabledKeys: Set<String>) {
+        let enabled = alarms.filter(\.isEnabled)
+        var known = Set(enabled.map(\.id))
         if let recheck = WakeCoordinator.shared.session?.recheckAlarmID { known.insert(recheck) }
         known.formUnion(WakeCoordinator.shared.session?.repeatAlarmIDs ?? [])
         known.formUnion(MedStore.shared.scheduledAlarmIDs)
-        service.pruneOrphans(known: known)
+        return (known, Set(enabled.map { $0.id.uuidString }))
+    }
+
+    func cleanupOrphans() {
+        let wanted = wantedSystemIDs()
+        service.pruneOrphans(known: wanted.known, enabledKeys: wanted.enabledKeys)
         let used = Set(alarms.compactMap { alarm -> String? in
             if case .photo(let name) = alarm.wallpaper { return name }
             return nil
