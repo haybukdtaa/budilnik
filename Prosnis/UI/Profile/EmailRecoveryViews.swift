@@ -8,6 +8,7 @@ struct EmailLinkView: View {
     @State private var codeSent = false
     @State private var working = false
     @State private var message: String?
+    @State private var confirmRemove = false
 
     var body: some View {
         List {
@@ -15,7 +16,7 @@ struct EmailLinkView: View {
                 Section {
                     Label(linked, systemImage: "checkmark.seal.fill").foregroundStyle(Theme.mint)
                     Button("Отвязать почту", role: .destructive) {
-                        run { await AccountStore.shared.removeEmail() }
+                        if settings.data.restoredByEmail { confirmRemove = true } else { run { await AccountStore.shared.removeEmail() } }
                     }
                 } footer: {
                     Text("Если потеряете телефон и код из 16 слов, аккаунт можно вернуть через письмо на эту почту: Профиль → Восстановить аккаунт.")
@@ -57,6 +58,11 @@ struct EmailLinkView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Theme.background)
+        .confirmationDialog("Это единственный способ вернуть аккаунт: кода из 16 слов на этом телефоне нет. Отвязать почту?",
+                            isPresented: $confirmRemove, titleVisibility: .visible) {
+            Button("Отвязать", role: .destructive) { run { await AccountStore.shared.removeEmail() } }
+            Button("Отмена", role: .cancel) {}
+        }
         .navigationTitle("Почта для восстановления")
         .navigationBarTitleDisplayMode(.inline)
     }

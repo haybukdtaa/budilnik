@@ -117,6 +117,7 @@ struct RootView: View {
     @State private var consentPostponed = false
     /// Окно документов и согласий закрыли («Позже»): до следующего запуска не спрашиваем.
     @State private var legalPostponed = false
+    @State private var showLegalSheet = false
 
     /// Запуск с «-screenshotTab N» (для скриншотов в автотестах): сразу вкладка N с тестовыми данными.
     /// Работает только в отладочной сборке.
@@ -204,6 +205,21 @@ struct RootView: View {
             if let session = wake.session, session.phase == .waiting {
                 RecheckBanner(session: session)
             }
+            if legalToShow {
+                // Не окно поверх экрана, а плашка: человека не перебивают, пока он занят.
+                HStack(spacing: 10) {
+                    Image(systemName: "doc.text")
+                    Text("Нужно ваше решение по документам и согласиям")
+                        .font(.app(.footnote))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Открыть") { showLegalSheet = true }
+                        .font(.app(.footnote).weight(.semibold))
+                    Button { legalPostponed = true } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("Скрыть до следующего запуска")
+                }
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(Theme.mint.opacity(0.18))
+            }
             TabView(selection: $tab) {
                 AlarmListView()
                     .tag(0)
@@ -277,10 +293,10 @@ struct RootView: View {
                 .interactiveDismissDisabled()
             }
             .sheet(isPresented: Binding(
-                get: { legalToShow && chargeToShow == nil && reconsentAmount == nil },
-                set: { if !$0 { legalPostponed = true } }
+                get: { showLegalSheet && legalToShow && chargeToShow == nil && reconsentAmount == nil },
+                set: { if !$0 { showLegalSheet = false; legalPostponed = true } }
             )) {
-                ConsentGateSheet { legalPostponed = true }
+                ConsentGateSheet { showLegalSheet = false; legalPostponed = true }
                     .preferredColorScheme(.dark)
             }
             .sheet(item: $wake.note) { state in

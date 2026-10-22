@@ -57,7 +57,7 @@ final class SyncEngine: ObservableObject {
         if needsMerge {
             let result = file.loadWithState()
             switch result.state {
-            case .loaded:
+            case .loaded, .salvaged:
                 var merged = result.value ?? []
                 for item in items { merged = SyncEngine.merged(merged, adding: item) }
                 items = merged

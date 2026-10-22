@@ -195,12 +195,19 @@ struct ConsentRequestSheet: View {
     let onGranted: () -> Void
     @Environment(\.dismiss) private var dismiss
 
+    /// Особые согласия имеют смысл только вместе с соглашением и согласием на обработку.
+    private var blocked: Bool { !kind.requiredForServer && !ConsentRules.serverAllowed(settings.data.consents) }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Text(kind.title).font(.app(.title3, weight: .bold))
                     Text(kind.summary)
+                    if blocked {
+                        Text("Сначала дайте согласие на условия и на обработку персональных данных (Профиль → Документы и согласия): без них серверные функции выключены.")
+                            .font(.app(.footnote)).foregroundStyle(.orange)
+                    }
                     if let document = kind.document {
                         NavigationLink("Прочитать полный текст") { LegalDocumentView(kind: document) }
                     }
@@ -216,6 +223,7 @@ struct ConsentRequestSheet: View {
                             .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 12))
                             .foregroundStyle(.white)
                     }
+                    .disabled(blocked).opacity(blocked ? 0.4 : 1)
                     Button("Не сейчас") { dismiss() }
                         .frame(maxWidth: .infinity)
                 }

@@ -43,6 +43,7 @@ final class AccountStore: ObservableObject {
         case BackendError.notFound: return "Аккаунт с такой почтой не найден."
         case BackendError.invalidCode, BackendError.forbidden: return "Код не подошёл или устарел. Запросите новый."
         case BackendError.rateLimited: return "Слишком много попыток. Подождите немного и повторите."
+        case BackendError.roomFull: return "Эта почта уже привязана к другому аккаунту."
         case BackendError.serverUnavailable: return "Нет связи с сервером. Повторите позже."
         default: return "Не получилось. Повторите позже."
         }
@@ -58,6 +59,8 @@ final class AccountStore: ObservableObject {
         do {
             try await backend.requestEmailCode(email: email, restore: restore)
             return nil
+        } catch BackendError.invalidCode {
+            return "Проверьте адрес почты."
         } catch {
             return message(for: error)
         }
@@ -191,6 +194,14 @@ final class AccountStore: ObservableObject {
             return
         }
         guard Keychain.exists(AccountStore.phraseKey) == false else { return }
+        // Приложение переустановили после восстановления по почте: ключ и номер аккаунта есть, кода из 16 слов нет и не было.
+        if let userID = Keychain.get(AccountStore.userIDKey).flatMap(UUID.init(uuidString:)),
+           Keychain.get(AccountStore.secretKey) != nil {
+            switchProfile(to: userID)
+            AppSettings.shared.data.identityCreated = true
+            AppSettings.shared.data.restoredByEmail = true
+            return
+        }
         // Код когда-то был, а теперь пропал: новый не создаём, человек вводит свой (см. needsRecoveryCode).
         guard !AppSettings.shared.data.identityCreated else { return }
         let phrase = RecoveryPhrase.generate()
@@ -385,9 +396,12 @@ final class AccountStore: ObservableObject {
         // Удаление на сервере работает всегда, в том числе после отзыва согласия.
         let backend: SocialBackend
         if let url = AppConfig.serverURL { backend = BackendRegistry.httpBackend(url) } else { backend = BackendRegistry.current }
-        if backend.isOnline && !backend.isDemo {
+        // Без токена на сервере для этого телефона ничего нет, удалять там нечего: локальная очистка не блокируется.
+        if backend.isOnline && !backend.isDemo && isSignedIn {
             do {
                 try await backend.deleteAccount()
+            } catch BackendError.notFound {
+                // Аккаунта на сервере уже нет.
             } catch {
                 return "Сервер не подтвердил удаление аккаунта: \(error.localizedDescription) Данные на телефоне не тронуты, попробуйте позже."
             }
@@ -451,9 +465,12 @@ enum BackendRegistry {
 @MainActor
 enum ConsentSync {
     static func flush() async {
-        guard let url = AppConfig.serverURL, AccountStore.shared.isSignedIn else { return }
+        guard let url = AppConfig.serverURL else { return }
         let records = AppSettings.shared.data.unsentConsents
         guard !records.isEmpty else { return }
+        // Согласие только что дано, а токена ещё нет: сначала входим, потом отправляем.
+        if !AccountStore.shared.isSignedIn { await AccountStore.shared.ensureSignedIn() }
+        guard AccountStore.shared.isSignedIn else { return }
         do {
             try await BackendRegistry.httpBackend(url).recordConsents(records)
             let sent = Set(records.map(\.id))

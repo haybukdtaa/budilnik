@@ -5,6 +5,7 @@ enum FileLoadState: Equatable {
     case loaded
     case unreadable  // файл есть, но закрыт (телефон ещё не разблокировали после включения)
     case corrupt     // файл есть, но не читается как данные (несовместимая версия)
+    case salvaged    // файл прочитан не полностью: часть записей пропущена
 }
 
 /// Список, который можно прочитать по одной записи: непонятные записи пропускаются, а не обнуляют весь список.
@@ -46,7 +47,7 @@ struct FileStore<Value: Codable> {
         // Исходный файл при первой же записи сохраняется рядом копией (см. save).
         if let lossy = (Value.self as Any.Type) as? LossyDecodable.Type,
            let salvaged = lossy.lossyDecode(data) as? Value {
-            return (salvaged, .loaded)
+            return (salvaged, .salvaged)
         }
         return (nil, .corrupt)
     }

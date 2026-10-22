@@ -50,6 +50,15 @@ final class HealthCheck: ObservableObject {
             isOK: notificationsOK
         ))
 
+        if AppConfig.serverURL != nil {
+            let filled = LegalOperator.isFilled
+            list.append(Item(
+                id: "legal-operator", title: "Данные оператора в документах",
+                detail: filled ? "Заполнены" : "Не заполнены: в политике и соглашении остались заглушки. Заполните LegalOperator до запуска сервера.",
+                isOK: filled
+            ))
+        }
+
         let enabled = AlarmStore.shared.alarms.filter(\.isEnabled)
         if enabled.contains(where: { $0.effectiveTask == .steps }) {
             let status = CMPedometer.authorizationStatus()

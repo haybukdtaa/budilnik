@@ -147,14 +147,14 @@ final class JournalStore: ObservableObject {
         entries += (result.value ?? []).filter { !known.contains($0.id) }
         entries.sort { $0.date > $1.date }
         needsMerge = false
-        if result.state == .loaded { file.save(entries) }
+        if result.state == .loaded || result.state == .salvaged { file.save(entries) }
     }
 
     private func save() {
         if needsMerge {
             let result = file.loadWithState()
             switch result.state {
-            case .loaded:
+            case .loaded, .salvaged:
                 let known = Set(entries.map(\.id))
                 entries += (result.value ?? []).filter { !known.contains($0.id) }
                 entries.sort { $0.date > $1.date }

@@ -18,6 +18,8 @@ final class AlarmStore: ObservableObject {
     private var loadFailed = false
     /// Файл есть, но не прочитался как список: пустой список не должен снимать все системные будильники.
     private var loadCorrupt = false
+    /// Часть записей не прочиталась: до перезапуска ничего не удаляем из системы, даже после сохранения.
+    private var loadSalvaged = false
 
     private init() {
         load()
@@ -43,6 +45,10 @@ final class AlarmStore: ObservableObject {
         alarms = result.value ?? []
         loadFailed = result.state == .unreadable
         loadCorrupt = result.state == .corrupt
+        if result.state == .salvaged {
+            loadSalvaged = true
+            message = "Часть будильников не удалось прочитать (возможно, они из другой версии). Остальные сохранены. Копия исходного файла лежит в Профиль → Здоровье приложения."
+        }
         // Данные старых версий без даты создания: считаем созданными сейчас, иначе одноразовый будильник «звонил» бы в 1 году.
         if alarms.contains(where: { $0.createdAt == nil }) {
             let now = Date()
@@ -288,7 +294,7 @@ final class AlarmStore: ObservableObject {
 
     func cleanupOrphans() {
         // Список не прочитался (телефон не разблокирован): пустой список снял бы все будильники.
-        guard !loadFailed, !loadCorrupt else { return }
+        guard !loadFailed, !loadCorrupt, !loadSalvaged else { return }
         let wanted = wantedSystemIDs()
         service.pruneOrphans(known: wanted.known, enabledKeys: wanted.enabledKeys)
         let used = Set(alarms.compactMap { alarm -> String? in
