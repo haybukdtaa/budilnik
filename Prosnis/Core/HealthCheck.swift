@@ -54,7 +54,7 @@ final class HealthCheck: ObservableObject {
             let filled = LegalOperator.isFilled
             list.append(Item(
                 id: "legal-operator", title: "Данные оператора в документах",
-                detail: filled ? "Заполнены" : "Не заполнены: в политике и соглашении остались заглушки. Заполните LegalOperator до запуска сервера.",
+                detail: filled ? "Заполнены" : "Не заполнены: в политике и соглашении остались заглушки вместо названия и адреса оператора. Нужно вписать реквизиты до запуска сервера.",
                 isOK: filled
             ))
         }
@@ -113,6 +113,7 @@ final class HealthCheck: ObservableObject {
     /// Перечитывает данные после возврата из копии.
     func reloadStores() {
         AlarmStore.shared.reload()
+        AlarmStore.shared.resyncAllEnabled()
         WakeCoordinator.shared.reload()
         JournalStore.shared.reload()
         ChallengeStore.shared.reload()

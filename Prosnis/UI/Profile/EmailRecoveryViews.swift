@@ -126,8 +126,9 @@ struct RestoreByEmailView: View {
                             done = error == nil
                         }
                     }
-                    .disabled(working || EmailAddress.normalizeCode(code) == nil)
+                    .disabled(working || done || EmailAddress.normalizeCode(code) == nil)
                     Button("Ввести другой адрес") { codeSent = false; code = "" }
+                        .disabled(done)
                 }
             }
             if let result {

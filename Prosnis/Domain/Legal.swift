@@ -120,7 +120,7 @@ enum EmailAddress {
 
     /// Код из письма: ровно 6 цифр.
     static func normalizeCode(_ text: String) -> String? {
-        let digits = text.filter(\.isNumber)
+        let digits = text.filter { $0.isASCII && $0.isNumber }
         return digits.count == 6 ? digits : nil
     }
 }

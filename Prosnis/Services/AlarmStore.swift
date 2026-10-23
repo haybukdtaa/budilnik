@@ -304,6 +304,12 @@ final class AlarmStore: ObservableObject {
         WallpaperStorage.deleteAll(except: used)
     }
 
+    /// После возврата из копии включённые будильники нужно заново поставить в систему.
+    func resyncAllEnabled() {
+        guard service.isAuthorized else { return }
+        for item in alarms where item.isEnabled { sync(item) }
+    }
+
     func runTest() {
         Task { message = await service.scheduleTest(after: 60) }
     }

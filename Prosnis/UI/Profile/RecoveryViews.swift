@@ -87,7 +87,7 @@ struct RestoreAccountView: View {
                         done = error == nil
                     }
                 }
-                .disabled(working || RecoveryPhrase.parse(text) == nil)
+                .disabled(working || done || RecoveryPhrase.parse(text) == nil)
             }
             if let result {
                 Section {

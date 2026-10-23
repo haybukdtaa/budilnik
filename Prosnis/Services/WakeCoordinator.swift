@@ -353,6 +353,7 @@ final class WakeCoordinator: ObservableObject {
         guard let (first, firstRing) = ringing.first else { return }
         // Задание начато без нажатия «Выключить»: звонок мог продолжаться, останавливаем его.
         service.stop(id: first.id)
+        for systemID in service.registeredIDs(for: first.id) { service.stop(id: systemID) }
         // Остальные прозвеневшие будильники ждут в очереди, а не считаются проспанными.
         let rest = ringing.dropFirst()
         begin(
@@ -541,7 +542,6 @@ final class WakeCoordinator: ObservableObject {
         case .failed: eventKind = .failed
         case .technical: eventKind = .technical
         }
-        emit(eventKind, session: finished, at: TrustedClock.now)
         let before = ProgressEngine.compute(entries: JournalStore.shared.realEntries, challenges: ChallengeStore.shared.challenges)
 
         let entry = JournalEntry(
@@ -566,10 +566,13 @@ final class WakeCoordinator: ObservableObject {
         // Запись для этого звонка уже есть (приложение закрыли между записью и удалением утра): не дублируем.
         let alreadyRecorded = !finished.isDemo && JournalStore.shared.hasEntry(alarmID: finished.alarmID, near: entry.date)
         if alreadyRecorded {
-            // Итог уже записан раньше и считается верным: второй раз ни дневник, ни платёж не трогаем.
+            // Итог уже записан раньше и считается верным: второй раз ни дневник, ни платёж, ни сервер не трогаем.
+            // Очередь других звонков при этом не теряется.
             setSession(nil)
+            startQueued(finished.queuedAlarmIDs ?? [], rings: finished.queuedRings ?? [:], now: TrustedClock.now)
             return
         }
+        emit(eventKind, session: finished, at: TrustedClock.now)
         JournalStore.shared.add(entry)
         setSession(nil)
 

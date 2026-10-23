@@ -75,6 +75,8 @@ struct ProsnisApp: App {
         }
         store.refreshExpected()
         store.refreshDatedAlarms()
+        // Лекарства читаем до чистки: иначе их напоминания могли бы показаться «лишними».
+        MedStore.shared.reloadIfNeeded()
         store.resyncFailed()
         store.cleanupOrphans()
         await DeadlineNotifications.refresh()
@@ -175,6 +177,8 @@ struct RootView: View {
     }
 
     /// Нужно ли показать окно документов и согласий (не поверх задания, утра, фокус-сессии).
+    private var legalSheetVisible: Bool { showLegalSheet && legalToShow && chargeToShow == nil && reconsentAmount == nil }
+
     private var legalToShow: Bool {
         guard !legalPostponed, settings.data.onboardingDone, wake.session == nil, wake.morning == nil, wake.note == nil,
               !focus.showsCover, RootView.screenshotTab == nil, RootView.screenshotScreen == nil else { return false }
@@ -293,11 +297,15 @@ struct RootView: View {
                 .interactiveDismissDisabled()
             }
             .sheet(isPresented: Binding(
-                get: { showLegalSheet && legalToShow && chargeToShow == nil && reconsentAmount == nil },
+                get: { legalSheetVisible },
                 set: { if !$0 { showLegalSheet = false; legalPostponed = true } }
             )) {
                 ConsentGateSheet { showLegalSheet = false; legalPostponed = true }
                     .preferredColorScheme(.dark)
+            }
+            .onChange(of: legalSheetVisible) { _, visible in
+                // Окно скрылось само (утро, списание): не показывать его снова, когда те экраны закроются.
+                if !visible { showLegalSheet = false }
             }
             .sheet(item: $wake.note) { state in
                 NoteView(state: state)

@@ -161,6 +161,13 @@ final class AppSettings: ObservableObject {
         loadFailed = result.state == .unreadable
     }
 
+    /// Приватность из копии аккаунта: сохраняется на телефоне, но не отправляется обратно на сервер как «выключено».
+    func applyRestoredPrivacy(_ privacy: PrivacySettings) {
+        suppressSideEffects = true
+        data.privacy = privacy
+        suppressSideEffects = false
+    }
+
     /// Перечитывает настройки с диска без побочных действий.
     func reload() {
         let result = file.loadWithState()
@@ -195,7 +202,9 @@ final class AppSettings: ObservableObject {
     /// Решение уходит на сервер как доказательство, когда есть связь.
     func setConsent(_ kind: ConsentKind, granted: Bool) {
         if let existing = data.consents[kind.rawValue], existing.granted == granted, existing.version == LegalVersion.current { return }
-        let hash = kind.document.map { ConsentRules.hash(LegalTexts.document($0).plainText) }
+        let hash: String? = kind == .terms
+            ? ConsentRules.hash(LegalTexts.document(.terms).plainText + LegalTexts.document(.privacy).plainText)
+            : kind.document.map { ConsentRules.hash(LegalTexts.document($0).plainText) }
         let now = TrustedClock.now
         data.consents[kind.rawValue] = ConsentEntry(version: LegalVersion.current, date: now, granted: granted, textHash: hash)
         var pending = data.unsentConsents

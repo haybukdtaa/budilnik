@@ -121,6 +121,8 @@ final class AccountStore: ObservableObject {
             return message(for: error)
         }
         if hasLocalData { return "Пока шло восстановление, на телефоне появились свои данные. Удалите их в Профиле и повторите." }
+        // Неотправленные изменения этого телефона не должны уйти в восстановленный аккаунт.
+        SyncEngine.shared.clear()
         guard Keychain.set(secret, for: AccountStore.secretKey, migratable: true),
               Keychain.set(result.userID.uuidString, for: AccountStore.userIDKey, migratable: true) else {
             return "Не удалось сохранить ключ на телефоне. Разблокируйте телефон и повторите."
@@ -190,6 +192,7 @@ final class AccountStore: ObservableObject {
             let userID = Keychain.get(AccountStore.userIDKey).flatMap(UUID.init(uuidString:))
                 ?? cacheUserID(for: phrase)
             if let userID { switchProfile(to: userID) }
+            if !AppSettings.shared.data.identityCreated { AppSettings.shared.data.pendingRestoreMerge = true }
             AppSettings.shared.data.identityCreated = true
             return
         }
@@ -198,6 +201,7 @@ final class AccountStore: ObservableObject {
         if let userID = Keychain.get(AccountStore.userIDKey).flatMap(UUID.init(uuidString:)),
            Keychain.get(AccountStore.secretKey) != nil {
             switchProfile(to: userID)
+            if !AppSettings.shared.data.identityCreated { AppSettings.shared.data.pendingRestoreMerge = true }
             AppSettings.shared.data.identityCreated = true
             AppSettings.shared.data.restoredByEmail = true
             return
@@ -354,7 +358,7 @@ final class AccountStore: ObservableObject {
                 profile.id = AppSettings.shared.data.profile.id
                 AppSettings.shared.data.profile = profile
             }
-            if let privacy = snapshot.privacy { AppSettings.shared.data.privacy = privacy }
+            if let privacy = snapshot.privacy { AppSettings.shared.applyRestoredPrivacy(privacy) }
             AlarmStore.shared.mergeRestored(snapshot.alarms ?? [])
             JournalStore.shared.mergeRestored(snapshot.journal ?? [])
             ChallengeStore.shared.mergeRestored(snapshot.challenges ?? [])

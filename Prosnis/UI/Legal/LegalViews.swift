@@ -78,6 +78,8 @@ struct ConsentChoice: Equatable {
     func apply(to settings: AppSettings) {
         for kind in ConsentKind.allCases {
             let existing = settings.data.consents[kind.rawValue]
+            // Согласие на старую редакцию, которое не подтвердили заново, не считается отзывом: сервер об этом не уведомляем.
+            if let existing, existing.granted, existing.version != LegalVersion.current, !self[kind] { continue }
             if kind == .terms || existing != nil || self[kind] {
                 settings.setConsent(kind, granted: self[kind])
             }
@@ -196,7 +198,7 @@ struct ConsentRequestSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     /// Особые согласия имеют смысл только вместе с соглашением и согласием на обработку.
-    private var blocked: Bool { !kind.requiredForServer && !ConsentRules.serverAllowed(settings.data.consents) }
+    private var blocked: Bool { !kind.requiredForServer && kind != .marketing && !ConsentRules.serverAllowed(settings.data.consents) }
 
     var body: some View {
         NavigationStack {

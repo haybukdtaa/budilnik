@@ -18,6 +18,7 @@ final class LegalAndRecoveryTests: XCTestCase {
         XCTAssertEqual(EmailAddress.normalizeCode("123 456"), "123456")
         XCTAssertNil(EmailAddress.normalizeCode("12345"))
         XCTAssertNil(EmailAddress.normalizeCode("1234567"))
+        XCTAssertNil(EmailAddress.normalizeCode("١٢٣٤٥٦"), "Цифры не из латиницы сервер не примет")
     }
 
     // MARK: Согласия
