@@ -8,18 +8,21 @@ extension Font {
     }
 }
 
-/// Кнопка с бордовой заливкой, как в логотипе.
+/// Кнопка из «закалённого стекла»: полупрозрачная ледяная заливка, тонкая рамка, светлый текст.
+/// Имя осталось прежним, чтобы не трогать все экраны.
 struct BurgundyButtonStyle: ButtonStyle {
-    var color: Color = Theme.burgundy
+    var color: Color = Theme.accent
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 14)
         configuration.label
             .font(.app(.headline))
-            .foregroundStyle(.white)
+            .foregroundStyle(color == .red ? Color.white : Theme.glassText)
             .padding(.horizontal, 20)
             .padding(.vertical, 11)
-            .background(color.opacity(configuration.isPressed ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 12))
+            .background(color.opacity(configuration.isPressed ? 0.34 : 0.22), in: shape)
+            .overlay(shape.strokeBorder(color.opacity(0.55), lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.4)
     }
 }
@@ -31,25 +34,31 @@ extension ButtonStyle where Self == BurgundyButtonStyle {
 }
 
 enum Theme {
-    /// Чёрный фон, строгие тёмно-серые блоки; цвета — из логотипа: роза и бордо.
-    static let background = Color.black
-    static let card = Color(white: 0.11)
+    /// «Закалённое стекло»: тёмный фон с холодным свечением сверху, полупрозрачные блоки, ледяной акцент.
+    static let background = LinearGradient(
+        colors: [Color(red: 0.086, green: 0.165, blue: 0.247), Color(red: 0.027, green: 0.043, blue: 0.067), Color(red: 0.020, green: 0.031, blue: 0.047)],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+    static let card = Color.white.opacity(0.07)
     static let ink = Color.white
-    /// Роза логотипа: ссылки, активная вкладка, выделения.
-    static let accent = Color(red: 0.847, green: 0.380, blue: 0.443)
-    /// Бордо логотипа: кнопки и заливки.
-    static let burgundy = Color(red: 0.557, green: 0.184, blue: 0.282)
+    /// Ледяной голубой: ссылки, активная вкладка, выделения.
+    static let accent = Color(red: 0.561, green: 0.816, blue: 1.0)
+    /// Глубокий голубой: заливки и рамки (имя от прежней палитры).
+    static let burgundy = Color(red: 0.290, green: 0.639, blue: 0.871)
     /// Включённый переключатель.
-    static let toggle = Color(red: 0.690, green: 0.227, blue: 0.333)
+    static let toggle = Color(red: 0.290, green: 0.639, blue: 0.871)
     static let accentGradient = LinearGradient(
-        colors: [Color(red: 0.478, green: 0.149, blue: 0.251), Color(red: 0.651, green: 0.208, blue: 0.322)],
+        colors: [Color(red: 0.180, green: 0.447, blue: 0.690), Color(red: 0.290, green: 0.639, blue: 0.871)],
         startPoint: .leading,
         endPoint: .trailing
     )
     /// Тонкие линии между строками.
-    static let separator = Color(white: 0.17)
-    /// Глубокий бордо цифр на циферблате.
-    static let numeral = Color(red: 0.369, green: 0.165, blue: 0.220)
+    static let separator = Color.white.opacity(0.10)
+    /// Приглушённый ледяной цвет цифр на циферблате.
+    static let numeral = Color(red: 0.200, green: 0.340, blue: 0.470)
+    /// Светлый текст на стеклянных кнопках.
+    static let glassText = Color(red: 0.875, green: 0.949, blue: 1.0)
     /// Цвет лекарств: мягкий мятный, чтобы с первого взгляда отличаться от будильников подъёма.
     static let mint = Color(red: 0.30, green: 0.64, blue: 0.62)
 
